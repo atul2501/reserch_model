@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.lifecycle import mark_dead, update_equity
+from app.agents.lifecycle import update_equity
 from app.analytics.pnl_engine import compute_trade_pnl, compute_unrealized_pnl
 from app.core.config import get_settings
 from app.core.logging import get_logger

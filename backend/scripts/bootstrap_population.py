@@ -15,7 +15,6 @@ from app.agents.lifecycle import create_generation
 from app.core.config import get_settings
 from app.core.database import session_scope
 from app.core.logging import configure_logging, get_logger
-from app.models.enums import StrategyFamily
 from app.models.strategy import Generation, Strategy, StrategyVersion
 from app.strategies.factory import generate_population_dna
 

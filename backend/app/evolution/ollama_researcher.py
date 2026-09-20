@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import json
 
+import httpx
+
 from app.schemas.strategy_dna import StrategyCandidate
-from app.services.ollama_client import OllamaClient, OllamaResponseError
+from app.services.ollama_client import OllamaClient, OllamaError
 
 _SYSTEM_PROMPT = """You are the evolutionary research analyst for a crypto trading
 strategy laboratory. You will be given a summary of recent population
@@ -61,5 +63,5 @@ async def propose_candidate(client: OllamaClient, research_summary: dict) -> Str
             temperature=0.6,
         )
         return candidate
-    except OllamaResponseError:
+    except (OllamaError, httpx.HTTPError):
         return None

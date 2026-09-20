@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.agents.decision_loop import run_decision_cycle
 from app.agents.lifecycle import is_population_extinct, record_extinction

@@ -9,17 +9,18 @@ from __future__ import annotations
 
 import asyncio
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.council.analysts import ANALYST_FOCUS, run_analyst
+from app.council.analysts import run_analyst
 from app.council.consensus import apply_judge, compute_consensus
 from app.models.council import CouncilAnalysis, CouncilDecision
 from app.models.enums import Bias
 from app.schemas.council import ANALYST_NAMES, AnalystResponse, ConsensusResult, JudgeResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient, OllamaResponseError
+from app.services.ollama_client import OllamaClient, OllamaError
 
 logger = get_logger(__name__)
 
@@ -124,8 +125,8 @@ async def _run_judge(client: OllamaClient, context: MarketContext, responses: li
             system_prompt=_JUDGE_SYSTEM_PROMPT, user_prompt=user_prompt, response_model=JudgeResponse
         )
         return judge_response
-    except OllamaResponseError:
-        logger.error("council.judge_failed", candle_open_time=context.candle_open_time)
+    except (OllamaError, httpx.HTTPError) as exc:
+        logger.error("council.judge_failed", candle_open_time=context.candle_open_time, error=str(exc))
         return None
 
 

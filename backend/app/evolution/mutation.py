@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import random
 
-from app.schemas.strategy_dna import Condition, RuleSet, StrategyDNA
+from app.schemas.strategy_dna import StrategyDNA
 
 MUTATION_RATE = 0.3  # probability any given mutable field is touched
 

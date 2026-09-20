@@ -9,8 +9,6 @@ no call is made.
 from __future__ import annotations
 
 import asyncio
-import time
-import uuid
 
 from app.core.config import get_settings
 from app.core.logging import get_logger

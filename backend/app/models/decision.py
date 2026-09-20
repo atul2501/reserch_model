@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import BigInteger, Float, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column

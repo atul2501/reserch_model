@@ -4,9 +4,14 @@ unstructured text is allowed to reach the trading engine.
 """
 from __future__ import annotations
 
+import httpx
+
+from app.core.logging import get_logger
 from app.schemas.council import ANALYST_NAMES, AnalystResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient, OllamaResponseError
+from app.services.ollama_client import OllamaClient, OllamaError
+
+logger = get_logger(__name__)
 
 ANALYST_FOCUS = {
     "trend": "Assess directional trend strength using EMA/SMA alignment and slope. Ignore short-term noise.",
@@ -51,13 +56,19 @@ def build_prompt(analyst: str, context: MarketContext) -> tuple[str, str]:
 
 
 async def run_analyst(client: OllamaClient, analyst: str, context: MarketContext) -> AnalystResponse | None:
-    """Returns None (analyst abstains) rather than raising, so one bad
-    Ollama response never blocks the rest of the council."""
+    """Returns None (analyst abstains) rather than raising, so one bad or
+    unreachable Ollama call never blocks the rest of the council or crashes
+    the whole trading cycle (spec section 41: on failure, fall back toward
+    HOLD rather than propagate). Catches OllamaError (timeout/rate-limit/
+    malformed-response, after internal retries are exhausted) and any raw
+    httpx transport error (e.g. connection refused) that isn't otherwise
+    wrapped by OllamaClient."""
     system_prompt, user_prompt = build_prompt(analyst, context)
     try:
         response, _stats = await client.generate_structured(
             system_prompt=system_prompt, user_prompt=user_prompt, response_model=AnalystResponse
         )
         return response
-    except OllamaResponseError:
+    except (OllamaError, httpx.HTTPError) as exc:
+        logger.error("council.analyst_failed", analyst=analyst, error=str(exc))
         return None

@@ -6,13 +6,10 @@ market data themselves.
 """
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import BigInteger, Float, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Float, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin

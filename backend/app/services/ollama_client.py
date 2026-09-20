@@ -116,7 +116,6 @@ class OllamaClient:
         retries_used = 0
 
         async def _attempt() -> dict[str, Any]:
-            nonlocal retries_used
             async with self._semaphore:
                 try:
                     resp = await self._client.post(
