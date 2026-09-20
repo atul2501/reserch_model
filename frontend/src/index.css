@@ -1,12 +1,43 @@
 @import "tailwindcss";
 
+@theme {
+  /* surfaces */
+  --color-bg: #060810;
+  --color-surface: #0b0e17;
+  --color-surface-2: #10141f;
+  --color-surface-3: #151a27;
+  --color-surface-4: #1a2030;
+
+  /* lines */
+  --color-line: #1c2230;
+  --color-line-strong: #2a3244;
+
+  /* text */
+  --color-text: #d8dee9;
+  --color-text-strong: #f2f4f8;
+  --color-muted: #7c8494;
+  --color-muted-2: #565e6e;
+
+  /* accents (a "-dim" variant of each is used for pill/badge backgrounds) */
+  --color-accent-blue: #6ea8ff;
+  --color-accent-blue-dim: rgba(110, 168, 255, 0.13);
+  --color-accent-green: #3fd096;
+  --color-accent-green-dim: rgba(63, 208, 150, 0.13);
+  --color-accent-red: #f16b7c;
+  --color-accent-red-dim: rgba(241, 107, 124, 0.13);
+  --color-accent-amber: #e2ac57;
+  --color-accent-amber-dim: rgba(226, 172, 87, 0.13);
+  --color-accent-purple: #b494ef;
+  --color-accent-purple-dim: rgba(180, 148, 239, 0.13);
+}
+
 :root {
   color-scheme: dark;
 }
 
 body {
-  background-color: #0a0e14;
-  color: #d8dee9;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
@@ -19,9 +50,57 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0e14;
+  background: var(--color-surface);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a3140;
+  background: var(--color-line-strong);
   border-radius: 4px;
+}
+
+/* ---- KPI stat card: bordered box with a colored left accent bar ---- */
+.stat-card {
+  position: relative;
+  padding: 0.75rem 0.9rem 0.75rem 1.1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  opacity: 0.85;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-line-strong);
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.5);
+}
+
+.stat-card--blue::before { background: var(--color-accent-blue); }
+.stat-card--green::before { background: var(--color-accent-green); }
+.stat-card--red::before { background: var(--color-accent-red); }
+.stat-card--amber::before { background: var(--color-accent-amber); }
+.stat-card--purple::before { background: var(--color-accent-purple); }
+.stat-card--neutral::before { background: var(--color-muted-2); }
+
+/* ---- skeleton loading shimmer ---- */
+@keyframes shimmer {
+  from { background-position: -220px 0; }
+  to { background-position: 220px 0; }
+}
+
+.skeleton {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-surface-3) 25%, var(--color-surface-4) 50%, var(--color-surface-3) 75%);
+  background-size: 440px 100%;
+  animation: shimmer 1.4s linear infinite;
 }

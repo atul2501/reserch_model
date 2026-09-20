@@ -1,26 +1,46 @@
+import type { ReactNode } from "react";
+
+type Tone = "neutral" | "positive" | "negative" | "warning";
+
+const TONE_TO_ACCENT: Record<Tone, string> = {
+  neutral: "blue",
+  positive: "green",
+  negative: "red",
+  warning: "amber",
+};
+
 export function StatTile({
   label,
   value,
   tone = "neutral",
   sub,
+  loading = false,
 }: {
   label: string;
-  value: string;
-  tone?: "neutral" | "positive" | "negative" | "warning";
+  value: ReactNode;
+  tone?: Tone;
   sub?: string;
+  loading?: boolean;
 }) {
-  const toneClass = {
-    neutral: "text-slate-200",
-    positive: "text-emerald-400",
-    negative: "text-rose-400",
-    warning: "text-amber-400",
-  }[tone];
+  const accent = TONE_TO_ACCENT[tone];
+
+  if (loading) {
+    return (
+      <div className={`stat-card stat-card--${accent}`}>
+        <div className="skeleton mb-3 h-[9px] w-3/5" />
+        <div className="skeleton mb-2.5 h-5 w-2/5" />
+        <div className="skeleton h-[9px] w-3/4" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wider text-slate-500">{label}</span>
-      <span className={`font-mono-num text-lg font-medium ${toneClass}`}>{value}</span>
-      {sub && <span className="text-[11px] text-slate-600">{sub}</span>}
+    <div className={`stat-card stat-card--${accent}`}>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wider text-muted">{label}</span>
+        <span className="font-mono-num text-lg font-medium text-text-strong">{value}</span>
+        {sub && <span className="text-[11px] text-muted-2">{sub}</span>}
+      </div>
     </div>
   );
 }
