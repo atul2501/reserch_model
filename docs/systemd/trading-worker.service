@@ -1,0 +1,18 @@
+[Unit]
+Description=Trading Lab worker (market ingestion / council / agent decision loop)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/reserch_model/backend
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/ec2-user/.venv/bin/python -m scripts.run_cycle
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
