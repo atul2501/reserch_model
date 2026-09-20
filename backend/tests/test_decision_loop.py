@@ -1,0 +1,155 @@
+"""Integration test for the per-candle agent decision loop: entry, exit,
+and the full audit trail (spec sections 12/18/19/20/32/45)."""
+from __future__ import annotations
+
+import uuid
+
+import pytest
+from sqlalchemy import select
+
+from app.agents.decision_loop import run_decision_cycle
+from app.agents.lifecycle import create_generation
+from app.execution.paper_adapter import PaperExecutionAdapter
+from app.models.agent import Agent
+from app.models.decision import Decision
+from app.models.enums import RiskDecision, StrategyFamily
+from app.models.strategy import Strategy, StrategyVersion
+from app.models.trading import Order, Position, Trade
+from app.schemas.market_context import (
+    MarketContext,
+    MomentumFeatures,
+    PriceActionFeatures,
+    RegimeState,
+    StructureFeatures,
+    TrendFeatures,
+    VolatilityFeatures,
+    VolumeFeatures,
+)
+from app.schemas.strategy_dna import Condition, PositionSizing, RiskProfile, RuleSet, StrategyDNA
+
+
+def _context(open_time: int, close: float, rsi: float, trend_strength: float) -> MarketContext:
+    return MarketContext(
+        symbol="SOL",
+        timeframe="1m",
+        candle_open_time=open_time,
+        close_price=close,
+        trend=TrendFeatures(ema_fast=close, ema_slow=close - 1, sma_fast=close, sma_slow=close, ema_slope=0.1, trend_strength=trend_strength),
+        momentum=MomentumFeatures(rsi_14=rsi, macd=0.1, macd_signal=0.05, macd_hist=0.05, roc_10=1.0),
+        volatility=VolatilityFeatures(atr_14=0.5, realized_vol=0.02, volatility_percentile=0.5, bb_upper=close + 2, bb_middle=close, bb_lower=close - 2, bb_width=0.02),
+        structure=StructureFeatures(),
+        volume=VolumeFeatures(volume_sma_20=1000, volume_ratio=1.0, volume_spike=False, vwap=close),
+        price_action=PriceActionFeatures(body=0.1, wick_ratio=0.1, candle_range=1.0, gap=0.0, is_momentum_candle=False),
+        regime=RegimeState(regime="TREND_UP", confidence=0.8),
+    )
+
+
+async def _make_agent(db_session, leverage_limit: float = 1.0) -> Agent:
+    strategy = Strategy(code=f"STRAT-TEST-{uuid.uuid4().hex[:8]}", family=StrategyFamily.MOMENTUM, name="test")
+    db_session.add(strategy)
+    await db_session.flush()
+
+    dna = StrategyDNA(
+        strategy_family=StrategyFamily.MOMENTUM,
+        indicators=[{"name": "rsi", "params": {"period": 14}}],
+        entry_rules=RuleSet(conditions=[Condition(feature="rsi_14", operator="gt", value=60)]),
+        exit_rules=RuleSet(conditions=[Condition(feature="rsi_14", operator="lt", value=40)]),
+        risk_profile=RiskProfile(max_leverage=leverage_limit, max_position_fraction=0.5),
+        position_sizing=PositionSizing(fraction_of_equity=0.1),
+        leverage_limit=leverage_limit,
+    )
+    version = StrategyVersion(strategy_id=strategy.id, version=1, generation=1, dna=dna.model_dump(mode="json"))
+    db_session.add(version)
+    await db_session.flush()
+
+    generation = await create_generation(
+        db_session, generation_number=100, strategy_version_ids=[version.id], starting_balance=100.0
+    )
+    agent = (await db_session.execute(select(Agent).where(Agent.generation == generation.number))).scalar_one()
+    return agent
+
+
+@pytest.mark.asyncio
+async def test_entry_signal_opens_position_and_writes_audit_trail(db_session):
+    agent = await _make_agent(db_session)
+    execution_engine = PaperExecutionAdapter()
+
+    entry_context = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session,
+        execution_engine,
+        entry_context,
+        prev_context=None,
+        generation=100,
+        council_decision_id=None,
+        global_max_leverage=5.0,
+        global_max_position_size=0.5,
+        global_max_drawdown=0.3,
+        global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    decisions = (await db_session.execute(select(Decision).where(Decision.agent_id == agent.id))).scalars().all()
+    assert len(decisions) == 1
+    assert decisions[0].risk_decision == RiskDecision.APPROVED
+
+    orders = (await db_session.execute(select(Order).where(Order.agent_id == agent.id))).scalars().all()
+    assert len(orders) == 1
+
+    positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
+    assert len(positions) == 1
+    assert positions[0].is_open is True
+
+    await db_session.refresh(agent)
+    assert agent.trade_count == 1
+    assert agent.balance < 100.0  # entry fee deducted
+
+
+@pytest.mark.asyncio
+async def test_exit_signal_closes_position_and_realizes_pnl(db_session):
+    agent = await _make_agent(db_session)
+    execution_engine = PaperExecutionAdapter()
+
+    entry_context = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, entry_context, None, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    exit_context = _context(open_time=2, close=110.0, rsi=30.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, exit_context, entry_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
+    assert positions[0].is_open is False
+
+    trades = (await db_session.execute(select(Trade).where(Trade.agent_id == agent.id))).scalars().all()
+    assert len(trades) == 1
+    assert trades[0].net_pnl > 0  # bought at 100, sold at 110
+
+    await db_session.refresh(agent)
+    assert agent.realized_pnl > 0
+    assert agent.equity > 100.0
+
+
+@pytest.mark.asyncio
+async def test_duplicate_position_not_opened_while_one_is_active(db_session):
+    agent = await _make_agent(db_session)
+    execution_engine = PaperExecutionAdapter()
+
+    ctx1 = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    ctx2 = _context(open_time=2, close=101.0, rsi=66.0, trend_strength=0.01)  # still entry-triggering, still open
+
+    for ctx, prev in ((ctx1, None), (ctx2, ctx1)):
+        await run_decision_cycle(
+            db_session, execution_engine, ctx, prev, generation=100, council_decision_id=None,
+            global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+            market_data_age_seconds=1.0,
+        )
+
+    positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
+    assert len(positions) == 1  # no second position opened while one is active

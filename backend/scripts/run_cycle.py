@@ -1,0 +1,162 @@
+"""The main trading cycle worker (spec section 61's end-to-end pipeline):
+
+    Hyperliquid -> MarketDataService -> feature engine -> regime detector
+        -> AI council (every N candles) -> shared MarketContext
+        -> decision loop (all active agents) -> risk engine -> execution
+        -> PnL / equity update -> extinction check
+
+Runs as a long-lived background process, separate from the FastAPI process
+(see app/main.py docstring) so a dashboard restart never interrupts trading.
+
+Usage:
+    python -m scripts.run_cycle          # loop forever, one cycle per candle close
+    python -m scripts.run_cycle --once   # run a single cycle and exit (for cron/testing)
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+
+from sqlalchemy import func, select
+
+from app.agents.decision_loop import run_decision_cycle
+from app.agents.lifecycle import is_population_extinct, record_extinction
+from app.core.config import get_settings
+from app.core.database import session_scope
+from app.core.logging import configure_logging, get_logger
+from app.council.service import run_council_cycle, should_run_council
+from app.execution.router import LiveSafetyGateError, get_execution_engine
+from app.market.feature_engine import InsufficientDataError, compute_features
+from app.market.market_data_service import MarketDataService
+from app.models.market import MarketFeatureSet, MarketRegimeRecord
+from app.models.strategy import Generation
+from app.schemas.market_context import MarketContext
+from app.services.ollama_client import OllamaClient
+
+logger = get_logger(__name__)
+
+_prev_context: MarketContext | None = None
+_candle_index = 0
+
+
+async def run_one_cycle(market_service: MarketDataService, ollama_client: OllamaClient) -> None:
+    global _prev_context, _candle_index
+    settings = get_settings()
+
+    async with session_scope() as db:
+        await market_service.sync_recent_candles(db)
+
+        if await market_service.is_stale(db):
+            logger.error("cycle.market_data_stale_skipping")
+            return
+
+        candles = await market_service.get_recent_candles(db, limit=300)
+        try:
+            context = compute_features(candles, symbol=settings.market_symbol, timeframe=settings.market_timeframe)
+        except InsufficientDataError as exc:
+            logger.warning("cycle.insufficient_data", detail=str(exc))
+            return
+
+        db.add(
+            MarketFeatureSet(
+                symbol=context.symbol,
+                timeframe=context.timeframe,
+                candle_open_time=context.candle_open_time,
+                features=context.model_dump(mode="json"),
+            )
+        )
+        db.add(
+            MarketRegimeRecord(
+                symbol=context.symbol,
+                timeframe=context.timeframe,
+                candle_open_time=context.candle_open_time,
+                regime=context.regime.regime,
+                confidence=context.regime.confidence,
+                detector_version=context.regime.detector_version,
+                detail={
+                    "volatility_percentile": context.volatility.volatility_percentile,
+                    "volume_ratio": context.volume.volume_ratio,
+                },
+            )
+        )
+        await db.commit()
+
+        council_decision_id = None
+        if settings.council_enabled and should_run_council(_candle_index, settings.council_interval_candles):
+            consensus = await run_council_cycle(db, ollama_client, context)
+            logger.info(
+                "cycle.council_decision",
+                final_bias=consensus.final_bias.value,
+                confidence=consensus.final_confidence,
+                judge_invoked=consensus.judge_invoked,
+            )
+
+        latest_generation = (
+            await db.execute(select(Generation).order_by(Generation.number.desc()).limit(1))
+        ).scalar_one_or_none()
+
+        if latest_generation is not None:
+            market_age = await market_service.latest_candle_age_seconds(db)
+            processed = await run_decision_cycle(
+                db,
+                get_execution_engine(settings),
+                context,
+                _prev_context,
+                generation=latest_generation.number,
+                council_decision_id=council_decision_id,
+                global_max_leverage=settings.max_leverage,
+                global_max_position_size=settings.max_position_size,
+                global_max_drawdown=settings.max_drawdown,
+                global_max_daily_loss=settings.max_daily_loss,
+                market_data_age_seconds=market_age,
+            )
+            logger.info("cycle.agents_processed", count=processed, generation=latest_generation.number)
+
+            if processed > 0 and await is_population_extinct(db, latest_generation.number):
+                # Spec section 15/52: record extinction; a human/researcher
+                # (or a separate scheduled job) must run the bootstrap script
+                # to spin up the next generation after reviewing the report —
+                # this loop does NOT auto-recreate a population silently.
+                await record_extinction(
+                    db,
+                    latest_generation.number,
+                    report={"note": "TODO: populate full extinction report (spec section 52)"},
+                )
+
+        _prev_context = context
+        _candle_index += 1
+
+
+async def main(run_once: bool = False) -> None:
+    configure_logging()
+    settings = get_settings()
+    market_service = MarketDataService()
+    ollama_client = OllamaClient()
+
+    try:
+        get_execution_engine(settings)  # fail fast if live mode is misconfigured
+    except LiveSafetyGateError as exc:
+        logger.critical("cycle.live_safety_gate_failed", error=str(exc))
+        raise
+
+    interval_seconds = 60 if settings.market_timeframe == "1m" else 300
+
+    try:
+        while True:
+            try:
+                await run_one_cycle(market_service, ollama_client)
+            except Exception:
+                logger.exception("cycle.unhandled_error")
+            if run_once:
+                break
+            await asyncio.sleep(interval_seconds)
+    finally:
+        await market_service.aclose()
+        await ollama_client.aclose()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
+    args = parser.parse_args()
+    asyncio.run(main(run_once=args.once))

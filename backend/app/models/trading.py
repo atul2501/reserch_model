@@ -1,0 +1,108 @@
+"""Orders, positions, and trades — all scoped to a single agent."""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import Float, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.enums import ExecutionVenue, OrderStatus, Side
+
+
+class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "orders"
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    # use_alter breaks the orders<->decisions circular FK dependency (Order
+    # references Decision, Decision references Order) so both tables can be
+    # created before either foreign key is added.
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("decisions.id", use_alter=True, name="fk_orders_decision_id"),
+        nullable=True,
+    )
+
+    # Idempotency key so a network retry can never duplicate an order
+    # (spec section 41). Callers must derive this deterministically from
+    # (agent_id, decision_id, attempt) rather than random.
+    client_order_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    side: Mapped[Side] = mapped_column(SAEnum(Side, name="order_side_enum"), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    requested_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    leverage: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+
+    venue: Mapped[ExecutionVenue] = mapped_column(SAEnum(ExecutionVenue, name="execution_venue_enum"), nullable=False)
+    status: Mapped[OrderStatus] = mapped_column(
+        SAEnum(OrderStatus, name="order_status_enum"), default=OrderStatus.PENDING, nullable=False
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    filled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    raw_venue_response: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+
+
+class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "positions"
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    side: Mapped[Side] = mapped_column(SAEnum(Side, name="position_side_enum"), nullable=False)
+
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    leverage: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+
+    stop_loss_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    take_profit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trailing_stop_distance: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    unrealized_pnl: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_open: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A closed round-trip (or partial close) — the unit fitness/metrics are
+    computed over. Distinct from Order: one position close may realize a
+    Trade even if it resulted from multiple fills."""
+
+    __tablename__ = "trades"
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    position_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("positions.id"), nullable=False)
+    entry_order_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("orders.id"), nullable=True)
+    exit_order_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("orders.id"), nullable=True)
+
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    side: Mapped[Side] = mapped_column(SAEnum(Side, name="trade_side_enum"), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    exit_price: Mapped[float] = mapped_column(Float, nullable=False)
+
+    gross_pnl: Mapped[float] = mapped_column(Float, nullable=False)
+    fees: Mapped[float] = mapped_column(Float, nullable=False)
+    funding: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    slippage_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    net_pnl: Mapped[float] = mapped_column(Float, nullable=False)
+
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    holding_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    entry_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    exit_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    exit_reason: Mapped[str] = mapped_column(String(64), nullable=False)  # stop_loss|take_profit|signal|liquidation|manual
