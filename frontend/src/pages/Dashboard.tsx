@@ -42,7 +42,7 @@ export function Dashboard() {
   const { data: health } = usePolling(api.health, 10_000);
   const { data: market, error: marketError } = usePolling(api.market, 5_000);
   const { data: population } = usePolling(api.population, 10_000);
-  const { data: leaderboard } = usePolling(() => api.leaderboard(25), 10_000);
+  const { data: leaderboard } = usePolling(() => api.leaderboard(500, true), 10_000);
 
   const marketFresh = health?.market_data_stale === false;
 
@@ -151,7 +151,7 @@ function LeaderboardTable({ rows }: { rows: LeaderboardEntry[] }) {
             >
               <td className="px-3 py-1.5 text-muted">{row.rank}</td>
               <td className="px-3 py-1.5 text-text-strong">{row.agent.identifier}</td>
-              <td className="px-3 py-1.5 text-muted">{row.strategy_family}</td>
+              <td className="px-3 py-1.5 text-muted">{row.strategy_family ?? "—"}</td>
               <td className="px-3 py-1.5">{fmtUsd(row.agent.equity)}</td>
               <td className={`px-3 py-1.5 ${row.agent.roi >= 0 ? "text-accent-green" : "text-accent-red"}`}>
                 {fmtPct(row.agent.roi)}

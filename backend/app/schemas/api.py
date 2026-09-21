@@ -45,7 +45,7 @@ class AgentDetail(AgentSummary):
 class LeaderboardEntry(BaseModel):
     rank: int
     agent: AgentSummary
-    strategy_family: str
+    strategy_family: str | None
 
 
 class MarketSnapshot(BaseModel):

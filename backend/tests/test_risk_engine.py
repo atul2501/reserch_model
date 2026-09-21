@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from app.models.agent import Agent
 from app.models.enums import RiskDecision, Side
@@ -30,6 +31,8 @@ def _agent(equity=100.0, peak_equity=100.0, starting_balance=100.0) -> Agent:
         balance=equity,
         equity=equity,
         peak_equity=peak_equity,
+        day_start_equity=equity,
+        day_start_date=date.today(),
     )
 
 

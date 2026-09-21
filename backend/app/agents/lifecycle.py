@@ -71,6 +71,8 @@ async def create_generation(
             balance=starting_balance,
             equity=starting_balance,
             peak_equity=starting_balance,
+            day_start_equity=starting_balance,
+            day_start_date=datetime.now(timezone.utc).date(),
         )
         agents.append(agent)
     db.add_all(agents)

@@ -137,6 +137,50 @@ async def test_exit_signal_closes_position_and_realizes_pnl(db_session):
 
 
 @pytest.mark.asyncio
+async def test_daily_loss_breaker_rejects_new_entry_after_intraday_loss(db_session):
+    agent = await _make_agent(db_session, leverage_limit=3.0)
+    execution_engine = PaperExecutionAdapter()
+
+    entry_context = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, entry_context, None, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    # Big same-(UTC-)day loss: the long position exits far below entry.
+    exit_context = _context(open_time=2, close=40.0, rsi=30.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, exit_context, entry_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    await db_session.refresh(agent)
+    assert agent.equity < agent.day_start_equity * 0.9  # more than a 10% same-day loss
+
+    # A fresh entry signal later the same (UTC epoch) day should now be blocked.
+    second_entry_context = _context(open_time=3, close=40.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, second_entry_context, exit_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    decisions = (
+        await db_session.execute(
+            select(Decision).where(Decision.agent_id == agent.id).order_by(Decision.market_candle_open_time)
+        )
+    ).scalars().all()
+    last_decision = decisions[-1]
+    assert last_decision.risk_decision == RiskDecision.REJECTED
+    assert "max_daily_loss_exceeded" in last_decision.risk_reasoning["reasons"]
+
+    positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
+    assert len(positions) == 1  # no second position opened — the breaker blocked it
+
+
+@pytest.mark.asyncio
 async def test_duplicate_position_not_opened_while_one_is_active(db_session):
     agent = await _make_agent(db_session)
     execution_engine = PaperExecutionAdapter()

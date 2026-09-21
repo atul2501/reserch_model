@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from app.backtesting.engine import BacktestResult, run_backtest
+from app.market.feature_engine import MIN_CANDLES_REQUIRED
 from app.schemas.strategy_dna import StrategyDNA
 
 
@@ -82,10 +83,15 @@ def run_walk_forward(
         test_start = start + train_window
         test_end = test_start + test_window
 
-        # The test slice needs `train_window` worth of history for the
-        # feature engine's warmup, so we hand it candles[start:test_end]
-        # and only score trades that occur within [test_start, test_end).
-        test_slice = candles.iloc[start:test_end].reset_index(drop=True)
+        # The engine starts trading MIN_CANDLES_REQUIRED candles into
+        # whatever slice it's given. Feeding it the full [start:test_end]
+        # slice would let it start trading ~(train_window - MIN_CANDLES_REQUIRED)
+        # candles before test_start, leaking in-sample trades into the
+        # "out-of-sample" scoring. Instead we hand it only enough lookback
+        # for feature warmup so its first tradeable candle lands exactly at
+        # test_start.
+        slice_start = max(0, test_start - MIN_CANDLES_REQUIRED)
+        test_slice = candles.iloc[slice_start:test_end].reset_index(drop=True)
         result = run_backtest(
             test_slice,
             dna,

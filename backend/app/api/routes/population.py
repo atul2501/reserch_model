@@ -33,7 +33,7 @@ async def get_population_summary(db: AsyncSession = Depends(get_db)):
         active_count=len(active),
         dead_count=len(dead),
         professional_count=len(professional),
-        total_equity=sum(a.equity for a in active),
+        total_equity=sum(a.equity for a in agents),
         total_realized_pnl=sum(a.realized_pnl for a in agents),
         total_capital_allocated=latest_gen.total_capital_allocated if latest_gen else 0.0,
     )

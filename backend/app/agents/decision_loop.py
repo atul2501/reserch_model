@@ -105,6 +105,8 @@ async def _process_agent(
     market_data_age_seconds: float | None,
     fee_rate: float,
 ) -> None:
+    market_timestamp = datetime.fromtimestamp(context.candle_open_time / 1000, tz=timezone.utc)
+
     open_position = (
         await db.execute(
             select(Position).where(Position.agent_id == agent.id, Position.is_open.is_(True))
@@ -114,9 +116,15 @@ async def _process_agent(
     if open_position is not None:
         _mark_to_market(agent, open_position, context.close_price)
 
+    # Anchor the daily-loss circuit breaker to the candle clock (not
+    # wall-clock) so this stays correct under backtests/replays too.
+    candle_date = market_timestamp.date()
+    if agent.day_start_date != candle_date:
+        agent.day_start_equity = agent.equity
+        agent.day_start_date = candle_date
+
     signal = evaluate(dna, context, prev_context, has_open_position=open_position is not None)
 
-    market_timestamp = datetime.fromtimestamp(context.candle_open_time / 1000, tz=timezone.utc)
     decision = Decision(
         agent_id=agent.id,
         strategy_version_id=agent.strategy_version_id,
@@ -152,7 +160,7 @@ async def _process_agent(
             current_price=context.close_price,
             atr=context.volatility.atr_14,
             equity=agent.equity,
-            daily_pnl=0.0,  # TODO(observability): wire daily PnL tracking once intraday reset is implemented
+            daily_pnl=agent.equity - agent.day_start_equity,
             has_open_position=False,
             market_data_age_seconds=market_data_age_seconds,
         ),

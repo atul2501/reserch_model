@@ -22,8 +22,8 @@ async def get_leaderboard(
 ):
     stmt = (
         select(Agent, Strategy.family)
-        .join(StrategyVersion, StrategyVersion.id == Agent.strategy_version_id)
-        .join(Strategy, Strategy.id == StrategyVersion.strategy_id)
+        .outerjoin(StrategyVersion, StrategyVersion.id == Agent.strategy_version_id)
+        .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
     )
     if not include_dead:
         stmt = stmt.where(Agent.status == AgentStatus.ACTIVE)
@@ -32,6 +32,10 @@ async def get_leaderboard(
     result = await db.execute(stmt)
     rows = result.all()
     return [
-        LeaderboardEntry(rank=i + 1, agent=_to_summary(agent), strategy_family=family.value)
+        LeaderboardEntry(
+            rank=i + 1,
+            agent=_to_summary(agent),
+            strategy_family=family.value if family is not None else None,
+        )
         for i, (agent, family) in enumerate(rows)
     ]

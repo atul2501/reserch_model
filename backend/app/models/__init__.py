@@ -6,6 +6,7 @@ from app.models.decision import Decision
 from app.models.evolution import EvolutionEvent, PopulationEvent
 from app.models.market import MarketCandle, MarketFeatureSet, MarketRegimeRecord
 from app.models.metrics import FitnessScore, PerformanceMetric
+from app.models.stage_metrics import StageMetrics
 from app.models.strategy import AgentSnapshot, Generation, Strategy, StrategyVersion
 from app.models.system import SystemEvent
 from app.models.trading import Order, Position, Trade
@@ -22,6 +23,7 @@ __all__ = [
     "MarketRegimeRecord",
     "FitnessScore",
     "PerformanceMetric",
+    "StageMetrics",
     "AgentSnapshot",
     "Generation",
     "Strategy",

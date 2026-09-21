@@ -7,9 +7,9 @@ balance. Death is permanent (`status = DEAD` is a one-way transition).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime
+from sqlalchemy import Date, DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -45,6 +45,11 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     peak_equity: Mapped[float] = mapped_column(Float, nullable=False)
     max_drawdown: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    # Anchors for the daily-loss circuit breaker (risk_engine.py): reset to
+    # the agent's equity whenever the candle clock rolls to a new UTC day.
+    day_start_equity: Mapped[float] = mapped_column(Float, nullable=False)
+    day_start_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     trade_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_professional: Mapped[bool] = mapped_column(default=False, nullable=False)

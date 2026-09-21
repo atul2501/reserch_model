@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 import pytest
 from sqlalchemy import select
@@ -89,6 +90,8 @@ def _fresh_agent(balance: float = 100.0) -> Agent:
         peak_equity=balance,
         max_drawdown=0.0,
         best_milestone_multiple=1.0,
+        day_start_equity=balance,
+        day_start_date=date.today(),
     )
 
 

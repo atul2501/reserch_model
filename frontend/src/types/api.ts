@@ -45,7 +45,7 @@ export interface AgentDetail extends AgentSummary {
 export interface LeaderboardEntry {
   rank: number;
   agent: AgentSummary;
-  strategy_family: string;
+  strategy_family: string | null;
 }
 
 export interface MarketSnapshot {
