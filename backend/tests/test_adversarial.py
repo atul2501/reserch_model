@@ -9,13 +9,19 @@ import pandas as pd
 import pytest
 
 from app.backtesting.adversarial import (
+    AdversarialReport,
+    ScenarioResult,
+    compute_robustness_score,
+    inject_abnormal_volume,
     inject_extreme_move,
     inject_gap,
+    inject_liquidity_reduction,
     inject_stale_period,
     inject_volatility_spike,
     perturb_dna_variants,
     run_adversarial_suite,
 )
+from app.backtesting.engine import BacktestResult
 from app.models.enums import StrategyFamily
 from app.schemas.strategy_dna import (
     Condition,
@@ -107,6 +113,25 @@ def test_inject_extreme_move_applies_permanent_shock():
     assert stressed.loc[len(candles) - 1, "close"] == pytest.approx(candles.loc[len(candles) - 1, "close"] * 0.75)
 
 
+def test_inject_abnormal_volume_spikes_only_the_windowed_volume():
+    candles = _trending_candles(50)
+    idx = 20
+    stressed = inject_abnormal_volume(candles, magnitude=5.0, at_index=idx, length=5)
+    for i in range(idx, idx + 5):
+        assert stressed.loc[i, "volume"] == pytest.approx(candles.loc[i, "volume"] * 5.0)
+        assert stressed.loc[i, "close"] == candles.loc[i, "close"]  # price untouched
+    assert stressed.loc[idx - 1, "volume"] == candles.loc[idx - 1, "volume"]  # untouched before window
+
+
+def test_inject_liquidity_reduction_collapses_windowed_volume():
+    candles = _trending_candles(50)
+    idx = 20
+    stressed = inject_liquidity_reduction(candles, magnitude=0.05, at_index=idx, length=5)
+    for i in range(idx, idx + 5):
+        assert stressed.loc[i, "volume"] == pytest.approx(candles.loc[i, "volume"] * 0.05)
+        assert stressed.loc[i, "close"] == candles.loc[i, "close"]
+
+
 def test_perturb_dna_variants_produces_distinct_valid_variants():
     dna = _never_trades_dna()  # default-range stop_loss.value, unlike _fragile_dna's out-of-range fixed_pct value
     variants = perturb_dna_variants(dna, 5, rng=random.Random(1))
@@ -126,11 +151,71 @@ def test_adversarial_suite_passes_for_a_strategy_that_never_trades():
     assert report.worst_case_net_return_pct == pytest.approx(0.0)
 
 
-def test_adversarial_suite_fails_for_an_overleveraged_unprotected_strategy():
+def test_adversarial_suite_fails_for_an_overleveraged_strategy_when_risk_engine_bypassed():
+    """`bypass_risk_engine=True` is the test-only escape hatch for
+    reproducing pre-Phase-0 behavior: with no Risk Engine in the loop at
+    all, this DNA's own 20x-leverage/100%-notional/10%-stop combination is
+    exactly as fragile as its docstring describes."""
+    candles = _trending_candles(600)
+    report = run_adversarial_suite(
+        _fragile_dna(), candles, symbol="SOL", timeframe="1m", starting_equity=100.0,
+        base_fee_rate=0.00045, base_slippage_bps=2, n_dna_variants=2, rng=random.Random(7),
+        bypass_risk_engine=True,
+    )
+    assert report.passed is False
+    assert report.failure_reasons
+
+
+def _scenario_result(scenario_name: str, fee_mult: float, slip_mult: float, idx: int, net_return_pct: float) -> ScenarioResult:
+    final_equity = 100.0 * (1 + net_return_pct)
+    result = BacktestResult(
+        equity_curve=[100.0, final_equity], trades=[], final_equity=final_equity, starting_equity=100.0
+    )
+    return ScenarioResult(scenario_name, fee_mult, slip_mult, idx, result)
+
+
+def test_compute_robustness_score_is_zero_for_an_empty_report():
+    assert compute_robustness_score(AdversarialReport()) == 0.0
+
+
+def test_compute_robustness_score_penalizes_parameter_instability_even_with_a_fine_baseline():
+    """Same worst-case drawdown/return in both reports — the only
+    difference is how much return varies across perturb_dna_variants at
+    the SAME scenario/cost combination. A strategy whose return swings
+    wildly under small parameter jitter (the 'only works at exactly one
+    parameter value' case) must score lower than one that doesn't, even
+    though its baseline numbers look equally fine."""
+    unstable_results = [
+        _scenario_result("baseline", 1.0, 1.0, 0, 0.20),
+        _scenario_result("baseline", 1.0, 1.0, 1, -0.15),
+        _scenario_result("baseline", 1.0, 1.0, 2, 0.25),
+        _scenario_result("baseline", 1.0, 1.0, 3, -0.20),
+        _scenario_result("baseline", 1.0, 1.0, 4, 0.30),
+    ]
+    unstable_report = AdversarialReport(
+        scenario_results=unstable_results, worst_case_max_drawdown_pct=0.05, worst_case_net_return_pct=0.05,
+        passed=True, failure_reasons=[],
+    )
+    stable_results = [_scenario_result("baseline", 1.0, 1.0, i, 0.10) for i in range(5)]
+    stable_report = AdversarialReport(
+        scenario_results=stable_results, worst_case_max_drawdown_pct=0.05, worst_case_net_return_pct=0.10,
+        passed=True, failure_reasons=[],
+    )
+
+    assert compute_robustness_score(unstable_report) < compute_robustness_score(stable_report)
+
+
+def test_adversarial_suite_risk_gating_protects_even_an_overleveraged_strategy():
+    """With the Risk Engine in the loop (the default, and the only mode any
+    production caller may use), the same fragile DNA's proposed 20x
+    leverage / 100% notional gets clamped down to the global limits before
+    any entry is taken — so the stop-loss blowup this DNA was designed to
+    trigger never actually happens. This is the Risk Engine's "final veto
+    authority" working as intended, not a weaker test."""
     candles = _trending_candles(600)
     report = run_adversarial_suite(
         _fragile_dna(), candles, symbol="SOL", timeframe="1m", starting_equity=100.0,
         base_fee_rate=0.00045, base_slippage_bps=2, n_dna_variants=2, rng=random.Random(7),
     )
-    assert report.passed is False
-    assert report.failure_reasons
+    assert report.passed is True
+    assert report.worst_case_max_drawdown_pct < 0.40

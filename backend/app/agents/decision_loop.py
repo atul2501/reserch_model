@@ -22,7 +22,7 @@ from app.execution.base import ExecutionEngine, ExecutionRequest
 from app.execution.paper_adapter import new_client_order_id
 from app.models.agent import Agent
 from app.models.decision import Decision
-from app.models.enums import AgentStatus, Bias, OrderStatus, RiskDecision, Side
+from app.models.enums import AgentStatus, Bias, OrderStatus, RiskDecision, Side, StrategyStage
 from app.models.strategy import StrategyVersion
 from app.models.trading import Order, Position, Trade
 from app.risk.risk_engine import RiskCheckInput, check_trade
@@ -64,15 +64,18 @@ async def run_decision_cycle(
         await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_(strategy_version_ids)))
     ).scalars().all()
     dna_by_version_id = {v.id: StrategyDNA.model_validate(v.dna) for v in versions}
+    stage_by_version_id = {v.id: v.stage for v in versions}
 
     processed = 0
     for agent in agents:
         dna = dna_by_version_id[agent.strategy_version_id]
+        stage = stage_by_version_id[agent.strategy_version_id]
         await _process_agent(
             db,
             execution_engine,
             agent,
             dna,
+            stage,
             context,
             prev_context,
             council_decision_id=council_decision_id,
@@ -94,6 +97,7 @@ async def _process_agent(
     execution_engine: ExecutionEngine,
     agent: Agent,
     dna: StrategyDNA,
+    stage: StrategyStage,
     context: MarketContext,
     prev_context: MarketContext | None,
     *,
@@ -140,7 +144,7 @@ async def _process_agent(
     )
 
     if open_position is not None and signal.matched_exit:
-        await _close_position(db, agent, open_position, context, decision, fee_rate)
+        await _close_position(db, agent, open_position, context, decision, fee_rate, stage)
         db.add(decision)
         return
 
@@ -209,6 +213,7 @@ async def _process_agent(
     order.rejection_reason = fill.rejection_reason
     order.filled_at = datetime.now(timezone.utc) if fill.status == OrderStatus.FILLED else None
     order.raw_venue_response = fill.raw_response
+    order.latency_ms = fill.latency_ms
 
     decision.order_id = order.id
 
@@ -247,7 +252,13 @@ def _mark_to_market(agent: Agent, position: Position, current_price: float) -> N
 
 
 async def _close_position(
-    db: AsyncSession, agent: Agent, position: Position, context: MarketContext, decision: Decision, fee_rate: float
+    db: AsyncSession,
+    agent: Agent,
+    position: Position,
+    context: MarketContext,
+    decision: Decision,
+    fee_rate: float,
+    stage: StrategyStage,
 ) -> None:
     exit_price = context.close_price
     fee = exit_price * position.quantity * fee_rate
@@ -284,6 +295,7 @@ async def _close_position(
         closed_at=position.closed_at,
         holding_seconds=int((position.closed_at - position.opened_at).total_seconds()),
         exit_reason="signal",
+        stage=stage,
     )
     db.add(trade)
     await db.flush()

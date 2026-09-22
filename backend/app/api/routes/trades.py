@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import bisect
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.market.regime_lookup import load_regime_lookup, regime_at
 from app.models.agent import Agent
 from app.models.enums import Side
-from app.models.market import MarketRegimeRecord
 from app.models.trading import Trade
 from app.schemas.api import RegimePerformance, SidePerformance, TradeSummary
 
@@ -67,19 +65,11 @@ async def get_regime_performance(db: AsyncSession = Depends(get_db)):
     if not trades:
         return []
 
-    regime_rows = (
-        await db.execute(select(MarketRegimeRecord.candle_open_time, MarketRegimeRecord.regime).order_by(MarketRegimeRecord.candle_open_time))
-    ).all()
-    open_times = [row[0] for row in regime_rows]
-    regimes = [row[1].value for row in regime_rows]
+    open_times, regimes = await load_regime_lookup(db)
 
     buckets: dict[str, list[float]] = {}
     for net_pnl, closed_at in trades:
-        if open_times:
-            idx = bisect.bisect_right(open_times, int(closed_at.timestamp() * 1000)) - 1
-            regime = regimes[idx] if idx >= 0 else "UNKNOWN"
-        else:
-            regime = "UNKNOWN"
+        regime = regime_at(int(closed_at.timestamp() * 1000), open_times, regimes)
         buckets.setdefault(regime, []).append(net_pnl)
 
     results = []

@@ -9,6 +9,7 @@ competition.
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.backtesting.stage_metrics_service import latest_stage_metrics
 from app.evolution.champion import CandidateMetrics, PromotionCriteria, PromotionDecision, evaluate_promotion
 from app.models.agent import Agent
-from app.models.enums import ChampionStatus, StrategyStage
+from app.models.enums import ChampionStatus, EvolutionEventType, StrategyStage
+from app.models.evolution import EvolutionEvent
 from app.models.strategy import StrategyVersion
 
 # Explicit minimum track-record gate, on top of champion.py's
@@ -90,11 +92,32 @@ async def evaluate_and_promote(
     decision.reasons = decision.reasons + track_record_reasons
     decision.promote = decision.promote and not track_record_reasons
 
+    # Every promotion or rejection is recorded, win or lose — this is the
+    # audit trail champion.py's own docstring promises but, until now, no
+    # caller ever actually wrote.
+    db.add(
+        EvolutionEvent(
+            event_type=EvolutionEventType.PROMOTION if decision.promote else EvolutionEventType.REJECTION,
+            parent_strategy_version_id=current_champion.id if current_champion is not None else None,
+            child_strategy_version_id=challenger_version.id,
+            generation=challenger_version.generation,
+            validation_result={
+                "criteria": asdict(criteria),
+                "challenger_metrics": asdict(challenger_metrics),
+                "champion_metrics": asdict(champion_metrics) if champion_metrics is not None else None,
+                "reasons": decision.reasons,
+            },
+            accepted=decision.promote,
+            rejection_reason="; ".join(decision.reasons) if not decision.promote else None,
+        )
+    )
+
     if decision.promote:
         if current_champion is not None:
             current_champion.champion_status = ChampionStatus.RETIRED
         challenger_version.champion_status = ChampionStatus.CHAMPION
-        await db.commit()
+
+    await db.commit()
 
     return decision
 

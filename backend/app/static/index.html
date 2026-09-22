@@ -173,6 +173,13 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
         <div class="chart-label"><span id="pop-label-left"></span><span id="pop-label-right"></span></div>
       </div>
     </div>
+    <div>
+      <h2>Correlation Convergence <span class="sub">mean pairwise strategy correlation by generation</span></h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="correlationChart"></svg></div>
+        <div class="chart-label"><span id="correlation-label-left"></span><span id="correlation-label-right"></span></div>
+      </div>
+    </div>
   </section>
 
   <section>
@@ -196,6 +203,129 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
         </tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Strategy Version Inspector <span class="sub">loads regime validation, reality gap, and adversarial robustness together for one strategy version</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="inspector-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="inspector-load" type="button">Load All</button>
+      </div>
+      <div style="margin-top:6px; color:var(--muted); font-size:12px;">Fills and loads the three lookup boxes below in one click — each also still works independently.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Regime Validation <span class="sub">per-regime breakdown &amp; robustness classification for one strategy version</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="regime-validation-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="regime-validation-load" type="button">Load</button>
+        <span id="regime-validation-badge"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="regime-validation-table">
+          <thead><tr>
+            <th>Regime</th><th>Trades</th><th>PnL</th><th>ROI</th><th>Profit Factor</th><th>Win Rate</th><th>Max Drawdown</th><th>Expectancy</th>
+          </tr></thead>
+          <tbody><tr><td colspan="8" class="empty">Enter a strategy_version_id above and click Load</td></tr></tbody>
+        </table>
+      </div>
+      <div id="regime-validation-reasoning" style="margin-top:8px; color:var(--muted); font-size:12px;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Reality Gap <span class="sub">stage-by-stage performance degradation for one strategy version</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="reality-gap-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="reality-gap-load" type="button">Load</button>
+      </div>
+      <div class="table-scroll">
+        <table id="reality-gap-table">
+          <thead><tr>
+            <th>Transition</th><th>Net Return</th><th>Max DD</th><th>Win Rate</th><th>Profit Factor</th>
+            <th>Fees</th><th>Slippage</th><th>Avg Latency</th><th>Missed Trades</th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="empty">Enter a strategy_version_id above and click Load</td></tr></tbody>
+        </table>
+      </div>
+      <div id="reality-gap-cumulative" style="margin-top:8px; color:var(--muted); font-size:12px;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Adversarial Robustness <span class="sub">stress-test scenario breakdown for one strategy version</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="adversarial-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="adversarial-load" type="button">Load</button>
+        <span id="adversarial-badge"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="adversarial-table">
+          <thead><tr><th>Scenario</th><th>Max Drawdown</th><th>Net Return</th></tr></thead>
+          <tbody><tr><td colspan="3" class="empty">Enter a strategy_version_id above and click Load</td></tr></tbody>
+        </table>
+      </div>
+      <div id="adversarial-reasoning" style="margin-top:8px; color:var(--muted); font-size:12px;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Strategy Correlation <span class="sub">family&times;family correlation &amp; top correlated pairs for one generation</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="correlation-generation-input" type="number" placeholder="generation number" style="width:160px; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="correlation-load" type="button">Load</button>
+      </div>
+      <div class="table-scroll">
+        <table id="correlation-family-table">
+          <thead><tr><th>Family A</th><th>Family B</th><th>Mean Correlation</th><th>Pairs</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty">Enter a generation number above and click Load</td></tr></tbody>
+        </table>
+      </div>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table id="correlation-top-pairs-table">
+          <thead><tr><th>Agent A</th><th>Family A</th><th>Agent B</th><th>Family B</th><th>Composite Correlation</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Champions <span class="sub">current champion per strategy lineage</span></h2>
+    <div class="panel table-scroll">
+      <table id="champions-table">
+        <thead><tr><th>Strategy Code</th><th>Family</th><th>Champion Version</th><th>Strategy ID</th></tr></thead>
+        <tbody><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Challengers &amp; Promotion History <span class="sub">pipeline stage per strategy version, and every promote/reject decision</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="challengers-input" type="text" placeholder="strategy_id (UUID, from Champions table)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+        <button id="challengers-load" type="button">Load</button>
+      </div>
+      <div class="table-scroll">
+        <table id="challengers-table">
+          <thead><tr><th>Strategy Version</th><th>Pipeline Stage</th><th>Entered Stage</th><th>Blocking Reasons</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty">Enter a strategy_id above and click Load</td></tr></tbody>
+        </table>
+      </div>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table id="promotion-history-table">
+          <thead><tr><th>Type</th><th>Champion</th><th>Challenger</th><th>Decision</th><th>Reason</th><th>When</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -403,6 +533,16 @@ async function refresh() {
     if (byCreated.length) setChartLabels("pop", ago(byCreated[0].created_at), ago(byCreated[byCreated.length - 1].created_at));
   });
 
+  await section("correlation-convergence", async () => {
+    const rows = await get("/api/correlation/convergence-history?limit=50");
+    const chronological = [...rows].reverse();
+    const points = chronological.map(r => ({ v: r.mean_pairwise_correlation }));
+    renderLineChart(document.getElementById("correlationChart"), points, "#4caf50");
+    if (chronological.length) {
+      setChartLabels("correlation", `gen ${chronological[0].generation}`, `gen ${chronological[chronological.length - 1].generation}`);
+    }
+  });
+
   await section("regime-performance", async () => {
     const rows = await get("/api/trades/by-regime");
     const tbody = document.querySelector("#regime-table tbody");
@@ -432,6 +572,214 @@ async function refresh() {
         <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
       </tr>`).join("");
   });
+
+  const regimeBadgeColor = { ROBUST: "#4caf50", REGIME_SPECIALIST: "#ffb300", FRAGILE: "#ff7043", UNSTABLE: "#9e9e9e" };
+  async function loadRegimeValidation() {
+    const id = document.getElementById("regime-validation-input").value.trim();
+    const tbody = document.querySelector("#regime-validation-table tbody");
+    const badge = document.getElementById("regime-validation-badge");
+    const reasoning = document.getElementById("regime-validation-reasoning");
+    if (!id) return;
+    await section("regime-validation", async () => {
+      badge.textContent = "loading…";
+      badge.style.color = "";
+      let report;
+      try {
+        report = await get(`/api/regime-validation/${encodeURIComponent(id)}`);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">No regime validation report for this strategy version yet</td></tr>`;
+        badge.textContent = "";
+        reasoning.textContent = "";
+        return;
+      }
+      const rows = Object.entries(report.per_regime);
+      tbody.innerHTML = rows.map(([regime, s]) => `
+        <tr>
+          <td>${regime}</td>
+          <td class="num">${s.trade_count}</td>
+          <td class="num ${s.pnl >= 0 ? 'pos' : 'neg'}">${dollar(s.pnl)}</td>
+          <td class="num">${pct(s.roi)}</td>
+          <td class="num">${s.profit_factor === null ? '-' : fmt(s.profit_factor)}</td>
+          <td class="num">${pct(s.win_rate)}</td>
+          <td class="num">${pct(s.max_drawdown_pct)}</td>
+          <td class="num ${(s.expectancy || 0) >= 0 ? 'pos' : 'neg'}">${dollar(s.expectancy)}</td>
+        </tr>`).join("");
+      badge.textContent = report.classification;
+      badge.style.color = regimeBadgeColor[report.classification] || "";
+      reasoning.textContent = report.classification_reasoning.join(" · ");
+    });
+  }
+  document.getElementById("regime-validation-load").addEventListener("click", loadRegimeValidation);
+  document.getElementById("regime-validation-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadRegimeValidation(); });
+
+  function gapCell(metric, isPct=true) {
+    if (!metric || metric.pct_change === null || metric.pct_change === undefined) return `<td class="num">-</td>`;
+    const cls = metric.pct_change >= 0 ? 'pos' : 'neg';
+    return `<td class="num ${cls}">${pct(metric.pct_change)}</td>`;
+  }
+  async function loadRealityGap() {
+    const id = document.getElementById("reality-gap-input").value.trim();
+    const tbody = document.querySelector("#reality-gap-table tbody");
+    const cumulativeEl = document.getElementById("reality-gap-cumulative");
+    if (!id) return;
+    await section("reality-gap", async () => {
+      let report;
+      try {
+        report = await get(`/api/reality-gap/${encodeURIComponent(id)}`);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty">Could not load reality-gap report</td></tr>`;
+        cumulativeEl.textContent = "";
+        return;
+      }
+      if (!report.transitions.length) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty">Fewer than 2 stages have recorded metrics yet for this strategy version</td></tr>`;
+        cumulativeEl.textContent = "";
+        return;
+      }
+      tbody.innerHTML = report.transitions.map(t => `
+        <tr>
+          <td>${t.from_stage} &rarr; ${t.to_stage}</td>
+          ${gapCell(t.net_return_pct)}
+          ${gapCell(t.max_drawdown_pct)}
+          ${gapCell(t.win_rate)}
+          ${gapCell(t.profit_factor)}
+          ${gapCell(t.total_fees)}
+          ${gapCell(t.total_slippage_cost)}
+          ${gapCell(t.avg_latency_ms)}
+          ${gapCell(t.missed_trade_pct)}
+        </tr>`).join("");
+      if (report.cumulative_gap) {
+        const c = report.cumulative_gap;
+        cumulativeEl.textContent = `Cumulative ${c.from_stage} → ${c.to_stage}: net return ${pct(c.net_return_pct.pct_change)}, max drawdown ${pct(c.max_drawdown_pct.pct_change)}`;
+      } else {
+        cumulativeEl.textContent = "";
+      }
+    });
+  }
+  document.getElementById("reality-gap-load").addEventListener("click", loadRealityGap);
+  document.getElementById("reality-gap-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadRealityGap(); });
+
+  async function loadAdversarial() {
+    const id = document.getElementById("adversarial-input").value.trim();
+    const tbody = document.querySelector("#adversarial-table tbody");
+    const badge = document.getElementById("adversarial-badge");
+    const reasoning = document.getElementById("adversarial-reasoning");
+    if (!id) return;
+    await section("adversarial", async () => {
+      badge.textContent = "loading…";
+      badge.style.color = "";
+      let report;
+      try {
+        report = await get(`/api/adversarial/${encodeURIComponent(id)}`);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" class="empty">No adversarial test report for this strategy version yet</td></tr>`;
+        badge.textContent = "";
+        reasoning.textContent = "";
+        return;
+      }
+      const rows = Object.entries(report.scenario_breakdown);
+      tbody.innerHTML = rows.map(([scenario, s]) => `
+        <tr>
+          <td>${scenario}</td>
+          <td class="num">${pct(s.max_drawdown_pct)}</td>
+          <td class="num ${s.net_return_pct >= 0 ? 'pos' : 'neg'}">${pct(s.net_return_pct)}</td>
+        </tr>`).join("");
+      badge.textContent = `${report.passed ? "PASSED" : "FAILED"} · robustness ${fmt(report.robustness_score, 2)}`;
+      badge.style.color = report.passed ? "#4caf50" : "#ff7043";
+      reasoning.textContent = report.failure_reasons.join(" · ");
+    });
+  }
+  document.getElementById("adversarial-load").addEventListener("click", loadAdversarial);
+  document.getElementById("adversarial-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAdversarial(); });
+
+  async function loadInspector() {
+    const id = document.getElementById("inspector-input").value.trim();
+    if (!id) return;
+    for (const [inputId, loader] of [
+      ["regime-validation-input", loadRegimeValidation],
+      ["reality-gap-input", loadRealityGap],
+      ["adversarial-input", loadAdversarial],
+    ]) {
+      document.getElementById(inputId).value = id;
+      await loader();
+    }
+  }
+  document.getElementById("inspector-load").addEventListener("click", loadInspector);
+  document.getElementById("inspector-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadInspector(); });
+
+  async function loadCorrelation() {
+    const gen = document.getElementById("correlation-generation-input").value.trim();
+    const familyTbody = document.querySelector("#correlation-family-table tbody");
+    const pairsTbody = document.querySelector("#correlation-top-pairs-table tbody");
+    if (gen === "") return;
+    await section("correlation", async () => {
+      const [familyRows, pairRows] = await Promise.all([
+        get(`/api/correlation/matrix?generation=${encodeURIComponent(gen)}`),
+        get(`/api/correlation/top-pairs?generation=${encodeURIComponent(gen)}&limit=50`),
+      ]);
+      familyTbody.innerHTML = familyRows.length ? familyRows.map(r => `
+        <tr>
+          <td>${r.family_a}</td>
+          <td>${r.family_b}</td>
+          <td class="num">${pct(r.mean_correlation)}</td>
+          <td class="num">${r.member_pair_count}</td>
+        </tr>`).join("") : `<tr><td colspan="4" class="empty">No correlation data for this generation yet</td></tr>`;
+      pairsTbody.innerHTML = pairRows.map(r => `
+        <tr>
+          <td>${r.agent_id_a.slice(0, 8)}</td>
+          <td>${r.strategy_family_a}</td>
+          <td>${r.agent_id_b.slice(0, 8)}</td>
+          <td>${r.strategy_family_b}</td>
+          <td class="num ${r.composite_correlation >= 0.8 ? 'neg' : ''}">${pct(r.composite_correlation)}</td>
+        </tr>`).join("");
+    });
+  }
+  document.getElementById("correlation-load").addEventListener("click", loadCorrelation);
+  document.getElementById("correlation-generation-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCorrelation(); });
+
+  await section("champions", async () => {
+    const rows = await get("/api/champions");
+    const tbody = document.querySelector("#champions-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="4" class="empty">No champion has been promoted in any lineage yet</td></tr>`; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.strategy_code}</td>
+        <td>${r.strategy_family}</td>
+        <td class="num">v${r.champion_version_number}</td>
+        <td style="font-family:monospace; font-size:11px;">${r.strategy_id}</td>
+      </tr>`).join("");
+  });
+
+  async function loadChallengers() {
+    const strategyId = document.getElementById("challengers-input").value.trim();
+    const challengersTbody = document.querySelector("#challengers-table tbody");
+    const historyTbody = document.querySelector("#promotion-history-table tbody");
+    if (!strategyId) return;
+    await section("challengers", async () => {
+      const [challengers, history] = await Promise.all([
+        get(`/api/champions/${encodeURIComponent(strategyId)}/challengers`),
+        get(`/api/champions/${encodeURIComponent(strategyId)}/history`),
+      ]);
+      challengersTbody.innerHTML = challengers.length ? challengers.map(c => `
+        <tr>
+          <td style="font-family:monospace; font-size:11px;">${c.strategy_version_id.slice(0, 8)}</td>
+          <td>${c.pipeline_stage}</td>
+          <td>${dateStr(new Date(c.entered_stage_at).getTime())}</td>
+          <td style="color:var(--muted); font-size:12px;">${c.blocking_reasons.join(" · ")}</td>
+        </tr>`).join("") : `<tr><td colspan="4" class="empty">No challengers evaluated for this lineage yet</td></tr>`;
+      historyTbody.innerHTML = history.map(e => `
+        <tr>
+          <td>${e.event_type}</td>
+          <td style="font-family:monospace; font-size:11px;">${e.parent_strategy_version_id ? e.parent_strategy_version_id.slice(0, 8) : '-'}</td>
+          <td style="font-family:monospace; font-size:11px;">${e.child_strategy_version_id ? e.child_strategy_version_id.slice(0, 8) : '-'}</td>
+          <td class="${e.accepted ? 'pos' : 'neg'}">${e.accepted ? 'PROMOTED' : 'REJECTED'}</td>
+          <td style="color:var(--muted); font-size:12px;">${e.rejection_reason || '-'}</td>
+          <td>${ago(e.created_at)}</td>
+        </tr>`).join("");
+    });
+  }
+  document.getElementById("challengers-load").addEventListener("click", loadChallengers);
+  document.getElementById("challengers-input").addEventListener("keydown", (e) => { if (e.key === "Enter") loadChallengers(); });
 
   await section("positions", async () => {
     const rows = await get("/api/positions?limit=200");
