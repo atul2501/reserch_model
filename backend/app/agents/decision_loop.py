@@ -71,29 +71,7 @@ async def run_decision_cycle(
     versions = (
         await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_(strategy_version_ids)))
     ).scalars().all()
-
-    # Each StrategyVersion's DNA is validated once, at insert time (see
-    # app/models/strategy.py) — but a single StrategyVersion whose stored
-    # JSON no longer matches the CURRENT StrategyDNA schema (schema drift
-    # from ongoing development, or a hand-edited/legacy row) must never
-    # crash the whole population's cycle. Isolate per-version: skip that
-    # version's agents this cycle, log it loudly, keep going for everyone
-    # else. This was previously unguarded and is the confirmed root cause
-    # of a whole-cycle crash from a single bad StrategyVersion row.
-    dna_by_version_id: dict[uuid.UUID, StrategyDNA] = {}
-    stage_by_version_id: dict[uuid.UUID, StrategyStage] = {}
-    broken_version_ids: set[uuid.UUID] = set()
-    for v in versions:
-        try:
-            dna_by_version_id[v.id] = StrategyDNA.model_validate(v.dna)
-            stage_by_version_id[v.id] = v.stage
-        except ValidationError as exc:
-            broken_version_ids.add(v.id)
-            logger.error(
-                "decision_loop.strategy_dna_invalid_skipping_version",
-                strategy_version_id=str(v.id),
-                error=str(exc),
-            )
+    dna_by_version_id = {v.id: StrategyDNA.model_validate(v.dna) for v in versions}
 
     processed = 0
     for agent in agents:
