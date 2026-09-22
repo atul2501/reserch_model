@@ -53,6 +53,19 @@ class MarketDataService:
 
         self._check_gaps(raw, interval_ms)
 
+        # Funding/open interest are point-in-time exchange values.  They are
+        # persisted with the most recently confirmed candle as the best
+        # available attribution; a failure here must not turn a healthy
+        # historical-candle recovery into a tradeable data set with invented
+        # funding values.
+        funding_context: dict = {}
+        try:
+            funding_context = await self._client.get_meta_and_funding(self._symbol)
+        except Exception as exc:
+            logger.warning("market_data.funding_context_unavailable", error=str(exc))
+
+        funding_rate = _as_float(funding_context.get("funding"))
+        open_interest = _as_float(funding_context.get("openInterest"))
         rows = [
             {
                 "symbol": self._symbol,
@@ -66,6 +79,8 @@ class MarketDataService:
                 "volume": float(c["v"]),
                 "trade_count": int(c.get("n", 0)) or None,
                 "is_final": int(c["T"]) <= end_ms,
+                "funding_rate": funding_rate if int(c["T"]) <= end_ms else None,
+                "open_interest": open_interest if int(c["T"]) <= end_ms else None,
                 "source": "hyperliquid",
             }
             for c in raw
@@ -74,7 +89,7 @@ class MarketDataService:
         stmt = pg_insert(MarketCandle).values(rows)
         update_cols = {
             col: getattr(stmt.excluded, col)
-            for col in ("close_time", "open", "high", "low", "close", "volume", "trade_count", "is_final")
+            for col in ("close_time", "open", "high", "low", "close", "volume", "trade_count", "is_final", "funding_rate", "open_interest")
         }
         stmt = stmt.on_conflict_do_update(
             index_elements=["symbol", "timeframe", "open_time"], set_=update_cols
@@ -94,13 +109,20 @@ class MarketDataService:
                     expected_interval_ms=interval_ms,
                 )
 
-    async def get_recent_candles(self, db: AsyncSession, limit: int = 300) -> pd.DataFrame:
+    async def get_recent_candles(
+        self, db: AsyncSession, limit: int = 300, *, confirmed_only: bool = True
+    ) -> pd.DataFrame:
+        """Return oldest-to-newest candles. Trading callers must use the
+        default confirmed-only path; mutable bars are available only to
+        explicitly labelled display/recovery callers."""
         stmt = (
             select(MarketCandle)
             .where(MarketCandle.symbol == self._symbol, MarketCandle.timeframe == self._timeframe)
             .order_by(MarketCandle.open_time.desc())
             .limit(limit)
         )
+        if confirmed_only:
+            stmt = stmt.where(MarketCandle.is_final.is_(True))
         result = await db.execute(stmt)
         candles = list(reversed(result.scalars().all()))
         if not candles:
@@ -114,6 +136,8 @@ class MarketDataService:
                     "low": c.low,
                     "close": c.close,
                     "volume": c.volume,
+                    "funding_rate": c.funding_rate,
+                    "open_interest": c.open_interest,
                 }
                 for c in candles
             ]
@@ -122,7 +146,11 @@ class MarketDataService:
     async def latest_candle_age_seconds(self, db: AsyncSession) -> float | None:
         stmt = (
             select(MarketCandle.close_time)
-            .where(MarketCandle.symbol == self._symbol, MarketCandle.timeframe == self._timeframe)
+            .where(
+                MarketCandle.symbol == self._symbol,
+                MarketCandle.timeframe == self._timeframe,
+                MarketCandle.is_final.is_(True),
+            )
             .order_by(MarketCandle.open_time.desc())
             .limit(1)
         )
@@ -137,3 +165,10 @@ class MarketDataService:
         if age is None:
             return True
         return age > STALE_DATA_THRESHOLD_SECONDS
+
+
+def _as_float(value: object) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None

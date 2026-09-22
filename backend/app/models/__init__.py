@@ -13,7 +13,7 @@ from app.models.reality_gap import RealityGapReport
 from app.models.regime_validation import RegimeValidationReport
 from app.models.stage_metrics import StageMetrics
 from app.models.strategy import AgentSnapshot, Generation, Strategy, StrategyVersion
-from app.models.system import SystemEvent
+from app.models.system import SystemEvent, WorkerCycle, WorkerLease
 from app.models.trading import Order, Position, Trade
 
 __all__ = [
@@ -41,6 +41,8 @@ __all__ = [
     "Strategy",
     "StrategyVersion",
     "SystemEvent",
+    "WorkerCycle",
+    "WorkerLease",
     "Order",
     "Position",
     "Trade",

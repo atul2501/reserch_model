@@ -22,6 +22,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 from tenacity import (
     retry,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
@@ -71,6 +72,18 @@ class OllamaCallStats:
     retries: int
 
 
+@dataclass
+class OllamaKeyHealth:
+    """In-memory credential health. Keys are intentionally never persisted
+    or logged; an operator refreshes credentials by restarting/reloading the
+    process after fixing configuration."""
+    disabled: bool = False
+    failure_count: int = 0
+    cooldown_until: float = 0.0
+    last_success: float | None = None
+    last_failure: float | None = None
+
+
 class OllamaClient:
     def __init__(self) -> None:
         settings = get_settings()
@@ -83,6 +96,7 @@ class OllamaClient:
         # same rate-limited one.
         self._api_keys = settings.ollama_api_key_list
         self._key_cursor = 0
+        self._key_health = [OllamaKeyHealth() for _ in self._api_keys]
         self._model = settings.ollama_model
         self._timeout = settings.ollama_timeout_seconds
         self._max_retries = settings.ollama_max_retries
@@ -100,10 +114,49 @@ class OllamaClient:
         be logged/diagnosed without ever logging a secret."""
         if not self._api_keys:
             return None, None
-        index = self._key_cursor % len(self._api_keys)
-        key = self._api_keys[index]
-        self._key_cursor += 1
-        return key, index
+        now = time.monotonic()
+        for _ in range(len(self._api_keys)):
+            index = self._key_cursor % len(self._api_keys)
+            self._key_cursor += 1
+            health = self._key_health[index]
+            if not health.disabled and health.cooldown_until <= now:
+                return self._api_keys[index], index
+        return None, None
+
+    def key_health_snapshot(self) -> list[dict[str, object]]:
+        """Safe operational state: positions/statuses only, never secrets."""
+        now = time.monotonic()
+        return [
+            {
+                "key_index": index,
+                "status": "disabled" if h.disabled else ("cooldown" if h.cooldown_until > now else "healthy"),
+                "failure_count": h.failure_count,
+                "last_success": h.last_success,
+                "last_failure": h.last_failure,
+            }
+            for index, h in enumerate(self._key_health)
+        ]
+
+    def _mark_success(self, key_index: int | None) -> None:
+        if key_index is not None:
+            health = self._key_health[key_index]
+            health.failure_count = 0
+            health.last_success = time.monotonic()
+
+    def _mark_failure(self, key_index: int | None, *, permanent: bool = False, cooldown: float = 0.0) -> None:
+        if key_index is not None:
+            health = self._key_health[key_index]
+            health.failure_count += 1
+            health.last_failure = time.monotonic()
+            health.disabled = permanent
+            health.cooldown_until = max(health.cooldown_until, time.monotonic() + cooldown)
+
+    def _retryable_error(self, exc: BaseException) -> bool:
+        if isinstance(exc, OllamaAuthError):
+            return any(not health.disabled for health in self._key_health)
+        if isinstance(exc, OllamaRateLimitError):
+            return any(not health.disabled and health.cooldown_until <= time.monotonic() for health in self._key_health)
+        return isinstance(exc, (OllamaTimeoutError, httpx.TransportError))
 
     def _headers(self) -> tuple[dict[str, str], int | None]:
         headers = {"Content-Type": "application/json"}
@@ -144,29 +197,34 @@ class OllamaClient:
         async def _attempt() -> dict[str, Any]:
             async with self._semaphore:
                 headers, key_index = self._headers()
+                if self._api_keys and key_index is None:
+                    raise OllamaAuthError("no healthy Ollama API key available")
                 try:
                     resp = await self._client.post("/api/chat", json=payload, headers=headers)
                 except httpx.TimeoutException as exc:
                     raise OllamaTimeoutError(str(exc)) from exc
                 if resp.status_code == 429:
+                    self._mark_failure(key_index, cooldown=20)
                     raise OllamaRateLimitError("ollama returned 429")
                 if resp.status_code in (401, 403):
                     # Bad/expired/revoked key at this index in the
                     # round-robin pool — never log the key itself, only
                     # its position, so ops can find and rotate it out.
+                    self._mark_failure(key_index, permanent=True)
                     logger.warning(
                         "ollama.auth_failed_rotating_key",
                         request_id=request_id, status=resp.status_code, key_index=key_index,
                     )
                     raise OllamaAuthError(f"ollama returned {resp.status_code} for key_index={key_index}")
                 resp.raise_for_status()
+                self._mark_success(key_index)
                 return resp.json()
 
         @retry(
             reraise=True,
             stop=stop_after_attempt(max(1, max_retries)),
             wait=wait_exponential(multiplier=1, min=1, max=20),
-            retry=retry_if_exception_type((OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, httpx.TransportError)),
+            retry=retry_if_exception(self._retryable_error),
         )
         async def _attempt_with_retry() -> dict[str, Any]:
             nonlocal retries_used

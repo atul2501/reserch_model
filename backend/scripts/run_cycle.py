@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import time
+import uuid
 
 from sqlalchemy import select
 
@@ -29,6 +31,8 @@ from app.execution.router import LiveSafetyGateError, get_execution_engine
 from app.market.feature_engine import InsufficientDataError, compute_features
 from app.market.market_data_service import MarketDataService
 from app.models.market import MarketFeatureSet, MarketRegimeRecord
+from app.models.system import WorkerCycle, WorkerLease
+from app.models.enums import Bias
 from app.models.strategy import Generation
 from app.schemas.market_context import MarketContext
 from app.services.ollama_client import OllamaClient
@@ -37,6 +41,24 @@ logger = get_logger(__name__)
 
 _prev_context: MarketContext | None = None
 _candle_index = 0
+_worker_id = str(uuid.uuid4())
+
+
+async def _acquire_or_refresh_lease(db, *, ttl_seconds: int = 180) -> bool:
+    """Best-effort durable single-worker lease. Database decision/cycle
+    uniqueness remains the final idempotency barrier if two processes race."""
+    now = time.time()
+    lease = await db.get(WorkerLease, "decision-worker")
+    if lease is not None and lease.owner_id != _worker_id and lease.expires_at > now:
+        logger.error("cycle.worker_lease_held", owner_id=lease.owner_id)
+        return False
+    if lease is None:
+        db.add(WorkerLease(name="decision-worker", owner_id=_worker_id, expires_at=now + ttl_seconds))
+    else:
+        lease.owner_id = _worker_id
+        lease.expires_at = now + ttl_seconds
+    await db.commit()
+    return True
 
 
 async def run_one_cycle(market_service: MarketDataService, ollama_client: OllamaClient) -> None:
@@ -44,18 +66,36 @@ async def run_one_cycle(market_service: MarketDataService, ollama_client: Ollama
     settings = get_settings()
 
     async with session_scope() as db:
+        if not await _acquire_or_refresh_lease(db):
+            return
         await market_service.sync_recent_candles(db)
 
         if await market_service.is_stale(db):
             logger.error("cycle.market_data_stale_skipping")
             return
 
-        candles = await market_service.get_recent_candles(db, limit=300)
+        candles = await market_service.get_recent_candles(db, limit=300, confirmed_only=True)
         try:
             context = compute_features(candles, symbol=settings.market_symbol, timeframe=settings.market_timeframe)
         except InsufficientDataError as exc:
             logger.warning("cycle.insufficient_data", detail=str(exc))
             return
+
+        cycle_id = f"{context.symbol}:{context.timeframe}:{context.candle_open_time}"
+        existing_cycle = await db.execute(
+            select(WorkerCycle).where(WorkerCycle.cycle_id == cycle_id)
+        )
+        if existing_cycle.scalar_one_or_none() is not None:
+            logger.info("cycle.duplicate_confirmed_candle_skipped", cycle_id=cycle_id)
+            return
+        cycle_started = time.time()
+        cycle = WorkerCycle(
+            cycle_id=cycle_id,
+            candle_timestamp=context.candle_open_time,
+            cycle_started_at=cycle_started,
+        )
+        db.add(cycle)
+        await db.flush()
 
         db.add(
             MarketFeatureSet(
@@ -138,6 +178,8 @@ async def run_one_cycle(market_service: MarketDataService, ollama_client: Ollama
                 global_max_daily_loss=settings.max_daily_loss,
                 market_data_age_seconds=market_age,
                 council_trade_allowed=council_trade_allowed,
+                council_bias=consensus.final_bias if council_decision_id is not None else None,
+                council_confidence=consensus.final_confidence if council_decision_id is not None else None,
             )
             logger.info(
                 "cycle.agents_processed", count=processed, generation=latest_generation.number,
@@ -154,6 +196,11 @@ async def run_one_cycle(market_service: MarketDataService, ollama_client: Ollama
                     latest_generation.number,
                     report={"note": "TODO: populate full extinction report (spec section 52)"},
                 )
+
+        cycle.cycle_completed_at = time.time()
+        cycle.cycle_latency_seconds = cycle.cycle_completed_at - cycle_started
+        cycle.completed = True
+        await db.commit()
 
         _prev_context = context
         _candle_index += 1
@@ -181,7 +228,10 @@ async def main(run_once: bool = False) -> None:
                 logger.exception("cycle.unhandled_error")
             if run_once:
                 break
-            await asyncio.sleep(interval_seconds)
+            # Align wake-up to the next exchange candle boundary rather than
+            # adding an interval after variable council/DB work completes.
+            now = time.time()
+            await asyncio.sleep(max(0.25, interval_seconds - (now % interval_seconds) + 0.25))
     finally:
         await market_service.aclose()
         await ollama_client.aclose()

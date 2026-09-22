@@ -180,6 +180,10 @@ def compute_features(candles: pd.DataFrame, symbol: str, timeframe: str) -> Mark
         timeframe=timeframe,
         candle_open_time=int(df["open_time"].iloc[-1]),
         close_price=float(close.iloc[-1]),
+        candle_high=float(high.iloc[-1]),
+        candle_low=float(low.iloc[-1]),
+        funding_rate=(float(df["funding_rate"].iloc[-1]) if "funding_rate" in df and pd.notna(df["funding_rate"].iloc[-1]) else None),
+        open_interest=(float(df["open_interest"].iloc[-1]) if "open_interest" in df and pd.notna(df["open_interest"].iloc[-1]) else None),
         trend=TrendFeatures(
             ema_fast=float(ema_fast.iloc[-1]),
             ema_slow=float(ema_slow.iloc[-1]),

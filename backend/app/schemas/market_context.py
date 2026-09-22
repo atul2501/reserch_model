@@ -77,6 +77,8 @@ class MarketContext(BaseModel):
     timeframe: str
     candle_open_time: int
     close_price: float
+    candle_high: float | None = None
+    candle_low: float | None = None
 
     trend: TrendFeatures
     momentum: MomentumFeatures

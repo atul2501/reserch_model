@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import JSON, BigInteger, Float, ForeignKey, Uuid
+from sqlalchemy import JSON, BigInteger, Float, ForeignKey, Uuid, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -18,6 +18,10 @@ from app.models.enums import Bias, RiskDecision
 
 class Decision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "decisions"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "market_candle_open_time", name="uq_decision_agent_candle"),
+        Index("ix_decision_candle", "market_candle_open_time"),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
@@ -37,6 +41,9 @@ class Decision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     agent_signal: Mapped[Bias] = mapped_column(SAEnum(Bias, name="decision_signal_enum"), nullable=False)
     agent_signal_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     agent_signal_reasoning: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    council_bias: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_council_bias_enum"), nullable=True)
+    council_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    final_signal: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_final_signal_enum"), nullable=True)
 
     risk_decision: Mapped[RiskDecision] = mapped_column(SAEnum(RiskDecision, name="decision_risk_enum"), nullable=False)
     risk_reasoning: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

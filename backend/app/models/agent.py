@@ -51,6 +51,9 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     day_start_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     trade_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    daily_trade_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_trade_time: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    cooldown_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     is_professional: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Highest equity multiple milestone reached (2, 3, 5, 10, ...). Section 16:

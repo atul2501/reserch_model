@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Uuid, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -15,6 +15,7 @@ from app.models.enums import ExecutionVenue, OrderStatus, Side, StrategyStage
 
 class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "orders"
+    __table_args__ = (Index("ix_orders_agent_created", "agent_id", "created_at"),)
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     # Orders <-> Decisions is a logical circular reference (Order references
@@ -33,6 +34,10 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     side: Mapped[Side] = mapped_column(SAEnum(Side, name="order_side_enum"), nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    requested_notional: Mapped[float | None] = mapped_column(Float, nullable=True)
+    approved_notional: Mapped[float | None] = mapped_column(Float, nullable=True)
+    initial_margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     requested_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     leverage: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
 
@@ -55,6 +60,7 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "positions"
+    __table_args__ = (Index("ix_positions_agent_open", "agent_id", "is_open"),)
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -63,6 +69,11 @@ class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
     leverage: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    initial_margin: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    maintenance_margin: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    peak_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trough_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_funding_time: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     stop_loss_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     take_profit_price: Mapped[float | None] = mapped_column(Float, nullable=True)

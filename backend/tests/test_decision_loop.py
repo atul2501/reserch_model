@@ -348,17 +348,18 @@ async def test_council_incomplete_blocks_new_entries_but_still_processes_exits(d
 
     # Now let council recover and open a real position, then verify a
     # later council-incomplete candle still permits closing it.
+    confirmed_entry_context = _context(open_time=2, close=100.0, rsi=65.0, trend_strength=0.01)
     await run_decision_cycle(
-        db_session, execution_engine, entry_context, None, generation=100, council_decision_id=None,
+        db_session, execution_engine, confirmed_entry_context, entry_context, generation=100, council_decision_id=None,
         global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
         market_data_age_seconds=1.0, council_trade_allowed=True,
     )
     positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
     assert len(positions) == 1
 
-    exit_context = _context(open_time=2, close=110.0, rsi=30.0, trend_strength=0.01)
+    exit_context = _context(open_time=3, close=110.0, rsi=30.0, trend_strength=0.01)
     await run_decision_cycle(
-        db_session, execution_engine, exit_context, entry_context, generation=100, council_decision_id=None,
+        db_session, execution_engine, exit_context, confirmed_entry_context, generation=100, council_decision_id=None,
         global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
         market_data_age_seconds=1.0, council_trade_allowed=False,  # council incomplete again — exit must still work
     )
