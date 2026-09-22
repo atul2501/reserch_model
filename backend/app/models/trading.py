@@ -4,29 +4,25 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 from app.models.enums import ExecutionVenue, OrderStatus, Side
 
 
 class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "orders"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
-    # use_alter breaks the orders<->decisions circular FK dependency (Order
-    # references Decision, Decision references Order) so both tables can be
-    # created before either foreign key is added.
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    # Orders <-> Decisions is a logical circular reference (Order references
+    # the Decision that spawned it; Decision.order_id is filled in afterward
+    # once execution completes). Only this side carries a real FK constraint
+    # — see the matching comment on Decision.order_id in decision.py.
     decision_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("decisions.id", use_alter=True, name="fk_orders_decision_id"),
-        nullable=True,
+        Uuid(as_uuid=True), ForeignKey("decisions.id"), nullable=True
     )
 
     # Idempotency key so a network retry can never duplicate an order
@@ -46,16 +42,16 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     rejection_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
-    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    filled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    filled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
-    raw_venue_response: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    raw_venue_response: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
 
 class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "positions"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     side: Mapped[Side] = mapped_column(SAEnum(Side, name="position_side_enum"), nullable=False)
 
@@ -70,8 +66,8 @@ class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     unrealized_pnl: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     is_open: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -81,10 +77,10 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "trades"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
-    position_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("positions.id"), nullable=False)
-    entry_order_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("orders.id"), nullable=True)
-    exit_order_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("orders.id"), nullable=True)
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    position_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("positions.id"), nullable=False)
+    entry_order_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("orders.id"), nullable=True)
+    exit_order_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("orders.id"), nullable=True)
 
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     side: Mapped[Side] = mapped_column(SAEnum(Side, name="trade_side_enum"), nullable=False)
@@ -99,8 +95,8 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     slippage_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     net_pnl: Mapped[float] = mapped_column(Float, nullable=False)
 
-    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    closed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     holding_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
 
     entry_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)

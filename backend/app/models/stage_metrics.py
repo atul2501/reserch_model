@@ -8,13 +8,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer
+from sqlalchemy import Float, ForeignKey, Integer, Uuid
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 from app.models.enums import StrategyStage
 
 
@@ -27,7 +26,7 @@ class StageMetrics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "stage_metrics"
 
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
     )
     stage: Mapped[StrategyStage] = mapped_column(SAEnum(StrategyStage, name="strategy_stage_enum"), nullable=False)
 
@@ -42,4 +41,4 @@ class StageMetrics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     oos_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     walk_forward_consistency: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

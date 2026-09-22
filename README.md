@@ -14,20 +14,23 @@ places a trade or overrides the risk engine.
 
 ## Status: this is a working foundation, not a finished product
 
-This repository was built from zero in one focused implementation pass. Everything
-described below as "built" has been exercised against a real PostgreSQL database and
-(where applicable) the real Hyperliquid public API — not just written and assumed
-correct. Everything under "Known gaps" is an honest TODO, not a stub pretending to be
-finished (see `app/execution/live_adapter.py` for the canonical example of how this
-codebase prefers "raises NotImplementedError with a clear reason" over a fake
-implementation).
+This repository was built from zero in one focused implementation pass, then migrated
+from Postgres to a single local SQLite file so the whole stack runs with zero external
+services. Everything described below as "built" has been exercised against a real
+database (originally Postgres, now SQLite — the ~525-agent population was carried over
+via `scripts/migrate_postgres_to_sqlite.py`) and (where applicable) the real
+Hyperliquid public API — not just written and assumed correct. Everything under "Known
+gaps" is an honest TODO, not a stub pretending to be finished (see
+`app/execution/live_adapter.py` for the canonical example of how this codebase prefers
+"raises NotImplementedError with a clear reason" over a fake implementation).
 
 ### What's built and verified
 
 - **Config / logging / database** — Pydantic settings, structured JSON logging with
-  secret redaction, async SQLAlchemy + Alembic. Migration applies and rolls back
-  cleanly against Postgres 16 (verified, including a fix for a circular FK between
-  `orders`/`decisions` and for Postgres enum types not being dropped on downgrade).
+  secret redaction, async SQLAlchemy + Alembic, SQLite (`aiosqlite`/`sqlite3`). A single
+  squashed migration applies and rolls back cleanly (the `orders`/`decisions` circular
+  reference is resolved by only one side carrying a real FK constraint, rather than
+  Postgres's deferred `ALTER TABLE ADD CONSTRAINT`, which SQLite doesn't support).
 - **Market data pipeline** — `HyperliquidClient` fetches real 1m SOL candles from
   Hyperliquid's public `/info` endpoint (verified live). `MarketDataService` upserts
   idempotently, detects gaps, and flags stale data.
@@ -75,8 +78,8 @@ implementation).
   is wired together and integration-tested end-to-end, including mark-to-market of
   open positions every candle.
 - **API + dashboard** — `/api/system/health`, `/api/market`, `/api/population`,
-  `/api/agents`, `/api/agents/{id}`, `/api/leaderboard`. A React/TypeScript/Tailwind
-  dashboard (dark, dense, table-first — not a consumer SaaS look) polls these and was
+  `/api/agents`, `/api/agents/{id}`, `/api/leaderboard`. A single unstyled static page
+  (`backend/app/static/index.html`, served by FastAPI at `/`) polls these and was
   visually verified against live data.
 - **End-to-end run**: `bootstrap_population.py` created a real diverse population in
   Postgres, `run_cycle.py --once` fetched a live SOL candle from Hyperliquid, computed
@@ -136,22 +139,20 @@ flowchart TD
     BT --> DNA
     AGENT --> API[FastAPI]
     MC --> API
-    API --> UI[React dashboard]
+    API --> UI[static HTML page]
 ```
 
 ```mermaid
 flowchart LR
     subgraph Deployment
-        PG[(PostgreSQL)]
-        API[backend: FastAPI]
+        DB[(SQLite file: trading_lab.db)]
+        API[backend: FastAPI, serves API + the static frontend]
         WORKER[worker: run_cycle.py]
-        UI[frontend: React/Vite]
     end
-    API --> PG
-    WORKER --> PG
+    API --> DB
+    WORKER --> DB
     WORKER -->|REST| HL[Hyperliquid]
     WORKER -->|REST, external only| OLLAMA[Ollama API]
-    UI -->|REST, polling| API
 ```
 
 The API process and the trading worker are separate processes on purpose
@@ -176,70 +177,65 @@ backend/app/
   backtesting/ event-driven engine, splits, walk-forward
   services/    OllamaClient
   api/         FastAPI routes
+  static/      the frontend — a single unstyled index.html served at "/"
 backend/scripts/
   bootstrap_population.py   create/recreate a generation of agents
   run_cycle.py              the main trading-cycle worker (--once for a single pass)
 backend/tests/    56 tests across DNA, lifecycle, risk, execution safety, council,
                   Ollama client failure modes, feature engine, fitness, backtesting,
                   and a full decision-loop integration test
-frontend/src/     React/TS/Tailwind dashboard (Dashboard page, Panel/StatTile/StatusDot
-                  components, polling hook, typed API client)
+run.sh            single entrypoint: sets up venv/migrations if needed, then runs the
+                  worker and the API (which also serves the frontend). No external
+                  database — trading_lab.db is a plain SQLite file.
 ```
 
 ## Setup
 
-### Backend
+### Run everything
+
+```bash
+./run.sh
+```
+
+This is the only command you need. It creates the backend virtualenv and installs
+dependencies if missing, applies migrations against the local SQLite file
+(`backend/trading_lab.db`, created automatically on first run), bootstraps the initial
+agent population if none exists, starts the trading worker in the background, and
+starts the API on `http://localhost:8000` — which also serves the frontend at `/`.
+Ctrl-C stops both the API and the worker. There's no database server to install or run.
+
+Before first run, fill in `backend/.env` (copied automatically from `.env.example` if
+missing) with `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` / `OLLAMA_MODEL`.
+
+### Manual / step-by-step backend setup
+
+Only needed if you want to run pieces individually instead of `./run.sh`:
 
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp ../.env.example .env   # then fill in OLLAMA_BASE_URL / OLLAMA_API_KEY / OLLAMA_MODEL
-```
 
-Create the database (adjust for your local Postgres):
+alembic upgrade head   # creates ./trading_lab.db if it doesn't exist yet
 
-```bash
-createdb trading_lab   # or: psql -c "CREATE DATABASE trading_lab OWNER trading_lab;"
-alembic upgrade head
-```
-
-Create the initial population and run one trading cycle:
-
-```bash
 python -m scripts.bootstrap_population
 python -m scripts.run_cycle --once     # or omit --once to loop forever
-```
 
-Run the API:
-
-```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload          # API + frontend at http://localhost:8000
 ```
 
 Run tests (uses `DATABASE_URL` from `.env`, or point it at a disposable test DB):
 
 ```bash
-DATABASE_URL="postgresql+asyncpg://trading_lab:trading_lab@localhost:5432/trading_lab_test" pytest
+DATABASE_URL="sqlite+aiosqlite:///./test_trading_lab.db" pytest
 ```
 
 ### Frontend
 
-```bash
-cd frontend
-npm install
-cp .env.example .env   # VITE_API_BASE_URL, defaults to http://localhost:8000
-npm run dev
-```
-
-### Docker
-
-```bash
-docker compose up --build
-```
-
-Ollama is intentionally **not** in `docker-compose.yml` — this platform always calls
-an external Ollama API (`OLLAMA_BASE_URL`), never a local container.
+There is no separate frontend app or build step — `backend/app/static/index.html` is a
+single plain HTML/JS file (no styling, no framework) that polls the API and is served
+directly by FastAPI at `/`.
 
 ## Trading modes
 
@@ -271,7 +267,7 @@ TRADING_MODE=live     # requires LIVE_TRADING_ENABLED=true, LIVE_ACCOUNT_CONFIRM
 
 ## Testing summary
 
-56 backend tests, all passing against a real PostgreSQL instance (no mocked DB):
+74 backend tests, all passing against a real SQLite database (no mocked DB):
 DNA validation/mutation/crossover, agent lifecycle and permanence, deterministic risk
 decisions, paper-execution safety and idempotency, council consensus/judge logic,
 Ollama client failure handling (timeout/429/malformed JSON/schema mismatch), feature

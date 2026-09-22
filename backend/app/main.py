@@ -9,15 +9,19 @@ this is deliberate, not an oversight; see docs/architecture.md.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api.routes import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 
 logger = get_logger(__name__)
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -44,6 +48,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router)
+
+    @app.get("/")
+    async def frontend():
+        return FileResponse(STATIC_DIR / "index.html")
+
     return app
 
 

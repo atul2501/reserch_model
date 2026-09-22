@@ -7,8 +7,7 @@ market data themselves.
 from __future__ import annotations
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import BigInteger, Float, Index, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON, BigInteger, Float, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -58,7 +57,7 @@ class MarketFeatureSet(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Full computed feature vector (trend/momentum/volatility/structure/
     # volume/price-action — see feature_engine.py for the schema this fills).
-    features: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    features: Mapped[dict] = mapped_column(JSON, nullable=False)
 
 
 class MarketRegimeRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -75,4 +74,4 @@ class MarketRegimeRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     regime: Mapped[MarketRegime] = mapped_column(SAEnum(MarketRegime, name="market_regime_enum"), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     detector_version: Mapped[str] = mapped_column(String(16), default="v1", nullable=False)
-    detail: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

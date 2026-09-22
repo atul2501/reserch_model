@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.enums import AgentStatus, MarketRegime
+from app.models.enums import AgentStatus, MarketRegime, Side
 
 
 class AgentSummary(BaseModel):
@@ -67,6 +67,25 @@ class PopulationSummary(BaseModel):
     total_equity: float
     total_realized_pnl: float
     total_capital_allocated: float
+
+
+class TradeSummary(BaseModel):
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_identifier: str
+    symbol: str
+    side: Side
+    quantity: float
+    entry_price: float
+    exit_price: float
+    net_pnl: float
+    gross_pnl: float
+    fees: float
+    exit_regime: str | None
+    exit_reason: str
+    opened_at: datetime
+    closed_at: datetime
+    holding_seconds: int
 
 
 class SystemHealth(BaseModel):

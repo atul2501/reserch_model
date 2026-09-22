@@ -56,8 +56,8 @@ class Settings(BaseSettings):
     max_daily_loss: float = 0.10
 
     # --- Database -----------------------------------------------------------
-    database_url: str = "postgresql+asyncpg://trading_lab:trading_lab@localhost:5432/trading_lab"
-    database_url_sync: str = "postgresql+psycopg2://trading_lab:trading_lab@localhost:5432/trading_lab"
+    database_url: str = "sqlite+aiosqlite:///./trading_lab.db"
+    database_url_sync: str = "sqlite:///./trading_lab.db"
 
     # --- Paper execution simulation ---------------------------------------
     paper_fee_rate: float = 0.00045

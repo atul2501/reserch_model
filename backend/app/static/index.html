@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Lab Dashboard</title>
+<style>
+:root {
+  --bg: #060810;
+  --surface: #0b0e15;
+  --surface-2: #10141c;
+  --surface-3: #151a24;
+  --line: #1d232d;
+  --line-strong: #2b3340;
+  --text: #e6e9ee;
+  --text-strong: #f8f9fb;
+  --muted: #8791a0;
+  --blue: #6ea8ff;
+  --green: #3fd096;
+  --red: #f16b7c;
+  --amber: #e2ac57;
+  --purple: #b494ef;
+  --radius: 10px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0 0 40px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.wrap { width: min(1400px, calc(100% - 32px)); margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+
+header {
+  position: sticky; top: 0; z-index: 10;
+  margin: 0 0 18px; padding: 14px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: rgba(6,8,16,.9);
+  border-bottom: 1px solid var(--line);
+}
+h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-strong); }
+h1 span { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
+
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface-2);
+  font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+  color: #aeb6c1;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+.dot.green { background: var(--green); }
+.dot.red { background: var(--red); }
+.dot.amber { background: var(--amber); }
+.dot.grey { background: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 20px; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+.card {
+  padding: 14px 15px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+
+section { margin-bottom: 20px; }
+section h2 {
+  margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8;
+}
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px;
+}
+.chart-wrap { height: 200px; }
+.chart-wrap svg { width: 100%; height: 100%; display: block; }
+
+.table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+#leaderboard-load-more {
+  appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
+  color: var(--text); border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px;
+  font-weight: 650; cursor: pointer;
+}
+#leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
+#leaderboard-load-more:disabled { opacity: .4; cursor: default; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+td { color: #bcc3cc; }
+tbody tr:hover { background: var(--surface-2); }
+
+.pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 650; }
+.side-long { color: var(--green); background: rgba(63,208,150,.13); }
+.side-short { color: var(--red); background: rgba(241,107,124,.13); }
+.tier-pro { color: var(--purple); background: rgba(180,148,239,.13); }
+.tier-std { color: var(--muted); background: var(--surface-3); }
+
+.empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Trading Lab <span id="market-title">loading...</span></h1>
+    <div class="badges" id="badges"></div>
+  </header>
+
+  <div class="grid" id="stat-cards"></div>
+
+  <section>
+    <h2>Market</h2>
+    <div class="panel" id="market-panel"></div>
+  </section>
+
+  <section class="two-col">
+    <div>
+      <h2>Total Equity Over Time <span style="color:var(--muted);font-weight:500;text-transform:none;">(since page opened)</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="equityChart"></svg></div></div>
+    </div>
+    <div>
+      <h2>Active Agents Over Time <span style="color:var(--muted);font-weight:500;text-transform:none;">(since page opened)</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="popChart"></svg></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Leaderboard <span style="color:var(--muted);font-weight:500;text-transform:none;">(showing <span id="lb-shown">0</span> of <span id="lb-total">0</span>)</span></h2>
+    <div class="panel">
+      <div class="table-scroll">
+        <table id="leaderboard-table">
+          <thead><tr>
+            <th>Rank</th><th>ID</th><th>Tier</th><th>Gen</th><th>Strategy</th>
+            <th>Balance</th><th>Equity</th><th>ROI</th><th>Realized PnL</th><th>Trades</th><th>Fitness</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div style="text-align:center; margin-top:10px;">
+        <button id="leaderboard-load-more" type="button">Load more</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recent Trades</h2>
+    <div class="panel table-scroll">
+      <table id="trades-table">
+        <thead><tr>
+          <th>Agent</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th>
+          <th>Net PnL</th><th>Reason</th><th>Opened</th><th>Closed</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Auto-refresh every 5s &middot; <span id="refresh-status">connecting...</span></footer>
+</div>
+
+<script>
+const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
+const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
+const timeStr = (iso) => iso ? new Date(iso).toLocaleTimeString() : "-";
+const ago = (iso) => {
+  if (!iso) return "-";
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime())/1000));
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  return Math.floor(s/3600) + "h ago";
+};
+
+async function get(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+
+// One section failing must never freeze the others.
+async function section(name, fn) {
+  try { await fn(); } catch (e) { console.error(`section "${name}" failed:`, e); }
+}
+
+// Minimal dependency-free SVG line chart, built from in-browser history
+// (no backend time-series endpoint needed) - accumulated by pushHistory().
+function renderLineChart(svg, points, color) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 200;
+  const padL = 46, padR = 8, padT = 8, padB = 18;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  if (points.length < 2) {
+    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">Collecting data...</text>`;
+    return;
+  }
+  const vals = points.map(p => p.v);
+  let minV = Math.min(...vals), maxV = Math.max(...vals);
+  if (minV === maxV) { minV -= 1; maxV += 1; }
+  const pad = (maxV - minV) * 0.1;
+  minV -= pad; maxV += pad;
+
+  const xAt = i => padL + (i / (points.length - 1)) * plotW;
+  const yAt = v => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
+
+  let out = "";
+  for (let i = 0; i <= 3; i++) {
+    const v = minV + (maxV - minV) * (i / 3);
+    const gy = yAt(v);
+    out += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#1d232d"/>`;
+    out += `<text x="${padL-6}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#8791a0">${fmt(v,0)}</text>`;
+  }
+  const d = points.map((p,i) => (i===0?"M":"L") + xAt(i).toFixed(1) + "," + yAt(p.v).toFixed(1)).join(" ");
+  out += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  svg.innerHTML = out;
+}
+
+const equityHistory = [];
+const popHistory = [];
+const MAX_HISTORY_POINTS = 120;
+function pushHistory(arr, value) {
+  if (value === null || value === undefined || isNaN(value)) return;
+  arr.push({ v: value });
+  if (arr.length > MAX_HISTORY_POINTS) arr.shift();
+}
+
+// How many leaderboard rows to show, grown by LEADERBOARD_PAGE_SIZE each
+// time "Load more" is clicked. Re-sent as `limit` on every 5s auto-refresh
+// too (not true offset pagination) - the displayed set is simply "the top
+// N", so it can't duplicate or shift between clicks.
+let leaderboardLimit = 50;
+const LEADERBOARD_PAGE_SIZE = 50;
+const LEADERBOARD_MAX = 500;
+let lastActiveCount = 0;
+
+document.getElementById("leaderboard-load-more").addEventListener("click", () => {
+  leaderboardLimit = Math.min(LEADERBOARD_MAX, leaderboardLimit + LEADERBOARD_PAGE_SIZE);
+  refresh();
+});
+
+function healthBadge(ok, label) {
+  const cls = ok === null || ok === undefined ? "grey" : (ok ? "green" : "red");
+  return `<span class="badge"><span class="dot ${cls}"></span>${label}</span>`;
+}
+
+async function refresh() {
+  await section("health", async () => {
+    const h = await get("/api/system/health");
+    document.getElementById("badges").innerHTML =
+      `<span class="badge"><span class="dot ${h.trading_mode === 'live' ? 'red' : 'green'}"></span>${h.trading_mode.toUpperCase()}</span>` +
+      healthBadge(h.database_ok, "DB") +
+      healthBadge(h.hyperliquid_configured, "Hyperliquid") +
+      healthBadge(h.ollama_configured, "Ollama") +
+      healthBadge(h.market_data_stale === false, h.market_data_stale ? "Market stale" : "Market fresh");
+  });
+
+  await section("market", async () => {
+    const m = await get("/api/market");
+    document.getElementById("market-title").textContent = `${m.symbol} $${fmt(m.close_price)}`;
+    document.getElementById("market-panel").innerHTML = `
+      <div class="grid" style="margin:0;grid-template-columns:repeat(5,minmax(0,1fr));">
+        <div><div class="card-label" style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Price</div><div>$${fmt(m.close_price)}</div></div>
+        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Regime</div><div>${m.regime} (${pct(m.regime_confidence)})</div></div>
+        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volatility %ile</div><div>${pct(m.volatility_percentile)}</div></div>
+        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volume Ratio</div><div>${fmt(m.volume_ratio)}x</div></div>
+        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Candle Time</div><div>${new Date(m.candle_open_time).toLocaleTimeString()}</div></div>
+      </div>`;
+  });
+
+  await section("population", async () => {
+    const p = await get("/api/population");
+    document.getElementById("stat-cards").innerHTML = `
+      <div class="card"><div class="label">Generation</div><div class="value num">${p.generation}</div></div>
+      <div class="card"><div class="label">Active Agents</div><div class="value num">${p.active_count} / ${p.target_size}</div></div>
+      <div class="card"><div class="label">Dead Agents</div><div class="value num">${p.dead_count}</div></div>
+      <div class="card"><div class="label">Professional</div><div class="value num">${p.professional_count}</div></div>
+      <div class="card"><div class="label">Total Equity</div><div class="value num">$${fmt(p.total_equity)}</div></div>
+      <div class="card"><div class="label">Total Realized PnL</div><div class="value num ${p.total_realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.total_realized_pnl)}</div></div>`;
+
+    pushHistory(equityHistory, p.total_equity);
+    pushHistory(popHistory, p.active_count);
+    renderLineChart(document.getElementById("equityChart"), equityHistory, "#6ea8ff");
+    renderLineChart(document.getElementById("popChart"), popHistory, "#3fd096");
+    lastActiveCount = p.active_count;
+  });
+
+  await section("leaderboard", async () => {
+    const rows = await get(`/api/leaderboard?limit=${leaderboardLimit}`);
+    const tbody = document.querySelector("#leaderboard-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="11" class="empty">No agents yet</td></tr>`; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="num">${r.rank}</td>
+        <td>${r.agent.identifier}</td>
+        <td><span class="pill ${r.agent.is_professional ? 'tier-pro' : 'tier-std'}">${r.agent.is_professional ? 'PRO' : 'std'}</span></td>
+        <td class="num">${r.agent.generation}</td>
+        <td>${r.strategy_family || "-"}</td>
+        <td class="num">$${fmt(r.agent.balance)}</td>
+        <td class="num">$${fmt(r.agent.equity)}</td>
+        <td class="num ${r.agent.roi >= 0 ? 'pos' : 'neg'}">${pct(r.agent.roi)}</td>
+        <td class="num ${r.agent.realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.agent.realized_pnl)}</td>
+        <td class="num">${r.agent.trade_count}</td>
+        <td class="num">${fmt(r.agent.fitness)}</td>
+      </tr>`).join("");
+
+    document.getElementById("lb-shown").textContent = rows.length;
+    document.getElementById("lb-total").textContent = lastActiveCount || rows.length;
+    const loadMoreBtn = document.getElementById("leaderboard-load-more");
+    const atEnd = rows.length < leaderboardLimit || leaderboardLimit >= LEADERBOARD_MAX;
+    loadMoreBtn.style.display = atEnd ? "none" : "";
+  });
+
+  await section("trades", async () => {
+    const rows = await get("/api/trades?limit=50");
+    const tbody = document.querySelector("#trades-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">No trades yet</td></tr>`; return; }
+    tbody.innerHTML = rows.map(t => `
+      <tr>
+        <td>${t.agent_identifier}</td>
+        <td><span class="pill ${t.side === 'LONG' ? 'side-long' : 'side-short'}">${t.side}</span></td>
+        <td class="num">$${fmt(t.entry_price)}</td>
+        <td class="num">$${fmt(t.exit_price)}</td>
+        <td class="num">${fmt(t.quantity, 4)}</td>
+        <td class="num ${t.net_pnl >= 0 ? 'pos' : 'neg'}">${dollar(t.net_pnl)}</td>
+        <td>${t.exit_reason}</td>
+        <td>${ago(t.opened_at)}</td>
+        <td>${ago(t.closed_at)}</td>
+      </tr>`).join("");
+  });
+
+  document.getElementById("refresh-status").textContent = "last updated " + new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

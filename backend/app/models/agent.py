@@ -9,14 +9,13 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime
+from sqlalchemy import Date
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import Float, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 from app.models.enums import AgentStatus
 
 
@@ -28,7 +27,7 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
     )
 
     status: Mapped[AgentStatus] = mapped_column(
@@ -58,7 +57,7 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # this must never be downgraded when equity later falls.
     best_milestone_multiple: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
 
-    death_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    death_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     death_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     final_equity: Mapped[float | None] = mapped_column(Float, nullable=True)
     final_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)

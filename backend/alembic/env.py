@@ -28,13 +28,17 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    # SQLite has very limited ALTER TABLE support (no ALTER/DROP COLUMN,
+    # no ADD CONSTRAINT) — batch mode has Alembic recreate the table under
+    # the hood for any migration that needs one of those.
+    context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True)
     with context.begin_transaction():
         context.run_migrations()
 

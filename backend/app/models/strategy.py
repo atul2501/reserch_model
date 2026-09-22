@@ -14,9 +14,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -42,18 +40,18 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "strategy_versions"
     __table_args__ = (UniqueConstraint("strategy_id", "version", name="uq_strategy_version"),)
 
-    strategy_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("strategies.id"), nullable=False)
+    strategy_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("strategies.id"), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
 
     parent_strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=True
     )
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
-    mutation_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    mutation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
     # Full strategy DNA payload — validated against app.schemas.strategy.StrategyDNA
     # before insertion. This column is never mutated after creation.
-    dna: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    dna: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     stage: Mapped[StrategyStage] = mapped_column(
         SAEnum(StrategyStage, name="strategy_stage_enum"), default=StrategyStage.RESEARCH, nullable=False
@@ -87,20 +85,20 @@ class AgentSnapshot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "agent_snapshots"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False
     )
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    strategy_dna: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    risk_config: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    indicator_config: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    model_config_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    regime_config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    strategy_dna: Mapped[dict] = mapped_column(JSON, nullable=False)
+    risk_config: Mapped[dict] = mapped_column(JSON, nullable=False)
+    indicator_config: Mapped[dict] = mapped_column(JSON, nullable=False)
+    model_config_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    regime_config: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     fitness: Mapped[float | None] = mapped_column(Float, nullable=True)
-    performance_metrics: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    performance_metrics: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     software_version: Mapped[str] = mapped_column(String(32), nullable=False)
     schema_version: Mapped[str] = mapped_column(String(32), nullable=False)

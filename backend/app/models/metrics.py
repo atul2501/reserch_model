@@ -8,20 +8,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import JSON, Float, ForeignKey, Integer, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 
 
 class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "performance_metrics"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
-    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    as_of: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     equity: Mapped[float] = mapped_column(Float, nullable=False)
     balance: Mapped[float] = mapped_column(Float, nullable=False)
@@ -49,7 +47,7 @@ class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     average_holding_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     survival_seconds: Mapped[float] = mapped_column(Float, nullable=False)
 
-    regime_performance: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    regime_performance: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     oos_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     walk_forward_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
@@ -57,8 +55,8 @@ class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 class FitnessScore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "fitness_scores"
 
-    agent_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
-    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    as_of: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     fitness: Mapped[float] = mapped_column(Float, nullable=False)
     return_score: Mapped[float] = mapped_column(Float, nullable=False)
@@ -69,4 +67,4 @@ class FitnessScore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     drawdown_penalty: Mapped[float] = mapped_column(Float, nullable=False)
     instability_penalty: Mapped[float] = mapped_column(Float, nullable=False)
 
-    weights_used: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    weights_used: Mapped[dict] = mapped_column(JSON, nullable=False)
