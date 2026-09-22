@@ -47,6 +47,13 @@ def configure_logging() -> None:
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         _redact,
         structlog.processors.StackInfoRenderer(),
+        # Without this, logger.exception(...)'s exc_info=True is a raw
+        # (type, value, traceback) tuple the JSON renderer can't serialize
+        # — it was silently degrading to the literal string/bool "true"
+        # with the actual exception and traceback dropped entirely. This
+        # is why "cycle.unhandled_error" never carried a traceback: it
+        # never made it into the log at all, not even for a human to grep.
+        structlog.processors.format_exc_info,
     ]
 
     if settings.log_json:
