@@ -188,6 +188,18 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
   </section>
 
   <section>
+    <h2>Performance by Side <span class="sub">closed trades, grouped by LONG / SHORT</span></h2>
+    <div class="panel table-scroll">
+      <table id="side-table">
+        <thead><tr>
+          <th>Side</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <h2>Active Trades <span class="sub">(<span id="positions-count">0</span> open positions)</span></h2>
     <div class="panel table-scroll">
       <table id="positions-table">
@@ -398,6 +410,21 @@ async function refresh() {
     tbody.innerHTML = rows.map(r => `
       <tr>
         <td>${r.regime}</td>
+        <td class="num">${r.trade_count}</td>
+        <td class="num">${r.win_count}</td>
+        <td class="num">${pct(r.win_rate)}</td>
+        <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
+        <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
+      </tr>`).join("");
+  });
+
+  await section("side-performance", async () => {
+    const rows = await get("/api/trades/by-side");
+    const tbody = document.querySelector("#side-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty">No closed trades yet</td></tr>`; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.side}</td>
         <td class="num">${r.trade_count}</td>
         <td class="num">${r.win_count}</td>
         <td class="num">${pct(r.win_rate)}</td>
