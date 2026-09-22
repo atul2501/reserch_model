@@ -21,29 +21,44 @@
   --amber: #e2ac57;
   --purple: #b494ef;
   --radius: 10px;
+  --shadow: 0 6px 20px -8px rgba(0,0,0,.5);
+  --ease: cubic-bezier(.4,0,.2,1);
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
   padding: 0 0 40px;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% -10%, rgba(110,168,255,.06), transparent 50%),
+    radial-gradient(circle at 90% 0%, rgba(63,208,150,.05), transparent 45%);
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 13px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 .wrap { width: min(1400px, calc(100% - 32px)); margin: 0 auto; }
 .num { font-variant-numeric: tabular-nums; }
+.sub { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
 
 header {
   position: sticky; top: 0; z-index: 10;
-  margin: 0 0 18px; padding: 14px 0;
+  margin: 0 0 20px; padding: 14px 0;
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  background: rgba(6,8,16,.9);
+  background: rgba(6,8,16,.86);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
   border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 24px -18px rgba(0,0,0,.7);
 }
-h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-strong); }
-h1 span { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
+h1 {
+  margin: 0; font-size: 16px; font-weight: 700;
+  background: linear-gradient(95deg, var(--text-strong) 40%, var(--blue) 140%);
+  -webkit-background-clip: text; background-clip: text; color: var(--text-strong);
+}
+h1 span { -webkit-background-clip: initial; background-clip: initial; margin-left: 9px; color: var(--muted); font-size: 11px; font-weight: 500; }
 
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge {
@@ -52,52 +67,64 @@ h1 span { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 5
   border: 1px solid var(--line-strong); background: var(--surface-2);
   font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
   color: #aeb6c1;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
 .dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
-.dot.green { background: var(--green); }
-.dot.red { background: var(--red); }
-.dot.amber { background: var(--amber); }
+.dot.green { background: var(--green); box-shadow: 0 0 6px rgba(63,208,150,.7); }
+.dot.red { background: var(--red); box-shadow: 0 0 6px rgba(241,107,124,.7); }
+.dot.amber { background: var(--amber); box-shadow: 0 0 6px rgba(226,172,87,.7); }
 .dot.grey { background: var(--muted); }
 
-.grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 20px; }
+.grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 22px; }
 @media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 @media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 
 .card {
-  padding: 14px 15px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius);
+  position: relative;
+  padding: 14px 15px 14px 17px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), border-color .15s var(--ease);
 }
+.card::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--blue); opacity: .75;
+}
+.card:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
 .card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
-.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; }
+.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
 .pos { color: var(--green); }
 .neg { color: var(--red); }
 
 section { margin-bottom: 20px; }
 section h2 {
-  margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: baseline; gap: 8px;
+  border-bottom: 1px solid var(--line);
   font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8;
 }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
 
 .panel {
+  position: relative;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
-.chart-wrap { height: 200px; }
+.chart-wrap { height: 190px; }
 .chart-wrap svg { width: 100%; height: 100%; display: block; }
+.chart-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 4px; }
 
 .table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
 #leaderboard-load-more {
   appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
   color: var(--text); border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px;
-  font-weight: 650; cursor: pointer;
+  font-weight: 650; cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease);
 }
 #leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
-#leaderboard-load-more:disabled { opacity: .4; cursor: default; }
 table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 td { color: #bcc3cc; }
+tbody tr { transition: background .12s var(--ease); }
 tbody tr:hover { background: var(--surface-2); }
 
 .pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 650; }
@@ -107,7 +134,7 @@ tbody tr:hover { background: var(--surface-2); }
 .tier-std { color: var(--muted); background: var(--surface-3); }
 
 .empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
-footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .03em; }
 </style>
 </head>
 <body>
@@ -124,19 +151,45 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
     <div class="panel" id="market-panel"></div>
   </section>
 
-  <section class="two-col">
+  <section class="chart-grid">
     <div>
-      <h2>Total Equity Over Time <span style="color:var(--muted);font-weight:500;text-transform:none;">(since page opened)</span></h2>
-      <div class="panel"><div class="chart-wrap"><svg id="equityChart"></svg></div></div>
+      <h2>Price History <span class="sub">last 200 candles</span></h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="priceChart"></svg></div>
+        <div class="chart-label"><span id="price-label-left"></span><span id="price-label-right"></span></div>
+      </div>
     </div>
     <div>
-      <h2>Active Agents Over Time <span style="color:var(--muted);font-weight:500;text-transform:none;">(since page opened)</span></h2>
-      <div class="panel"><div class="chart-wrap"><svg id="popChart"></svg></div></div>
+      <h2>Cumulative Realized PnL <span class="sub">all closed trades</span></h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="pnlChart"></svg></div>
+        <div class="chart-label"><span id="pnl-label-left"></span><span id="pnl-label-right"></span></div>
+      </div>
+    </div>
+    <div>
+      <h2>Population Growth <span class="sub">agents created over time</span></h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="popChart"></svg></div>
+        <div class="chart-label"><span id="pop-label-left"></span><span id="pop-label-right"></span></div>
+      </div>
     </div>
   </section>
 
   <section>
-    <h2>Leaderboard <span style="color:var(--muted);font-weight:500;text-transform:none;">(showing <span id="lb-shown">0</span> of <span id="lb-total">0</span>)</span></h2>
+    <h2>Active Trades <span class="sub">(<span id="positions-count">0</span> open positions)</span></h2>
+    <div class="panel table-scroll">
+      <table id="positions-table">
+        <thead><tr>
+          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Current Price</th><th>Qty</th><th>Amount</th><th>Leverage</th>
+          <th>Unrealized PnL</th><th>Stop Loss Rule</th><th>Take Profit Rule</th><th>Opened</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Leaderboard <span class="sub">(showing <span id="lb-shown">0</span> of <span id="lb-total">0</span>)</span></h2>
     <div class="panel">
       <div class="table-scroll">
         <table id="leaderboard-table">
@@ -158,7 +211,7 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
     <div class="panel table-scroll">
       <table id="trades-table">
         <thead><tr>
-          <th>Agent</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th>
+          <th>Agent</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Amount</th>
           <th>Net PnL</th><th>Reason</th><th>Opened</th><th>Closed</th>
         </tr></thead>
         <tbody></tbody>
@@ -173,7 +226,7 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
 const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
-const timeStr = (iso) => iso ? new Date(iso).toLocaleTimeString() : "-";
+const dateStr = (ms) => ms ? new Date(ms).toLocaleString(undefined, {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "-";
 const ago = (iso) => {
   if (!iso) return "-";
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime())/1000));
@@ -193,23 +246,26 @@ async function section(name, fn) {
   try { await fn(); } catch (e) { console.error(`section "${name}" failed:`, e); }
 }
 
-// Minimal dependency-free SVG line chart, built from in-browser history
-// (no backend time-series endpoint needed) - accumulated by pushHistory().
+// Minimal dependency-free SVG line chart. `points` is [{v: number}, ...] in
+// chronological order, evenly spaced by index (not by real elapsed time) -
+// close enough for these series and keeps the renderer simple.
 function renderLineChart(svg, points, color) {
-  const w = svg.clientWidth || 400, h = svg.clientHeight || 200;
-  const padL = 46, padR = 8, padT = 8, padB = 18;
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 46, padR = 8, padT = 8, padB = 10;
   const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
 
   if (points.length < 2) {
-    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">Collecting data...</text>`;
+    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data yet</text>`;
     return;
   }
   const vals = points.map(p => p.v);
+  const allNonNegative = vals.every(v => v >= 0);
   let minV = Math.min(...vals), maxV = Math.max(...vals);
   if (minV === maxV) { minV -= 1; maxV += 1; }
   const pad = (maxV - minV) * 0.1;
   minV -= pad; maxV += pad;
+  if (allNonNegative && minV < 0) minV = 0;
 
   const xAt = i => padL + (i / (points.length - 1)) * plotW;
   const yAt = v => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
@@ -226,13 +282,9 @@ function renderLineChart(svg, points, color) {
   svg.innerHTML = out;
 }
 
-const equityHistory = [];
-const popHistory = [];
-const MAX_HISTORY_POINTS = 120;
-function pushHistory(arr, value) {
-  if (value === null || value === undefined || isNaN(value)) return;
-  arr.push({ v: value });
-  if (arr.length > MAX_HISTORY_POINTS) arr.shift();
+function setChartLabels(prefix, leftText, rightText) {
+  document.getElementById(`${prefix}-label-left`).textContent = leftText || "";
+  document.getElementById(`${prefix}-label-right`).textContent = rightText || "";
 }
 
 // How many leaderboard rows to show, grown by LEADERBOARD_PAGE_SIZE each
@@ -243,6 +295,19 @@ let leaderboardLimit = 50;
 const LEADERBOARD_PAGE_SIZE = 50;
 const LEADERBOARD_MAX = 500;
 let lastActiveCount = 0;
+let lastLivePrice = null;
+
+// Strategy DNA rules are relative (a multiple or a percent), not a fixed
+// trigger price - the trading engine evaluates them live each cycle rather
+// than storing a stop/target price on the position. Render them as what
+// they actually are instead of a price that doesn't exist.
+function formatRule(method, value) {
+  if (!method || value === null || value === undefined) return '<span style="color:var(--muted)">off</span>';
+  if (method === "fixed_pct") return `${fmt(value, 1)}%`;
+  if (method === "atr_multiple") return `${fmt(value, 2)}x ATR`;
+  if (method === "risk_reward_multiple") return `${fmt(value, 2)}R`;
+  return `${method} ${fmt(value, 2)}`;
+}
 
 document.getElementById("leaderboard-load-more").addEventListener("click", () => {
   leaderboardLimit = Math.min(LEADERBOARD_MAX, leaderboardLimit + LEADERBOARD_PAGE_SIZE);
@@ -267,15 +332,22 @@ async function refresh() {
 
   await section("market", async () => {
     const m = await get("/api/market");
+    lastLivePrice = m.close_price;
     document.getElementById("market-title").textContent = `${m.symbol} $${fmt(m.close_price)}`;
     document.getElementById("market-panel").innerHTML = `
       <div class="grid" style="margin:0;grid-template-columns:repeat(5,minmax(0,1fr));">
-        <div><div class="card-label" style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Price</div><div>$${fmt(m.close_price)}</div></div>
+        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Price</div><div>$${fmt(m.close_price)}</div></div>
         <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Regime</div><div>${m.regime} (${pct(m.regime_confidence)})</div></div>
         <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volatility %ile</div><div>${pct(m.volatility_percentile)}</div></div>
         <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volume Ratio</div><div>${fmt(m.volume_ratio)}x</div></div>
         <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Candle Time</div><div>${new Date(m.candle_open_time).toLocaleTimeString()}</div></div>
       </div>`;
+  });
+
+  await section("price-history", async () => {
+    const candles = await get("/api/market/history?limit=200");
+    renderLineChart(document.getElementById("priceChart"), candles.map(c => ({ v: c.close })), "#6ea8ff");
+    if (candles.length) setChartLabels("price", dateStr(candles[0].open_time), dateStr(candles[candles.length - 1].open_time));
   });
 
   await section("population", async () => {
@@ -287,12 +359,50 @@ async function refresh() {
       <div class="card"><div class="label">Professional</div><div class="value num">${p.professional_count}</div></div>
       <div class="card"><div class="label">Total Equity</div><div class="value num">$${fmt(p.total_equity)}</div></div>
       <div class="card"><div class="label">Total Realized PnL</div><div class="value num ${p.total_realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.total_realized_pnl)}</div></div>`;
-
-    pushHistory(equityHistory, p.total_equity);
-    pushHistory(popHistory, p.active_count);
-    renderLineChart(document.getElementById("equityChart"), equityHistory, "#6ea8ff");
-    renderLineChart(document.getElementById("popChart"), popHistory, "#3fd096");
     lastActiveCount = p.active_count;
+  });
+
+  await section("pnl-history", async () => {
+    const trades = await get("/api/trades?limit=500");
+    const chronological = [...trades].reverse(); // API returns newest first
+    let running = 0;
+    const points = chronological.map(t => { running += t.net_pnl; return { v: running }; });
+    renderLineChart(document.getElementById("pnlChart"), points, "#3fd096");
+    if (chronological.length) setChartLabels("pnl", ago(chronological[0].closed_at), ago(chronological[chronological.length - 1].closed_at));
+  });
+
+  await section("population-growth", async () => {
+    const agents = await get("/api/agents?limit=500");
+    const byCreated = [...agents].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const points = byCreated.map((_, i) => ({ v: i + 1 }));
+    renderLineChart(document.getElementById("popChart"), points, "#b494ef");
+    if (byCreated.length) setChartLabels("pop", ago(byCreated[0].created_at), ago(byCreated[byCreated.length - 1].created_at));
+  });
+
+  await section("positions", async () => {
+    const rows = await get("/api/positions?limit=200");
+    document.getElementById("positions-count").textContent = rows.length;
+    const tbody = document.querySelector("#positions-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="empty">No open positions</td></tr>`; return; }
+    tbody.innerHTML = rows.map(p => {
+      const priceCell = lastLivePrice === null ? "-" :
+        `$${fmt(lastLivePrice)} <span class="${lastLivePrice >= p.entry_price ? 'pos' : 'neg'}">(${lastLivePrice >= p.entry_price ? '+' : ''}${pct((lastLivePrice - p.entry_price) / p.entry_price)})</span>`;
+      return `
+      <tr>
+        <td>${p.agent_identifier}</td>
+        <td>${p.strategy_family || "-"}</td>
+        <td><span class="pill ${p.side === 'LONG' ? 'side-long' : 'side-short'}">${p.side}</span></td>
+        <td class="num">$${fmt(p.entry_price)}</td>
+        <td class="num">${priceCell}</td>
+        <td class="num">${fmt(p.quantity, 4)}</td>
+        <td class="num">$${fmt(p.quantity * p.entry_price)}</td>
+        <td class="num">${fmt(p.leverage, 1)}x</td>
+        <td class="num ${p.unrealized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.unrealized_pnl)}</td>
+        <td class="num">${formatRule(p.stop_loss_method, p.stop_loss_value)}</td>
+        <td class="num">${formatRule(p.take_profit_method, p.take_profit_value)}</td>
+        <td>${ago(p.opened_at)}</td>
+      </tr>`;
+    }).join("");
   });
 
   await section("leaderboard", async () => {
@@ -324,7 +434,7 @@ async function refresh() {
   await section("trades", async () => {
     const rows = await get("/api/trades?limit=50");
     const tbody = document.querySelector("#trades-table tbody");
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">No trades yet</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(t => `
       <tr>
         <td>${t.agent_identifier}</td>
@@ -332,6 +442,7 @@ async function refresh() {
         <td class="num">$${fmt(t.entry_price)}</td>
         <td class="num">$${fmt(t.exit_price)}</td>
         <td class="num">${fmt(t.quantity, 4)}</td>
+        <td class="num">$${fmt(t.quantity * t.entry_price)}</td>
         <td class="num ${t.net_pnl >= 0 ? 'pos' : 'neg'}">${dollar(t.net_pnl)}</td>
         <td>${t.exit_reason}</td>
         <td>${ago(t.opened_at)}</td>

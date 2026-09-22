@@ -69,21 +69,35 @@ class OllamaClient:
         if not settings.ollama_base_url:
             logger.warning("ollama.not_configured", detail="OLLAMA_BASE_URL is empty")
         self._base_url = settings.ollama_base_url.rstrip("/")
-        self._api_key = settings.ollama_api_key
+        # Multiple keys round-robin (see _next_key): every attempt, including
+        # retries, picks the next key in rotation, so a 429 on one key gets
+        # its retry on a *different* key instead of just backing off on the
+        # same rate-limited one.
+        self._api_keys = settings.ollama_api_key_list
+        self._key_cursor = 0
         self._model = settings.ollama_model
         self._timeout = settings.ollama_timeout_seconds
         self._max_retries = settings.ollama_max_retries
         self._semaphore = asyncio.Semaphore(settings.ollama_concurrency)
         self._client = httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout)
         self.last_stats: OllamaCallStats | None = None
+        logger.info("ollama.client_initialized", key_count=len(self._api_keys), model=self._model)
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    def _next_key(self) -> str | None:
+        if not self._api_keys:
+            return None
+        key = self._api_keys[self._key_cursor % len(self._api_keys)]
+        self._key_cursor += 1
+        return key
+
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
-        if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+        api_key = self._next_key()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def generate_structured(

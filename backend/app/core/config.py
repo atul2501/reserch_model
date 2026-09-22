@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # --- Ollama -------------------------------------------------------------
     ollama_base_url: str = ""
     ollama_api_key: str = ""
+    # Optional: multiple keys (e.g. several free-tier accounts), comma-separated.
+    # OllamaClient round-robins across these — every retry attempt picks the
+    # next key, so a 429 on one key is transparently retried on the next
+    # instead of just backing off on the same rate-limited key. Falls back
+    # to the single `ollama_api_key` above when unset.
+    ollama_api_keys: str = ""
     ollama_model: str = ""
     ollama_timeout_seconds: int = 120
     ollama_max_retries: int = 3
@@ -102,6 +108,13 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def ollama_api_key_list(self) -> list[str]:
+        keys = [k.strip() for k in self.ollama_api_keys.split(",") if k.strip()]
+        if not keys and self.ollama_api_key:
+            keys = [self.ollama_api_key]
+        return keys
 
     def is_live(self) -> bool:
         return self.trading_mode == TradingMode.LIVE

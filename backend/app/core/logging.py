@@ -14,7 +14,14 @@ import structlog
 
 from app.core.config import get_settings
 
-_REDACT_KEYS = {"api_key", "private_key", "authorization", "ollama_api_key", "hyperliquid_private_key"}
+_REDACT_KEYS = {
+    "api_key",
+    "private_key",
+    "authorization",
+    "ollama_api_key",
+    "ollama_api_keys",
+    "hyperliquid_private_key",
+}
 
 
 def _redact(_, __, event_dict: dict) -> dict:

@@ -69,6 +69,32 @@ class PopulationSummary(BaseModel):
     total_capital_allocated: float
 
 
+class CandlePoint(BaseModel):
+    open_time: int
+    close: float
+
+
+class PositionSummary(BaseModel):
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_identifier: str
+    symbol: str
+    side: Side
+    quantity: float
+    entry_price: float
+    leverage: float
+    unrealized_pnl: float
+    opened_at: datetime
+    strategy_family: str | None
+    # The trading engine evaluates stop-loss/take-profit rules live each
+    # cycle rather than storing a fixed trigger price on the position, so
+    # these describe the strategy's *rule* (from its DNA), not a price.
+    take_profit_method: str | None
+    take_profit_value: float | None
+    stop_loss_method: str | None
+    stop_loss_value: float | None
+
+
 class TradeSummary(BaseModel):
     id: uuid.UUID
     agent_id: uuid.UUID
