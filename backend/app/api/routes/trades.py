@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import bisect
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.agent import Agent
+from app.models.market import MarketRegimeRecord
 from app.models.trading import Trade
-from app.schemas.api import TradeSummary
+from app.schemas.api import RegimePerformance, TradeSummary
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
@@ -45,3 +48,51 @@ async def list_trades(
         )
         for trade, identifier in result.all()
     ]
+
+
+@router.get("/by-regime", response_model=list[RegimePerformance])
+async def get_regime_performance(db: AsyncSession = Depends(get_db)):
+    """Breaks down closed-trade performance by the market regime that was
+    active when each trade closed.
+
+    Trade.exit_regime is never actually set by the trading engine (it
+    evaluates fills live rather than stamping a regime onto the row), so
+    this reconstructs it: for each trade's close time, find the most recent
+    MarketRegimeRecord at or before that moment — the same regime the
+    shared market pipeline had classified at the time — and aggregate
+    win rate / PnL per regime from that.
+    """
+    trades = (await db.execute(select(Trade.net_pnl, Trade.closed_at))).all()
+    if not trades:
+        return []
+
+    regime_rows = (
+        await db.execute(select(MarketRegimeRecord.candle_open_time, MarketRegimeRecord.regime).order_by(MarketRegimeRecord.candle_open_time))
+    ).all()
+    open_times = [row[0] for row in regime_rows]
+    regimes = [row[1].value for row in regime_rows]
+
+    buckets: dict[str, list[float]] = {}
+    for net_pnl, closed_at in trades:
+        if open_times:
+            idx = bisect.bisect_right(open_times, int(closed_at.timestamp() * 1000)) - 1
+            regime = regimes[idx] if idx >= 0 else "UNKNOWN"
+        else:
+            regime = "UNKNOWN"
+        buckets.setdefault(regime, []).append(net_pnl)
+
+    results = []
+    for regime, pnls in buckets.items():
+        wins = sum(1 for p in pnls if p > 0)
+        results.append(
+            RegimePerformance(
+                regime=regime,
+                trade_count=len(pnls),
+                win_count=wins,
+                win_rate=wins / len(pnls),
+                total_pnl=sum(pnls),
+                avg_pnl=sum(pnls) / len(pnls),
+            )
+        )
+    results.sort(key=lambda r: r.trade_count, reverse=True)
+    return results
