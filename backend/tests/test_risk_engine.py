@@ -109,6 +109,26 @@ def test_reduces_oversized_position():
     assert "position_size_reduced_to_limit" in result.reasons
 
 
+def test_rejects_new_trade_when_council_incomplete():
+    """Fail-closed contract: an INCOMPLETE council cycle (quorum not met)
+    must block every NEW trade at the Risk Engine — the single actual
+    enforcement point, never bypassed by an upstream caller that already
+    "knows" the council failed."""
+    result = check_trade(
+        _base_input(council_trade_allowed=False),
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+    )
+    assert result.decision == RiskDecision.REJECTED
+    assert result.reasons == ["council_incomplete_no_new_trades"]
+    assert result.approved_notional == 0.0
+
+
+def test_council_trade_allowed_true_is_unaffected():
+    """Default (council healthy or not applicable) behaves exactly as
+    before this fix — this flag must never introduce a false rejection."""
+    assert _check(_base_input(council_trade_allowed=True)) == RiskDecision.APPROVED
+
+
 def test_reduces_excessive_leverage():
     result = check_trade(
         _base_input(proposed_leverage=100.0),

@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     evolution_enabled: bool = True
     council_interval_candles: int = 5
     council_consensus_margin: int = 2
+    # Below this many successfully-responding analysts (of 8), the council
+    # cycle is INCOMPLETE: final_bias forced to NEUTRAL, trade_allowed=False,
+    # and the Risk Engine rejects any new entry for this candle. A partial
+    # response (e.g. 5/8 after some analysts fail) must never be treated as
+    # an ordinary full-strength consensus.
+    council_min_successful_analysts: int = 6
     evolution_interval_hours: int = 24
 
     # --- Professional classification ----------------------------------------

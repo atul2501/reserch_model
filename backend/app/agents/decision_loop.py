@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,9 +48,16 @@ async def run_decision_cycle(
     global_max_daily_loss: float,
     market_data_age_seconds: float | None,
     fee_rate: float | None = None,
+    council_trade_allowed: bool = True,
 ) -> int:
     """Evaluates every ACTIVE agent in `generation` against `context`.
-    Returns the number of agents processed."""
+    Returns the number of agents processed.
+
+    `council_trade_allowed=False` (this candle's council cycle was
+    INCOMPLETE — quorum not met) still runs every agent so exits/audit
+    Decisions keep happening, but blocks every NEW entry via the Risk
+    Engine (see RiskCheckInput.council_trade_allowed / check_trade) —
+    fail closed, never skip the risk check just to keep the cycle moving."""
     fee_rate = fee_rate if fee_rate is not None else get_settings().paper_fee_rate
     agents = (
         await db.execute(
@@ -63,11 +71,34 @@ async def run_decision_cycle(
     versions = (
         await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_(strategy_version_ids)))
     ).scalars().all()
-    dna_by_version_id = {v.id: StrategyDNA.model_validate(v.dna) for v in versions}
-    stage_by_version_id = {v.id: v.stage for v in versions}
+
+    # Each StrategyVersion's DNA is validated once, at insert time (see
+    # app/models/strategy.py) — but a single StrategyVersion whose stored
+    # JSON no longer matches the CURRENT StrategyDNA schema (schema drift
+    # from ongoing development, or a hand-edited/legacy row) must never
+    # crash the whole population's cycle. Isolate per-version: skip that
+    # version's agents this cycle, log it loudly, keep going for everyone
+    # else. This was previously unguarded and is the confirmed root cause
+    # of a whole-cycle crash from a single bad StrategyVersion row.
+    dna_by_version_id: dict[uuid.UUID, StrategyDNA] = {}
+    stage_by_version_id: dict[uuid.UUID, StrategyStage] = {}
+    broken_version_ids: set[uuid.UUID] = set()
+    for v in versions:
+        try:
+            dna_by_version_id[v.id] = StrategyDNA.model_validate(v.dna)
+            stage_by_version_id[v.id] = v.stage
+        except ValidationError as exc:
+            broken_version_ids.add(v.id)
+            logger.error(
+                "decision_loop.strategy_dna_invalid_skipping_version",
+                strategy_version_id=str(v.id),
+                error=str(exc),
+            )
 
     processed = 0
     for agent in agents:
+        if agent.strategy_version_id in broken_version_ids:
+            continue
         dna = dna_by_version_id[agent.strategy_version_id]
         stage = stage_by_version_id[agent.strategy_version_id]
         await _process_agent(
@@ -85,6 +116,7 @@ async def run_decision_cycle(
             global_max_daily_loss=global_max_daily_loss,
             market_data_age_seconds=market_data_age_seconds,
             fee_rate=fee_rate,
+            council_trade_allowed=council_trade_allowed,
         )
         processed += 1
 
@@ -108,6 +140,7 @@ async def _process_agent(
     global_max_daily_loss: float,
     market_data_age_seconds: float | None,
     fee_rate: float,
+    council_trade_allowed: bool = True,
 ) -> None:
     market_timestamp = datetime.fromtimestamp(context.candle_open_time / 1000, tz=timezone.utc)
 
@@ -167,6 +200,7 @@ async def _process_agent(
             daily_pnl=agent.equity - agent.day_start_equity,
             has_open_position=False,
             market_data_age_seconds=market_data_age_seconds,
+            council_trade_allowed=council_trade_allowed,
         ),
         global_max_leverage=global_max_leverage,
         global_max_position_size=global_max_position_size,

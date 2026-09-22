@@ -47,6 +47,14 @@ class OllamaRateLimitError(OllamaError):
     pass
 
 
+class OllamaAuthError(OllamaError):
+    """Raised on 401/403. Deliberately retried (see generate_structured's
+    @retry decorator) — with multiple OLLAMA_API_KEYS round-robining per
+    attempt (see _next_key), a single revoked/expired key must not
+    permanently fail every call that happens to land on it; the retry
+    exists specifically to rotate onto the next key in the pool instead."""
+
+
 class OllamaResponseError(OllamaError):
     """Raised when the model's response could not be parsed into the
     expected structured schema — never let this reach the trading engine
@@ -86,19 +94,23 @@ class OllamaClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    def _next_key(self) -> str | None:
+    def _next_key(self) -> tuple[str | None, int | None]:
+        """Returns (key, key_index). key_index is the position in
+        OLLAMA_API_KEYS (never the key value itself) so auth failures can
+        be logged/diagnosed without ever logging a secret."""
         if not self._api_keys:
-            return None
-        key = self._api_keys[self._key_cursor % len(self._api_keys)]
+            return None, None
+        index = self._key_cursor % len(self._api_keys)
+        key = self._api_keys[index]
         self._key_cursor += 1
-        return key
+        return key, index
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self) -> tuple[dict[str, str], int | None]:
         headers = {"Content-Type": "application/json"}
-        api_key = self._next_key()
+        api_key, key_index = self._next_key()
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        return headers
+        return headers, key_index
 
     async def generate_structured(
         self,
@@ -131,14 +143,22 @@ class OllamaClient:
 
         async def _attempt() -> dict[str, Any]:
             async with self._semaphore:
+                headers, key_index = self._headers()
                 try:
-                    resp = await self._client.post(
-                        "/api/chat", json=payload, headers=self._headers()
-                    )
+                    resp = await self._client.post("/api/chat", json=payload, headers=headers)
                 except httpx.TimeoutException as exc:
                     raise OllamaTimeoutError(str(exc)) from exc
                 if resp.status_code == 429:
                     raise OllamaRateLimitError("ollama returned 429")
+                if resp.status_code in (401, 403):
+                    # Bad/expired/revoked key at this index in the
+                    # round-robin pool — never log the key itself, only
+                    # its position, so ops can find and rotate it out.
+                    logger.warning(
+                        "ollama.auth_failed_rotating_key",
+                        request_id=request_id, status=resp.status_code, key_index=key_index,
+                    )
+                    raise OllamaAuthError(f"ollama returned {resp.status_code} for key_index={key_index}")
                 resp.raise_for_status()
                 return resp.json()
 
@@ -146,13 +166,13 @@ class OllamaClient:
             reraise=True,
             stop=stop_after_attempt(max(1, max_retries)),
             wait=wait_exponential(multiplier=1, min=1, max=20),
-            retry=retry_if_exception_type((OllamaTimeoutError, OllamaRateLimitError, httpx.TransportError)),
+            retry=retry_if_exception_type((OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, httpx.TransportError)),
         )
         async def _attempt_with_retry() -> dict[str, Any]:
             nonlocal retries_used
             try:
                 return await _attempt()
-            except (OllamaTimeoutError, OllamaRateLimitError, httpx.TransportError):
+            except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, httpx.TransportError):
                 retries_used += 1
                 raise
 
@@ -161,8 +181,10 @@ class OllamaClient:
         except httpx.HTTPStatusError as exc:
             logger.error("ollama.http_error", request_id=request_id, status=exc.response.status_code)
             raise OllamaError(f"ollama http error: {exc}") from exc
-        except (OllamaTimeoutError, OllamaRateLimitError) as exc:
-            logger.error("ollama.call_failed", request_id=request_id, error=str(exc))
+        except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError) as exc:
+            logger.error(
+                "ollama.call_failed", request_id=request_id, error=str(exc), retries_used=retries_used,
+            )
             raise
 
         latency_ms = int((time.monotonic() - start) * 1000)

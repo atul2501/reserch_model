@@ -6,6 +6,8 @@ validation (the caller then retries or treats the analyst as abstained).
 """
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, Field
 
 from app.models.enums import Bias
@@ -55,5 +57,25 @@ class ConsensusResult(BaseModel):
     judge_response: JudgeResponse | None = None
     final_bias: Bias
     final_confidence: float
+
+    # --- Quorum -------------------------------------------------------
+    # A partial response (e.g. 5/8 analysts after some fail) must never be
+    # treated as an ordinary full-strength consensus — these fields make
+    # that distinction explicit and machine-checkable downstream (Risk
+    # Engine gates on trade_allowed, never on final_bias/confidence alone).
+    council_status: str = "COMPLETE"  # "COMPLETE" | "INCOMPLETE"
+    expected_analysts: int = 0
+    successful_analysts: int = 0
+    failed_analysts: list[str] = Field(default_factory=list)
+    failure_reasons: dict[str, str] = Field(default_factory=dict)
+    quorum_met: bool = True
+    trade_allowed: bool = True
+
+    # --- Audit timing (council_start/analyst-level timing live on the
+    # persisted CouncilAnalysis rows; these are the cycle-level summary) --
+    council_decision_id: uuid.UUID | None = None  # set once the CouncilDecision row is flushed
+    council_start: float | None = None  # unix epoch seconds
+    consensus_time: float | None = None  # seconds from council_start to consensus computed
+    total_council_latency: float | None = None  # seconds from council_start to full persistence
 
     model_config = {"extra": "forbid"}

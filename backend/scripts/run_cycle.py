@@ -81,15 +81,43 @@ async def run_one_cycle(market_service: MarketDataService, ollama_client: Ollama
         )
         await db.commit()
 
+        # Both reset fresh every call (local vars, not module globals): a
+        # council decision is only ever attached to Decision rows made
+        # THIS candle, on THIS call. A candle where the council doesn't run
+        # at all (should_run_council is False) gets council_decision_id=None
+        # and council_trade_allowed=True (unchanged, pre-existing behavior)
+        # rather than silently reusing a previous candle's result — that's
+        # what "prevent a stale council result from being used for a later
+        # market candle" means here: no cross-candle carry-forward, ever.
         council_decision_id = None
+        council_trade_allowed = True
         if settings.council_enabled and should_run_council(_candle_index, settings.council_interval_candles):
             consensus = await run_council_cycle(db, ollama_client, context)
+            council_decision_id = consensus.council_decision_id
+            council_trade_allowed = consensus.trade_allowed
             logger.info(
                 "cycle.council_decision",
                 final_bias=consensus.final_bias.value,
                 confidence=consensus.final_confidence,
                 judge_invoked=consensus.judge_invoked,
+                council_status=consensus.council_status,
+                quorum_met=consensus.quorum_met,
+                expected_analysts=consensus.expected_analysts,
+                successful_analysts=consensus.successful_analysts,
+                failed_analysts=consensus.failed_analysts,
+                failure_reasons=consensus.failure_reasons,
+                trade_allowed=consensus.trade_allowed,
+                council_start=consensus.council_start,
+                consensus_time=consensus.consensus_time,
+                total_council_latency=consensus.total_council_latency,
             )
+            if not consensus.quorum_met:
+                logger.warning(
+                    "cycle.council_incomplete_no_new_trades",
+                    candle_open_time=context.candle_open_time,
+                    successful_analysts=consensus.successful_analysts,
+                    required=settings.council_min_successful_analysts,
+                )
 
         latest_generation = (
             await db.execute(select(Generation).order_by(Generation.number.desc()).limit(1))
@@ -109,8 +137,12 @@ async def run_one_cycle(market_service: MarketDataService, ollama_client: Ollama
                 global_max_drawdown=settings.max_drawdown,
                 global_max_daily_loss=settings.max_daily_loss,
                 market_data_age_seconds=market_age,
+                council_trade_allowed=council_trade_allowed,
             )
-            logger.info("cycle.agents_processed", count=processed, generation=latest_generation.number)
+            logger.info(
+                "cycle.agents_processed", count=processed, generation=latest_generation.number,
+                council_trade_allowed=council_trade_allowed,
+            )
 
             if processed > 0 and await is_population_extinct(db, latest_generation.number):
                 # Spec section 15/52: record extinction; a human/researcher

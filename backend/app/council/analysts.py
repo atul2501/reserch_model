@@ -4,6 +4,9 @@ unstructured text is allowed to reach the trading engine.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
 import httpx
 
 from app.core.logging import get_logger
@@ -12,6 +15,25 @@ from app.schemas.market_context import MarketContext
 from app.services.ollama_client import OllamaClient, OllamaError
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class AnalystRunResult:
+    """Carries this analyst's own timing/stats directly, rather than
+    reading OllamaClient.last_stats — that attribute is a single shared
+    field on the client instance, overwritten by whichever concurrent call
+    finishes last, so under asyncio.gather() every CouncilAnalysis row
+    would silently get the wrong (most-recently-finished) analyst's
+    latency/request_id. Each result here is self-contained instead."""
+
+    analyst: str
+    response: AnalystResponse | None
+    error: str | None
+    started_at: datetime
+    completed_at: datetime
+    request_id: str
+    latency_ms: int
+    model: str
 
 ANALYST_FOCUS = {
     "trend": "Assess directional trend strength using EMA/SMA alignment and slope. Ignore short-term noise.",
@@ -55,20 +77,33 @@ def build_prompt(analyst: str, context: MarketContext) -> tuple[str, str]:
     return system_prompt, user_prompt
 
 
-async def run_analyst(client: OllamaClient, analyst: str, context: MarketContext) -> AnalystResponse | None:
-    """Returns None (analyst abstains) rather than raising, so one bad or
-    unreachable Ollama call never blocks the rest of the council or crashes
-    the whole trading cycle (spec section 41: on failure, fall back toward
-    HOLD rather than propagate). Catches OllamaError (timeout/rate-limit/
-    malformed-response, after internal retries are exhausted) and any raw
-    httpx transport error (e.g. connection refused) that isn't otherwise
-    wrapped by OllamaClient."""
+async def run_analyst(client: OllamaClient, analyst: str, context: MarketContext) -> AnalystRunResult:
+    """Never raises — one bad or unreachable Ollama call must never block
+    the rest of the council or crash the whole trading cycle (spec section
+    41: on failure, fall back toward HOLD rather than propagate). Catches
+    OllamaError (timeout/rate-limit/auth/malformed-response, after
+    OllamaClient's internal retries are exhausted) and any raw httpx
+    transport error (e.g. connection refused) that isn't otherwise wrapped
+    by OllamaClient. Every analyst goes through the exact same `client`
+    instance passed in — this function never constructs its own client or
+    auth logic."""
+    started_at = datetime.now(timezone.utc)
     system_prompt, user_prompt = build_prompt(analyst, context)
     try:
-        response, _stats = await client.generate_structured(
+        response, stats = await client.generate_structured(
             system_prompt=system_prompt, user_prompt=user_prompt, response_model=AnalystResponse
         )
-        return response
+        completed_at = datetime.now(timezone.utc)
+        return AnalystRunResult(
+            analyst=analyst, response=response, error=None,
+            started_at=started_at, completed_at=completed_at,
+            request_id=stats.request_id, latency_ms=stats.latency_ms, model=stats.model,
+        )
     except (OllamaError, httpx.HTTPError) as exc:
+        completed_at = datetime.now(timezone.utc)
         logger.error("council.analyst_failed", analyst=analyst, error=str(exc))
-        return None
+        return AnalystRunResult(
+            analyst=analyst, response=None, error=str(exc),
+            started_at=started_at, completed_at=completed_at,
+            request_id="", latency_ms=int((completed_at - started_at).total_seconds() * 1000), model="",
+        )

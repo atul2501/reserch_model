@@ -30,6 +30,12 @@ class RiskCheckInput:
     has_open_position: bool
     market_data_age_seconds: float | None
     liquidation_distance_pct: float | None = None
+    # Fail-closed gate: False when this candle's council cycle was
+    # INCOMPLETE (quorum not met) or otherwise marked unsafe upstream. The
+    # Risk Engine is the single place this is actually enforced — callers
+    # must never skip invoking check_trade just because they already know
+    # the council failed (spec: "do not bypass the Risk Engine").
+    council_trade_allowed: bool = True
 
 
 @dataclass
@@ -45,6 +51,9 @@ def check_trade(inp: RiskCheckInput, *, global_max_leverage: float, global_max_p
     reasons: list[str] = []
 
     # Hard blockers — reject outright, no reduction possible.
+    if not inp.council_trade_allowed:
+        return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, ["council_incomplete_no_new_trades"])
+
     if inp.market_data_age_seconds is not None and inp.market_data_age_seconds > MAX_STALE_DATA_SECONDS:
         return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, ["stale_market_data"])
 

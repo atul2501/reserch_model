@@ -7,7 +7,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from app.services.ollama_client import OllamaClient, OllamaResponseError
+from app.services.ollama_client import OllamaAuthError, OllamaClient, OllamaResponseError
 
 
 class _Echo(BaseModel):
@@ -77,4 +77,47 @@ async def test_timeout_is_retried_then_raises():
     client._client = _mock_transport(handler)
     client._max_retries = 2
     with pytest.raises(Exception):
+        await client.generate_structured(system_prompt="s", user_prompt="u", response_model=_Echo)
+
+
+@pytest.mark.asyncio
+async def test_401_on_one_key_is_retried_and_recovers_on_the_next_key():
+    """Root cause of the reported intermittent analyst 401s: with multiple
+    OLLAMA_API_KEYS round-robining per attempt, a single bad/expired key
+    must not permanently fail a call — the retry must rotate onto the next
+    (good) key and succeed, not fail immediately on the first 401."""
+    calls = {"count": 0, "auth_headers_seen": []}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        auth = request.headers.get("Authorization")
+        calls["auth_headers_seen"].append(auth)
+        if auth == "Bearer bad-key":
+            return httpx.Response(401)
+        return httpx.Response(200, json={"message": {"content": json.dumps({"value": "ok"})}})
+
+    client = OllamaClient()
+    client._client = _mock_transport(handler)
+    client._api_keys = ["bad-key", "good-key"]
+    client._max_retries = 3
+
+    result, stats = await client.generate_structured(system_prompt="s", user_prompt="u", response_model=_Echo)
+
+    assert result.value == "ok"
+    assert calls["count"] == 2  # first attempt (bad-key, 401) + retry (good-key, 200)
+    assert calls["auth_headers_seen"] == ["Bearer bad-key", "Bearer good-key"]
+    assert stats.retries == 1
+
+
+@pytest.mark.asyncio
+async def test_401_on_every_key_exhausts_retries_and_raises_auth_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    client = OllamaClient()
+    client._client = _mock_transport(handler)
+    client._api_keys = ["bad-key-1", "bad-key-2"]
+    client._max_retries = 2
+
+    with pytest.raises(OllamaAuthError):
         await client.generate_structured(system_prompt="s", user_prompt="u", response_model=_Echo)

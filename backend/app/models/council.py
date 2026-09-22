@@ -31,6 +31,22 @@ class CouncilDecision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     key_risks: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     invalidators: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
 
+    # --- Quorum audit trail --------------------------------------------
+    council_status: Mapped[str] = mapped_column(String(16), default="COMPLETE", nullable=False)  # COMPLETE|INCOMPLETE
+    expected_analysts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    successful_analysts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_analysts: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    failure_reasons: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    quorum_met: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # The Risk Engine's actual gate — never derive this from final_bias
+    # alone, since a healthy 8/8 NEUTRAL and a forced 3/8-quorum-failure
+    # NEUTRAL must remain distinguishable.
+    trade_allowed: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+    # --- Latency audit --------------------------------------------------
+    council_start: Mapped[float | None] = mapped_column(Float, nullable=True)  # unix epoch seconds
+    total_council_latency_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
 
 class CouncilAnalysis(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """One analyst's structured response feeding into a CouncilDecision."""
@@ -52,3 +68,8 @@ class CouncilAnalysis(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     model: Mapped[str] = mapped_column(String(64), nullable=False)
     was_valid: Mapped[bool] = mapped_column(default=True, nullable=False)
     raw_response: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+    # Per-analyst timing audit — lets a slow/stuck analyst be identified
+    # individually instead of only seeing the cycle-level total.
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
