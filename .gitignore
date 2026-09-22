@@ -30,3 +30,7 @@ dist/
 # Local DB / backups
 *.db
 backend/backups/
+
+# run.sh service state (pidfiles, logs)
+backend/.run/
+backend/logs/

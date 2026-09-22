@@ -185,7 +185,8 @@ backend/tests/    56 tests across DNA, lifecycle, risk, execution safety, counci
                   Ollama client failure modes, feature engine, fitness, backtesting,
                   and a full decision-loop integration test
 run.sh            single entrypoint: sets up venv/migrations if needed, then runs the
-                  worker and the API (which also serves the frontend). No external
+                  worker and API as background services (systemd-style — restart on
+                  crash, own log files, start/stop/restart/status/logs). No external
                   database — trading_lab.db is a plain SQLite file.
 ```
 
@@ -194,15 +195,25 @@ run.sh            single entrypoint: sets up venv/migrations if needed, then run
 ### Run everything
 
 ```bash
-./run.sh
+./run.sh          # or: ./run.sh start
 ```
 
-This is the only command you need. It creates the backend virtualenv and installs
-dependencies if missing, applies migrations against the local SQLite file
-(`backend/trading_lab.db`, created automatically on first run), bootstraps the initial
-agent population if none exists, starts the trading worker in the background, and
-starts the API on `http://localhost:8000` — which also serves the frontend at `/`.
-Ctrl-C stops both the API and the worker. There's no database server to install or run.
+This is the only command you need. On first run it creates the backend virtualenv,
+installs dependencies, applies migrations against the local SQLite file
+(`backend/trading_lab.db`, created automatically), and bootstraps the initial agent
+population if none exists. Then it starts the trading worker and the API (which also
+serves the frontend at `/`) as **background services** — each under its own
+restart-on-crash supervisor loop, like systemd's `Restart=always`, so a crashed process
+comes back on its own a few seconds later instead of silently staying dead. The command
+returns immediately; there's no foreground process to Ctrl-C, and no database server to
+install or run.
+
+```bash
+./run.sh status    # is it running?
+./run.sh logs      # tail -f both log files (backend/logs/worker.log, api.log)
+./run.sh restart   # stop then start (e.g. after pulling new code)
+./run.sh stop      # stop both services
+```
 
 Before first run, fill in `backend/.env` (copied automatically from `.env.example` if
 missing) with `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` / `OLLAMA_MODEL`.
