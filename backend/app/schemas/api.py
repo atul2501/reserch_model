@@ -123,6 +123,15 @@ class RegimePerformance(BaseModel):
     avg_pnl: float
 
 
+class SidePerformance(BaseModel):
+    side: Side
+    trade_count: int
+    win_count: int
+    win_rate: float
+    total_pnl: float
+    avg_pnl: float
+
+
 class SystemHealth(BaseModel):
     database_ok: bool
     hyperliquid_configured: bool

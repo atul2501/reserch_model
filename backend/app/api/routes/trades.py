@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.agent import Agent
+from app.models.enums import Side
 from app.models.market import MarketRegimeRecord
 from app.models.trading import Trade
-from app.schemas.api import RegimePerformance, TradeSummary
+from app.schemas.api import RegimePerformance, SidePerformance, TradeSummary
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
@@ -87,6 +88,41 @@ async def get_regime_performance(db: AsyncSession = Depends(get_db)):
         results.append(
             RegimePerformance(
                 regime=regime,
+                trade_count=len(pnls),
+                win_count=wins,
+                win_rate=wins / len(pnls),
+                total_pnl=sum(pnls),
+                avg_pnl=sum(pnls) / len(pnls),
+            )
+        )
+    results.sort(key=lambda r: r.trade_count, reverse=True)
+    return results
+
+
+@router.get("/by-side", response_model=list[SidePerformance])
+async def get_side_performance(db: AsyncSession = Depends(get_db)):
+    """Breaks down closed-trade performance by LONG vs SHORT.
+
+    Unlike regime (reconstructed from timestamps), side is a direct column
+    on Trade, so this is a straight groupby. Useful as a second fee-vs-edge
+    tell alongside /by-regime: a side with a healthy win rate but ~$0
+    avg_pnl means wins are barely covering entry+exit fees on that side,
+    same signature as the LOW_VOLATILITY regime case.
+    """
+    trades = (await db.execute(select(Trade.net_pnl, Trade.side))).all()
+    if not trades:
+        return []
+
+    buckets: dict[Side, list[float]] = {}
+    for net_pnl, side in trades:
+        buckets.setdefault(side, []).append(net_pnl)
+
+    results = []
+    for side, pnls in buckets.items():
+        wins = sum(1 for p in pnls if p > 0)
+        results.append(
+            SidePerformance(
+                side=side,
                 trade_count=len(pnls),
                 win_count=wins,
                 win_rate=wins / len(pnls),
