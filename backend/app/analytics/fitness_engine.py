@@ -23,6 +23,12 @@ class FitnessInputs:
     oos_score: float | None        # 0.0-1.0, out-of-sample performance ratio
     walk_forward_score: float | None  # 0.0-1.0, consistency across walk-forward windows
     return_volatility: float | None   # stddev of periodic returns, for instability penalty
+    # 0.0-1.0, this agent's mean composite_correlation to its peers this
+    # generation (StrategyCorrelationEngine). Optional and only ever
+    # applied when FitnessWeights.correlation_penalty_weight > 0 — the
+    # locked-in rule is that correlation is a breeding-time diversity
+    # signal, never a kill signal, so this stays an opt-in soft term.
+    mean_pairwise_correlation: float | None = None
 
 
 @dataclass
@@ -34,6 +40,10 @@ class FitnessWeights:
     oos_weight: float = 1.5
     drawdown_penalty_weight: float = 2.0
     instability_penalty_weight: float = 1.0
+    # Defaults to 0.0 (off): correlation must never lower an agent's
+    # fitness ranking by default, per the locked-in "diversity signal, not
+    # a kill/rank signal" rule — set explicitly nonzero to opt in.
+    correlation_penalty_weight: float = 0.0
 
     def as_dict(self) -> dict[str, float]:
         return self.__dict__.copy()
@@ -49,6 +59,7 @@ class FitnessResult:
     oos_score: float
     drawdown_penalty: float
     instability_penalty: float
+    correlation_penalty: float = 0.0
     weights_used: dict[str, float] = field(default_factory=dict)
 
 
@@ -78,6 +89,9 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
 
     drawdown_penalty = inputs.max_drawdown_pct  # 0..1, higher drawdown = bigger penalty
     instability_penalty = _clip(inputs.return_volatility or 0.0, lo=0.0, hi=1.0)
+    # 0.0 whenever correlation_penalty_weight is left at its default (0.0)
+    # or no correlation data was supplied — see FitnessWeights' docstring.
+    correlation_penalty = _clip(inputs.mean_pairwise_correlation or 0.0, lo=0.0, hi=1.0)
 
     fitness = (
         w.return_weight * return_score
@@ -87,6 +101,7 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
         + w.oos_weight * oos_score
         - w.drawdown_penalty_weight * drawdown_penalty
         - w.instability_penalty_weight * instability_penalty
+        - w.correlation_penalty_weight * correlation_penalty
     )
 
     return FitnessResult(
@@ -98,6 +113,7 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
         oos_score=oos_score,
         drawdown_penalty=drawdown_penalty,
         instability_penalty=instability_penalty,
+        correlation_penalty=correlation_penalty,
         weights_used=w.as_dict(),
     )
 

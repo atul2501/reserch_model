@@ -12,7 +12,7 @@ from app.agents.lifecycle import create_generation
 from app.execution.paper_adapter import PaperExecutionAdapter
 from app.models.agent import Agent
 from app.models.decision import Decision
-from app.models.enums import RiskDecision, StrategyFamily
+from app.models.enums import RiskDecision, StrategyFamily, StrategyStage
 from app.models.strategy import Strategy, StrategyVersion
 from app.models.trading import Order, Position, Trade
 from app.schemas.market_context import (
@@ -44,7 +44,7 @@ def _context(open_time: int, close: float, rsi: float, trend_strength: float) ->
     )
 
 
-async def _make_agent(db_session, leverage_limit: float = 1.0) -> Agent:
+async def _make_agent(db_session, leverage_limit: float = 1.0, stage: StrategyStage | None = None) -> Agent:
     strategy = Strategy(code=f"STRAT-TEST-{uuid.uuid4().hex[:8]}", family=StrategyFamily.MOMENTUM, name="test")
     db_session.add(strategy)
     await db_session.flush()
@@ -58,7 +58,10 @@ async def _make_agent(db_session, leverage_limit: float = 1.0) -> Agent:
         position_sizing=PositionSizing(fraction_of_equity=0.1),
         leverage_limit=leverage_limit,
     )
-    version = StrategyVersion(strategy_id=strategy.id, version=1, generation=1, dna=dna.model_dump(mode="json"))
+    version_kwargs = {"stage": stage} if stage is not None else {}
+    version = StrategyVersion(
+        strategy_id=strategy.id, version=1, generation=1, dna=dna.model_dump(mode="json"), **version_kwargs
+    )
     db_session.add(version)
     await db_session.flush()
 
@@ -197,3 +200,31 @@ async def test_duplicate_position_not_opened_while_one_is_active(db_session):
 
     positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
     assert len(positions) == 1  # no second position opened while one is active
+
+
+@pytest.mark.asyncio
+async def test_closed_trade_is_stamped_with_the_strategy_versions_stage(db_session):
+    """Trade.stage must reflect StrategyVersion.stage as it was when the
+    trade closed, so stage_metrics_service can isolate a PAPER-stage
+    trade's history from a SHADOW-stage one for the same version instead of
+    blending them (the reality-gap MVP limitation this column fixes)."""
+    agent = await _make_agent(db_session, stage=StrategyStage.PAPER)
+    execution_engine = PaperExecutionAdapter()
+
+    entry_context = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, entry_context, None, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    exit_context = _context(open_time=2, close=110.0, rsi=30.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, exit_context, entry_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+
+    trades = (await db_session.execute(select(Trade).where(Trade.agent_id == agent.id))).scalars().all()
+    assert len(trades) == 1
+    assert trades[0].stage == StrategyStage.PAPER

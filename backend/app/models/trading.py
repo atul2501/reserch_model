@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
-from app.models.enums import ExecutionVenue, OrderStatus, Side
+from app.models.enums import ExecutionVenue, OrderStatus, Side, StrategyStage
 
 
 class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -44,6 +44,11 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     filled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+    # ExecutionResult.latency_ms is returned by every adapter but was
+    # previously discarded — persisting it is what lets stage_metrics_service
+    # report avg_latency_ms per stage for the reality gap.
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     raw_venue_response: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
@@ -102,3 +107,12 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     entry_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)
     exit_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)
     exit_reason: Mapped[str] = mapped_column(String(64), nullable=False)  # stop_loss|take_profit|signal|liquidation|manual
+
+    # Which StrategyStage was active on the parent StrategyVersion when this
+    # trade closed. StrategyVersion.stage is mutable (advances over time), so
+    # without stamping it here, stage_metrics_service.compute_live_stage_metrics
+    # can't tell a PAPER-stage trade apart from a SHADOW-stage one for the
+    # same version — this column is what makes that split possible.
+    stage: Mapped[StrategyStage | None] = mapped_column(
+        SAEnum(StrategyStage, name="trade_stage_enum"), nullable=True
+    )

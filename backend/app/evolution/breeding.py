@@ -18,6 +18,7 @@ from app.evolution.crossover import crossover
 from app.evolution.diversity import dna_distance, population_diversity_score
 from app.evolution.mutation import mutate
 from app.models.agent import Agent
+from app.models.enums import StrategyFamily
 from app.models.strategy import Strategy, StrategyVersion
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.factory import generate_population_dna
@@ -38,11 +39,18 @@ class BreedingResult:
 
 
 async def select_survivors(
-    db: AsyncSession, *, generation_number: int, survivor_count: int
+    db: AsyncSession, *, generation_number: int, survivor_count: int,
+    max_family_survivor_fraction: float | None = None,
 ) -> list[Agent]:
     """Ranks every agent in `generation_number` by `Agent.fitness` (falling
     back to `equity` for agents that haven't had fitness computed yet) and
-    returns the top `survivor_count`."""
+    returns the top `survivor_count`.
+
+    `max_family_survivor_fraction`, when given, caps how many survivors may
+    come from any single strategy_family (anti-cloning: prevents one
+    dominant, highly-correlated family from taking every survivor slot).
+    None (the default) preserves the original pure-fitness-ranking
+    behavior exactly."""
     agents = (
         await db.execute(select(Agent).where(Agent.generation == generation_number))
     ).scalars().all()
@@ -51,7 +59,31 @@ async def select_survivors(
         key=lambda a: a.fitness if a.fitness is not None else a.equity,
         reverse=True,
     )
-    return ranked[:survivor_count]
+    if max_family_survivor_fraction is None:
+        return ranked[:survivor_count]
+
+    version_ids = {a.strategy_version_id for a in ranked}
+    versions = (await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_(version_ids)))).scalars().all()
+    family_by_version_id = {v.id: StrategyDNA.model_validate(v.dna).strategy_family.value for v in versions}
+
+    max_per_family = max(1, int(survivor_count * max_family_survivor_fraction))
+    family_counts: dict[str, int] = {}
+    selected: list[Agent] = []
+    overflow: list[Agent] = []
+    for agent in ranked:
+        family = family_by_version_id[agent.strategy_version_id]
+        if family_counts.get(family, 0) < max_per_family:
+            selected.append(agent)
+            family_counts[family] = family_counts.get(family, 0) + 1
+        else:
+            overflow.append(agent)
+        if len(selected) == survivor_count:
+            break
+    if len(selected) < survivor_count:
+        # Cap left us short (e.g. too few distinct families) — backfill
+        # from the highest-ranked overflow rather than under-filling.
+        selected.extend(overflow[: survivor_count - len(selected)])
+    return selected
 
 
 async def select_and_breed_next_generation(
@@ -62,16 +94,26 @@ async def select_and_breed_next_generation(
     next_generation_size: int,
     diversity_floor: float = DIVERSITY_FLOOR,
     rng: random.Random | None = None,
+    preserve_family_codes: set[str] | None = None,
+    mutation_rate_multiplier: float = 1.0,
+    max_family_survivor_fraction: float | None = None,
 ) -> BreedingResult:
     """Selects survivors from `generation_number`, breeds
     `next_generation_size` children via crossover+mutation, and enforces
     `diversity_floor` on the candidate DNA set before persisting each child
     as a new Strategy + StrategyVersion row. Does NOT call create_generation
-    — the caller does that with the returned strategy_version_ids."""
+    — the caller does that with the returned strategy_version_ids.
+
+    `preserve_family_codes`/`mutation_rate_multiplier`/
+    `max_family_survivor_fraction` are the diversity-pressure signals
+    StrategyCorrelationEngine's `apply_diversity_pressure` produces
+    (app/evolution/correlation_service.py) — all optional, all no-ops at
+    their defaults, so calling this without them is unchanged behavior."""
     rng = rng or random.Random()
 
     survivors = await select_survivors(
-        db, generation_number=generation_number, survivor_count=survivor_count
+        db, generation_number=generation_number, survivor_count=survivor_count,
+        max_family_survivor_fraction=max_family_survivor_fraction,
     )
     if not survivors:
         raise ValueError(f"no survivors found for generation {generation_number}")
@@ -89,12 +131,23 @@ async def select_and_breed_next_generation(
         parent_a_id, parent_a_dna = rng.choice(survivor_pairs)
         parent_b_id, parent_b_dna = rng.choice(survivor_pairs)
         child_dna = mutate(crossover(parent_a_dna, parent_b_dna, rng), rng)
+        # Extra mutation passes, probabilistically, when diversity pressure
+        # calls for it (mutation_rate_multiplier > 1.0) — never touches
+        # mutation.py's own MUTATION_RATE constant, just layers additional
+        # independent passes on top.
+        extra_passes = mutation_rate_multiplier - 1.0
+        while extra_passes > 0:
+            if rng.random() < min(1.0, extra_passes):
+                child_dna = mutate(child_dna, rng)
+            extra_passes -= 1.0
         candidates.append((child_dna, parent_a_id, parent_b_id))
 
     injected_fresh = 0
     rejected_remutated = 0
     candidate_dnas = [c[0] for c in candidates]
     diversity = population_diversity_score(candidate_dnas)
+
+    inject_distribution = _preserve_family_distribution(preserve_family_codes)
 
     attempts = 0
     while diversity < diversity_floor and attempts < MAX_DIVERSITY_REPAIR_ATTEMPTS and len(candidate_dnas) >= 2:
@@ -105,7 +158,9 @@ async def select_and_breed_next_generation(
             candidates[j] = (new_dna, candidates[j][1], candidates[j][2])
             rejected_remutated += 1
         else:
-            fresh = generate_population_dna(1, seed=rng.randint(0, 2**31 - 1))[0]
+            fresh = generate_population_dna(
+                1, distribution=inject_distribution, seed=rng.randint(0, 2**31 - 1)
+            )[0]
             candidate_dnas[j] = fresh
             candidates[j] = (fresh, None, None)
             injected_fresh += 1
@@ -140,6 +195,27 @@ async def select_and_breed_next_generation(
         injected_fresh_count=injected_fresh,
         rejected_and_remutated_count=rejected_remutated,
     )
+
+
+def _preserve_family_distribution(preserve_family_codes: set[str] | None) -> dict[StrategyFamily, float] | None:
+    """Biases fresh-DNA injection toward minority families
+    apply_diversity_pressure flagged as under-represented: 80% of weight
+    split across the preserved families, 20% across everything else (never
+    fully excludes non-preserved families). None (the default) leaves
+    generate_population_dna's own default distribution untouched."""
+    if not preserve_family_codes:
+        return None
+    all_families = list(StrategyFamily)
+    preserved = [f for f in all_families if f.value in preserve_family_codes]
+    others = [f for f in all_families if f.value not in preserve_family_codes]
+    if not preserved or not others:
+        return None
+    distribution: dict[StrategyFamily, float] = {}
+    for f in preserved:
+        distribution[f] = 0.8 / len(preserved)
+    for f in others:
+        distribution[f] = 0.2 / len(others)
+    return distribution
 
 
 def _most_correlated_pair(dnas: list[StrategyDNA]) -> tuple[int, int]:

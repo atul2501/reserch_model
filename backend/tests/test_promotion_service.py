@@ -11,7 +11,8 @@ from sqlalchemy import select
 
 from app.evolution.promotion_service import MIN_STAGE_DAYS, evaluate_and_promote
 from app.models.agent import Agent
-from app.models.enums import ChampionStatus, StrategyFamily, StrategyStage
+from app.models.enums import ChampionStatus, EvolutionEventType, StrategyFamily, StrategyStage
+from app.models.evolution import EvolutionEvent
 from app.models.stage_metrics import StageMetrics
 from app.models.strategy import Strategy, StrategyVersion
 from app.schemas.strategy_dna import Condition, RuleSet, StrategyDNA
@@ -87,6 +88,11 @@ async def test_no_promotion_without_stage_metrics(db_session):
 
     assert decision.promote is False
     assert "no_stage_metrics_recorded" in decision.reasons
+    # No StageMetrics exists yet to evaluate against, so there's nothing
+    # meaningful to audit — this early-return path is the one case that
+    # legitimately writes no EvolutionEvent.
+    events = (await db_session.execute(select(EvolutionEvent))).scalars().all()
+    assert events == []
 
 
 @pytest.mark.asyncio
@@ -101,6 +107,33 @@ async def test_no_promotion_under_minimum_track_record(db_session):
 
     assert decision.promote is False
     assert any("stage_track_record" in r for r in decision.reasons)
+
+
+@pytest.mark.asyncio
+async def test_rejection_is_recorded_as_an_evolution_event(db_session):
+    """Every rejection must be auditable, not just every promotion — until
+    this was wired up, evaluate_and_promote never wrote EvolutionEvent at
+    all despite champion.py's docstring promising it."""
+    now = datetime.now(timezone.utc)
+    created_at = now - timedelta(days=MIN_STAGE_DAYS - 1)
+    version, _ = await _seed_version(db_session, created_at=created_at)
+    db_session.add(_passing_metrics(version.id, computed_at=now))
+    db_session.add(_agent_with_fitness(version.id, fitness=0.10, identifier="GEN01-AG0001"))
+    await db_session.commit()
+
+    decision = await evaluate_and_promote(db_session, version.id, stage=StrategyStage.PAPER)
+    assert decision.promote is False
+
+    events = (await db_session.execute(select(EvolutionEvent))).scalars().all()
+    assert len(events) == 1
+    event = events[0]
+    assert event.event_type == EvolutionEventType.REJECTION
+    assert event.accepted is False
+    assert event.child_strategy_version_id == version.id
+    assert event.parent_strategy_version_id is None  # no prior champion in this lineage
+    assert event.rejection_reason
+    assert "stage_track_record" in event.rejection_reason
+    assert event.validation_result["reasons"] == decision.reasons
 
 
 @pytest.mark.asyncio
@@ -134,3 +167,14 @@ async def test_promotes_and_retires_previous_champion_when_all_gates_pass(db_ses
     await db_session.refresh(champion)
     assert challenger.champion_status == ChampionStatus.CHAMPION
     assert champion.champion_status == ChampionStatus.RETIRED
+
+    events = (await db_session.execute(select(EvolutionEvent))).scalars().all()
+    assert len(events) == 1
+    event = events[0]
+    assert event.event_type == EvolutionEventType.PROMOTION
+    assert event.accepted is True
+    assert event.child_strategy_version_id == challenger.id
+    assert event.parent_strategy_version_id == champion.id
+    assert event.rejection_reason is None
+    assert event.validation_result["challenger_metrics"]["fitness"] == pytest.approx(0.40)
+    assert event.validation_result["champion_metrics"]["fitness"] == pytest.approx(0.10)

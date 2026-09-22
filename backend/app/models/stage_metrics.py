@@ -41,4 +41,18 @@ class StageMetrics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     oos_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     walk_forward_consistency: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Reality-gap fields: PnL alone hides *why* a stage underperformed the
+    # one before it — cost drag (fees/funding/slippage) vs execution
+    # quality (latency/missed fills) are different failure modes with
+    # different fixes. Nullable because backtest/walk-forward stages don't
+    # populate all of them (no real fill latency exists in a backtest).
+    total_fees: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_funding: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_slippage_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_trade_net_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    missed_trade_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    missed_trade_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_signal_to_fill_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     computed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

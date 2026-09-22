@@ -84,6 +84,44 @@ class Settings(BaseSettings):
     pro_max_drawdown: float = 0.20
     pro_min_oos_score: float = 0.70
 
+    # --- Regime validation ----------------------------------------------------
+    regime_validation_min_trades_per_regime: int = 10
+    regime_validation_robust_min_positive_regimes_pct: float = 0.7
+    regime_validation_specialist_min_pnl_share: float = 0.6
+
+    # --- Strategy correlation ---------------------------------------------------
+    max_strategy_correlation: float = 0.80
+    max_return_correlation: float = 0.80
+    min_strategy_diversity: float = 0.60
+    correlation_lookback_days: int = 30
+    correlation_time_bucket: str = "1h"
+    max_family_survivor_fraction: float = 0.35
+    correlation_diversity_pressure_enabled: bool = True
+
+    # --- Reality gap ------------------------------------------------------------
+    # Soft flag/report annotation only — champion/challenger evaluates the raw
+    # per-metric numbers itself rather than a single pass/fail threshold here.
+    reality_gap_max_acceptable_degradation_pct: float = 0.35
+
+    # --- Champion/Challenger ------------------------------------------------
+    champion_min_trade_count: int = 100
+    champion_min_oos_score: float = 0.65
+    champion_min_walk_forward_consistency: float = 0.6
+    champion_max_drawdown: float = 0.25
+    champion_min_profit_factor: float = 1.3
+    champion_min_fitness_improvement: float = 0.05
+    champion_min_stage_days: int = 14
+    champion_min_observation_days: int = 14
+
+    # --- Adversarial testing ------------------------------------------------
+    adversarial_max_acceptable_drawdown: float = 0.40
+    adversarial_min_acceptable_worst_case_return: float = -0.20
+    adversarial_n_dna_variants: int = 5
+    adversarial_fee_stress_multiplier: float = 2.0
+    adversarial_slippage_stress_multiplier: float = 3.0
+    adversarial_partial_fill_min_pct: float = 0.3
+    adversarial_execution_delay_jitter_ms: int = 500
+
     # --- Live trading safety gates -------------------------------------------
     live_trading_enabled: bool = False
     live_account_confirmed: bool = False
