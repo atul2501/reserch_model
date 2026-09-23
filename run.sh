@@ -118,12 +118,20 @@ cmd_start() {
   supervise research "$VENV_DIR/bin/python" -m scripts.run_research
 
   echo "==> Starting API + frontend (restart-on-crash, logging to $LOG_DIR/api.log)"
-  supervise api "$VENV_DIR/bin/uvicorn" app.main:app --host "${API_HOST:-127.0.0.1}" --port "${API_PORT:-8000}"
+  # uvicorn's CLI does not read backend/.env, so pick API_HOST / API_PORT up from it here
+  # (an already-exported environment variable wins). Default stays loopback.
+  env_value() {
+    grep -E "^$1=" "$BACKEND_DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d "\"' \r"
+  }
+  API_HOST="${API_HOST:-$(env_value API_HOST)}"; API_HOST="${API_HOST:-127.0.0.1}"
+  API_PORT="${API_PORT:-$(env_value API_PORT)}"; API_PORT="${API_PORT:-8000}"
+  echo "==> API will listen on ${API_HOST}:${API_PORT}"
+  supervise api "$VENV_DIR/bin/uvicorn" app.main:app --host "$API_HOST" --port "$API_PORT"
 
   sleep 1
   cmd_status
   echo ""
-  echo "Dashboard: http://localhost:8000/"
+  echo "Dashboard: http://${API_HOST}:${API_PORT}/"
   echo "Logs:      ./run.sh logs"
   echo "Stop:      ./run.sh stop"
 }
