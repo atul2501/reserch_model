@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_trading_lab.db")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./data/test_trading_lab.db")
 os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
 os.environ.setdefault("OLLAMA_MODEL", "test-model")
 

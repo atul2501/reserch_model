@@ -57,7 +57,7 @@ Diagnose (PostgreSQL):
 SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) total FROM pg_class
 WHERE relkind='r' AND relnamespace='public'::regnamespace ORDER BY pg_total_relation_size(oid) DESC LIMIT 8;
 ```
-Diagnose (SQLite): `sqlite3 trading_lab.db "select name, sum(pgsize)/1048576 MB from dbstat group by name order by 2 desc limit 8;"`
+Diagnose (SQLite): `sqlite3 backend/data/trading_lab.db "select name, sum(pgsize)/1048576 MB from dbstat group by name order by 2 desc limit 8;"`
 
 One-time cleanup of an existing database (take a backup / `pg_dump` first; **stop the worker**):
 ```bash
@@ -72,3 +72,18 @@ Rows linked to an order or trade are never deleted. `--vacuum` returns disk to t
 `VACUUM (FULL, ANALYZE) decisions` on PostgreSQL, which takes an exclusive lock; use `pg_repack` if you cannot stop
 the worker). On a 496 MB production backup this produced 8.4 MB with all 1,033 orders / 930 trades intact.
 Routine housekeeping: `python -m scripts.prune_decisions` (deletes legacy no-op rows older than `DECISION_RETENTION_DAYS`).
+
+## Where the database files live
+Everything SQLite-related is in **one folder: `backend/data/`** (`trading_lab.db`, `backups/`, and the test database).
+Relative paths in `DATABASE_URL` are resolved from `backend/`, not from the directory you launch from, so the app,
+alembic, the scripts and the tests always use the same file. The folder is git-ignored and created automatically.
+
+Moving an existing install (stop everything first so no `-wal/-shm` file is in flight):
+```bash
+cd ~/reserch_model && ./run.sh stop
+mkdir -p backend/data
+mv backend/trading_lab.db* backend/data/ 2>/dev/null
+mv backend/backups backend/data/ 2>/dev/null
+sed -i 's#^DATABASE_URL=.*#DATABASE_URL=sqlite+aiosqlite:///./data/trading_lab.db#; s#^DATABASE_URL_SYNC=.*#DATABASE_URL_SYNC=sqlite:///./data/trading_lab.db#' backend/.env
+./run.sh start
+```

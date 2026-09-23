@@ -8,9 +8,31 @@ from __future__ import annotations
 
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+
+def resolve_sqlite_url(url: str) -> str:
+    """Rewrite a RELATIVE sqlite file URL to an absolute one under BACKEND_DIR and create its folder.
+    Absolute paths, in-memory databases and non-SQLite URLs are returned unchanged."""
+    from sqlalchemy.engine import make_url
+
+    if not url.startswith("sqlite"):
+        return url
+    parsed = make_url(url)
+    db = parsed.database
+    if not db or db == ":memory:" or db.startswith("file:"):
+        return url
+    path = Path(db)
+    if not path.is_absolute():
+        path = (BACKEND_DIR / path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return parsed.set(database=str(path)).render_as_string(hide_password=False)
 
 
 class TradingMode(str, Enum):
@@ -98,8 +120,10 @@ class Settings(BaseSettings):
     max_daily_loss: float = 0.10
 
     # --- Database -----------------------------------------------------------
-    database_url: str = "sqlite+aiosqlite:///./trading_lab.db"
-    database_url_sync: str = "sqlite:///./trading_lab.db"
+    # All database files live in ONE folder: backend/data/  (relative SQLite paths are resolved
+    # against the backend directory, never the current working directory).
+    database_url: str = "sqlite+aiosqlite:///./data/trading_lab.db"
+    database_url_sync: str = "sqlite:///./data/trading_lab.db"
     # Production: DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trading_lab
     # (SQLite stays the default for local development and the test-suite.)
     database_pool_size: int = 20
@@ -270,6 +294,14 @@ class Settings(BaseSettings):
     # (see `python -m scripts.hash_api_key`). Roles: viewer|researcher|operator|admin.
     api_auth_required: bool = True
     api_keys: str = ""
+
+    @model_validator(mode="after")
+    def _anchor_sqlite_paths(self) -> "Settings":
+        """Relative SQLite paths resolve against backend/ (not the CWD) and their folder is created,
+        so the app, alembic, scripts and tests all use the SAME file no matter where they are launched."""
+        self.database_url = resolve_sqlite_url(self.database_url)
+        self.database_url_sync = resolve_sqlite_url(self.database_url_sync)
+        return self
 
     @field_validator("agent_count")
     @classmethod

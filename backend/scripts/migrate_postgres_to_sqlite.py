@@ -7,7 +7,7 @@ Postgres is still reachable).
 
 Usage:
     python -m scripts.migrate_postgres_to_sqlite
-    python -m scripts.migrate_postgres_to_sqlite --pg-url postgresql://... --sqlite-path ./trading_lab.db
+    python -m scripts.migrate_postgres_to_sqlite --pg-url postgresql://... --sqlite-path ./data/trading_lab.db
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def main() -> None:
     settings = get_settings()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-url", default=settings.database_url_sync, help="Source Postgres URL (sync, psycopg2)")
-    parser.add_argument("--sqlite-path", default="./trading_lab.db", help="Destination SQLite file path")
+    parser.add_argument("--sqlite-path", default="./data/trading_lab.db", help="Destination SQLite file path")
     args = parser.parse_args()
 
     migrate(args.pg_url, args.sqlite_path)

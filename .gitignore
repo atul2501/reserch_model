@@ -33,7 +33,7 @@ dist/
 *.db-shm
 *.db-wal
 *.db-journal
-backend/backups/
+backend/data/
 
 # run.sh service state (pidfiles, logs)
 backend/.run/

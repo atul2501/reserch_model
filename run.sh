@@ -81,6 +81,7 @@ do_setup() {
     cp "$ROOT_DIR/.env.example" .env
   fi
 
+  mkdir -p "$BACKEND_DIR/data"   # every database file lives here
   echo "==> Running migrations"
   alembic upgrade head
 
@@ -140,6 +141,15 @@ cmd_stop() {
   for name in "${SERVICES[@]}"; do
     echo "==> Stopping $name"
     stop_one "$name"
+  done
+  # The supervisor loop is stopped above, but the python child can survive it (it did on the
+  # server, forcing manual pkill). Make sure nothing from THIS project keeps running.
+  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main"; do
+    pkill -f "$pattern" 2>/dev/null || true
+  done
+  sleep 1
+  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main"; do
+    pkill -9 -f "$pattern" 2>/dev/null || true
   done
 }
 
