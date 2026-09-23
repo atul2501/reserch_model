@@ -45,3 +45,30 @@ A previously consumed OOS slice cannot be reused: a *new* epoch (new data) is re
 cd backend && .venv/bin/python -m pytest -q                       # SQLite
 DATABASE_URL=postgresql+asyncpg://… .venv/bin/python -m pytest -q # PostgreSQL (also runs tests/test_postgres.py)
 ```
+
+## Database size / `decisions` growth
+Before this fix every agent wrote a `decisions` row on every candle (500 x 1/min = ~720k rows/day), 99% of them
+"no signal / holding", each with a ~1.4 KB copy of the market snapshot (already stored once per candle in
+`market_features`). Now only **actionable** agent-candles (entries, exits, vetoes, risk rejections, cooldown /
+daily-limit skips) write a row, and `market_context` is no longer copied. Expected growth: a few MB/day.
+
+Diagnose (PostgreSQL):
+```sql
+SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) total FROM pg_class
+WHERE relkind='r' AND relnamespace='public'::regnamespace ORDER BY pg_total_relation_size(oid) DESC LIMIT 8;
+```
+Diagnose (SQLite): `sqlite3 trading_lab.db "select name, sum(pgsize)/1048576 MB from dbstat group by name order by 2 desc limit 8;"`
+
+One-time cleanup of an existing database (take a backup / `pg_dump` first; **stop the worker**):
+```bash
+./run.sh stop
+cd backend
+python -m scripts.prune_decisions --dry-run --older-than-days 0     # shows what would go
+python -m scripts.prune_decisions --older-than-days 0 --strip-context --vacuum
+alembic upgrade head        # SQLite: do this AFTER pruning (batch ALTER rebuilds the table)
+./run.sh start
+```
+Rows linked to an order or trade are never deleted. `--vacuum` returns disk to the OS (`VACUUM` on SQLite,
+`VACUUM (FULL, ANALYZE) decisions` on PostgreSQL, which takes an exclusive lock; use `pg_repack` if you cannot stop
+the worker). On a 496 MB production backup this produced 8.4 MB with all 1,033 orders / 930 trades intact.
+Routine housekeeping: `python -m scripts.prune_decisions` (deletes legacy no-op rows older than `DECISION_RETENTION_DAYS`).

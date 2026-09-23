@@ -97,7 +97,8 @@ async def test_500_agents_one_cycle_is_fast_query_bounded_and_ollama_free(db_ses
     per_candle_specs = len(computed) / 12
     assert 0 < per_candle_specs < 200
     decisions = (await db_session.execute(select(func.count()).select_from(Decision))).scalar_one()
-    assert decisions == 500 * 12                                          # every agent audited on every candle
+    # Only actionable agent-candles are audited (entries, exits, vetoes) - NOT 500 x 12 no-op rows.
+    assert decisions < 500 * 12 * 0.5
     opened_ever = (await db_session.execute(select(func.count()).select_from(Position))).scalar_one()
     from app.models.enums import OrderStatus
     orders = (await db_session.execute(select(func.count()).select_from(Order).where(

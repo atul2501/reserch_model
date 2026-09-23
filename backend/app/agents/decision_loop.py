@@ -292,17 +292,20 @@ async def _process_agent(cc: CycleContext, agent: Agent) -> None:
         agent.day_start_date = market_ts.date()
         agent.daily_trade_count = 0
 
+    # A Decision row is an AUDIT record of something that happened (an entry attempt,
+    # an exit, a veto, a rejection). The ~99% of agent-candles where nothing happened
+    # ("no signal", "holding") write NO row: they were 237k of 239k rows (~470 MB after
+    # 1.5 days) and carry no information. The per-candle market snapshot lives once in
+    # `market_features`, so it is no longer copied into every decision either.
     decision = Decision(
+        id=uuid.uuid4(),
         agent_id=agent.id, strategy_version_id=agent.strategy_version_id, council_decision_id=cc.council_decision_id,
         market_candle_open_time=context.candle_open_time, market_timestamp=market_ts,
-        market_context=context.model_dump(mode="json"),
+        market_context=None,
         agent_signal=Bias.NEUTRAL, agent_signal_confidence=0.0, agent_signal_reasoning={},
         council_bias=cc.council.bias, council_confidence=cc.council.confidence, final_signal=Bias.NEUTRAL,
         risk_decision=RiskDecision.REJECTED, risk_reasoning={},
     )
-    db.add(decision)
-    await db.flush()  # decision.id seeds the deterministic order idempotency key
-
     # ---- 1. manage the open position ------------------------------------- #
     if position is not None:
         if await _manage_open_position(cc, agent, dna, stage, position, decision, bar):
@@ -325,19 +328,20 @@ async def _process_agent(cc: CycleContext, agent: Agent) -> None:
             await _close_position(cc, agent, dna, stage, position, decision, reference_price=bar.close,
                                   order_kind="market", exit_reason=signal.reasoning.get("exit_reason") or "signal")
         else:
-            decision.risk_reasoning = {"skipped": "position_open_holding"}
+            pass  # holding: nothing happened -> no audit row
         return
 
     if not signal.matched_entry:
-        decision.risk_reasoning = {"skipped": "no_entry_signal_or_position_open"}
-        return
+        return  # no signal: nothing happened -> no audit row
 
     # DNA trade-frequency controls are hard runtime gates, not metadata.
     if agent.cooldown_until is not None and market_ts < agent.cooldown_until:
         decision.risk_reasoning = {"skipped": "cooldown_active", "cooldown_until": agent.cooldown_until.isoformat()}
+        await _keep(db, decision)
         return
     if agent.daily_trade_count >= dna.max_trades_per_day:
         decision.risk_reasoning = {"skipped": "max_trades_per_day_reached"}
+        await _keep(db, decision)
         return
 
     # ---- 3. council as shared context (never an oracle) ------------------- #
@@ -346,6 +350,7 @@ async def _process_agent(cc: CycleContext, agent: Agent) -> None:
     council_audit = combined.audit()
     if combined.reason == "council_directional_conflict_veto":
         decision.risk_reasoning = {"skipped": "council_directional_conflict", "council": council_audit}
+        await _keep(db, decision)
         return
 
     # ---- 4. sizing + risk ------------------------------------------------- #
@@ -397,7 +402,10 @@ async def _process_agent(cc: CycleContext, agent: Agent) -> None:
     }
     if rejected:
         metrics.inc("risk_vetoes")
+        await _keep(db, decision)
         return
+
+    await _keep(db, decision)  # the Order FK needs the Decision row in place
 
     # ---- 5. order + fill -------------------------------------------------- #
     order = Order(
@@ -459,6 +467,14 @@ async def _process_agent(cc: CycleContext, agent: Agent) -> None:
     agent.daily_trade_count += 1
     agent.last_trade_time = cc.close_dt
     _set_equity(agent, agent.balance)
+
+
+async def _keep(db: AsyncSession, decision: Decision) -> None:
+    """Persist an actionable decision (idempotent). Flushed immediately so its id
+    can back the deterministic order idempotency key and the Order foreign key."""
+    if decision not in db:
+        db.add(decision)
+        await db.flush()
 
 
 def _apply_fill_to_order(order: Order, fill, cc: CycleContext) -> None:
@@ -552,6 +568,7 @@ async def _close_position(
     (the position stays open and is retried next bar)."""
     settings = get_settings()
     db, context = cc.db, cc.context
+    await _keep(db, decision)
     order = Order(
         agent_id=agent.id, decision_id=decision.id,
         client_order_id=new_client_order_id(str(agent.id), str(decision.id), "exit"),

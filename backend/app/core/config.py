@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     ollama_max_retries: int = 3
     ollama_concurrency: int = 10
 
+    # Housekeeping: no-op decision rows (legacy) older than this many days are pruned by
+    # `python -m scripts.prune_decisions`. Rows linked to an order/trade are NEVER pruned.
+    decision_retention_days: int = 7
+
     # --- Worker ---------------------------------------------------------------
     worker_lease_ttl_seconds: int = 90
     worker_lease_heartbeat_seconds: int = 30

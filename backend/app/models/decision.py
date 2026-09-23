@@ -37,7 +37,9 @@ class Decision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     market_timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     # Snapshot of the shared market context this decision was made against.
-    market_context: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # DEPRECATED: no longer written (the per-candle snapshot lives once in `market_features`;
+    # copying it into every decision cost ~314 MB per 240k rows). Kept nullable for history.
+    market_context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Deterministic strategy evaluation output.
     agent_signal: Mapped[Bias] = mapped_column(SAEnum(Bias, name="decision_signal_enum"), nullable=False)

@@ -62,7 +62,7 @@ async def test_experiment_records_all_required_provenance(db_session):
 
 def test_code_and_schema_versions_are_resolved():
     assert code_version() not in ("", None)
-    assert schema_version() == "b5e2f9a3c7d4"    # alembic head shipped with this code
+    assert schema_version() == "c6f3a1b8d5e2"    # alembic head shipped with this code
 
 
 async def test_confirmed_only_loader_never_returns_open_bars(db_session):

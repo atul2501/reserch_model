@@ -69,8 +69,11 @@ async def test_latest_confirmed_bar_processed_and_recorded(db_session, no_counci
     row = (await _cycles(db_session))[T0 + 399 * INTERVAL]
     assert row.status == "COMPLETED" and row.completed and row.agents_processed == 3
     assert row.cycle_latency_seconds is not None and row.council_status == "NOT_RUN"
+    # Only ACTIONABLE agent-candles leave an audit row; "nothing happened" writes none.
     decisions = (await db_session.execute(select(Decision))).scalars().all()
-    assert len(decisions) == 3 and {d.market_candle_open_time for d in decisions} == {T0 + 399 * INTERVAL}
+    assert {d.market_candle_open_time for d in decisions} <= {T0 + 399 * INTERVAL}
+    assert all(d.market_context is None for d in decisions)          # snapshot lives once in market_features
+    assert len(decisions) < 3 or all(d.order_id or d.risk_reasoning.get("skipped") for d in decisions)
 
 
 async def test_open_bar_is_never_processed(db_session, no_council):
@@ -88,10 +91,11 @@ async def test_completed_candle_is_never_reprocessed(db_session, no_council):
     _, market = await _setup(db_session)
     eng = PaperExecutionAdapter()
     await cycle_mod.run_pending_cycles(db_session, market, None, execution_engine=eng)
+    n_before = len((await db_session.execute(select(Decision))).scalars().all())
     again = await cycle_mod.run_pending_cycles(db_session, market, None, execution_engine=eng)
     assert again == []
     n = len((await db_session.execute(select(Decision))).scalars().all())
-    assert n == 3
+    assert n == n_before  # nothing was re-decided
 
 
 async def test_crash_mid_cycle_leaves_candle_pending_and_retry_succeeds(db_session, no_council, monkeypatch):
