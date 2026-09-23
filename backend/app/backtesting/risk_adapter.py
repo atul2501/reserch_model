@@ -38,6 +38,7 @@ def backtest_risk_check(
     global_max_position_size: float,
     global_max_drawdown: float,
     global_max_daily_loss: float,
+    stop_distance_pct: float | None = None,
 ) -> float:
     """Returns the risk-approved notional (0.0 if the real Risk Engine would
     reject this entry) for one proposed backtest entry. Never bypassed:
@@ -57,6 +58,7 @@ def backtest_risk_check(
             daily_pnl=equity - day_start_equity,
             has_open_position=False,
             market_data_age_seconds=None,
+            stop_distance_pct=stop_distance_pct,
         ),
         global_max_leverage=global_max_leverage,
         global_max_position_size=global_max_position_size,

@@ -8,6 +8,11 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/home/ec2-user/reserch_model/backend
 Environment="PYTHONUNBUFFERED=1"
+# Secrets live OUTSIDE the repo (root-owned, mode 0600) — never in git.
+EnvironmentFile=-/etc/trading-lab/env
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
 ExecStart=/home/ec2-user/.venv/bin/python -m scripts.run_cycle
 Restart=always
 RestartSec=5

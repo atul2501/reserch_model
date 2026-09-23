@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.council.analysts import AnalystRunResult, run_analyst
@@ -56,22 +57,72 @@ def should_run_council(candle_index: int, interval_candles: int) -> bool:
     return candle_index % interval_candles == 0
 
 
+def _failed_result(analyst: str, reason: str, started: datetime | None = None) -> AnalystRunResult:
+    now = datetime.now(timezone.utc)
+    started = started or now
+    return AnalystRunResult(
+        analyst=analyst, response=None, error=reason, started_at=started, completed_at=now,
+        request_id="", latency_ms=int((now - started).total_seconds() * 1000), model="",
+    )
+
+
+async def _gather_analysts_with_deadline(
+    client: OllamaClient, context: MarketContext, *, analyst_timeout: float, deadline: float
+) -> list[AnalystRunResult]:
+    """Runs every analyst concurrently, each with its own timeout, and the
+    whole set under one hard deadline. Anything still running at the deadline
+    is CANCELLED and recorded as failed — a slow model can delay the council
+    by at most `deadline` seconds, never by minutes."""
+    if not client.is_available():
+        # Known-bad credentials / cooldown: no network, no waiting — fail closed now.
+        return [_failed_result(name, "ollama_unavailable") for name in ANALYST_NAMES]
+
+    async def _one(name: str) -> AnalystRunResult:
+        started = datetime.now(timezone.utc)
+        try:
+            return await asyncio.wait_for(
+                run_analyst(client, name, context, deadline_seconds=analyst_timeout), timeout=analyst_timeout
+            )
+        except asyncio.TimeoutError:
+            return _failed_result(name, "analyst_timeout", started)
+
+    tasks = {name: asyncio.create_task(_one(name), name=f"analyst-{name}") for name in ANALYST_NAMES}
+    done, pending = await asyncio.wait(tasks.values(), timeout=deadline)
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+        logger.error("council.deadline_exceeded_cancelled_slow_analysts", deadline=deadline, cancelled=len(pending))
+    results: list[AnalystRunResult] = []
+    for name, task in tasks.items():
+        if task in done and not task.cancelled() and task.exception() is None:
+            results.append(task.result())
+        else:
+            results.append(_failed_result(name, "council_deadline_exceeded"))
+    return results
+
+
 async def run_council_cycle(
     db: AsyncSession,
     client: OllamaClient,
     context: MarketContext,
+    *,
+    deadline_seconds: float | None = None,
+    analyst_timeout_seconds: float | None = None,
 ) -> ConsensusResult:
     settings = get_settings()
     council_start_monotonic = time.monotonic()
     council_start_epoch = time.time()
+    deadline = deadline_seconds if deadline_seconds is not None else settings.council_deadline_seconds
+    analyst_timeout = analyst_timeout_seconds if analyst_timeout_seconds is not None else settings.council_analyst_timeout_seconds
 
-    # Every analyst goes through the SAME `client` instance and the SAME
-    # run_analyst() — there is no per-analyst auth/client construction
-    # anywhere in this call. asyncio.gather runs all 8 concurrently
-    # (bounded by OllamaClient's own internal semaphore); this is not a
-    # sequential loop.
-    tasks = [run_analyst(client, name, context) for name in ANALYST_NAMES]
-    results: list[AnalystRunResult] = await asyncio.gather(*tasks)
+    # All analysts share the SAME client instance (auth/backoff/concurrency
+    # live there) and run concurrently under per-analyst and whole-council
+    # deadlines. The result is bound to `context.candle_open_time` and is
+    # never reused for another candle.
+    results: list[AnalystRunResult] = await _gather_analysts_with_deadline(
+        client, context, analyst_timeout=analyst_timeout, deadline=deadline
+    )
 
     expected_analysts = len(ANALYST_NAMES)
     succeeded = [r for r in results if r.response is not None]
@@ -82,7 +133,9 @@ async def run_council_cycle(
     quorum_met = successful_analysts >= settings.council_min_successful_analysts
 
     consensus_time_monotonic: float
+    metrics.inc("council_cycles", status="COMPLETE" if quorum_met else "INCOMPLETE")
     if not quorum_met:
+        metrics.inc("council_quorum_failures")
         logger.error(
             "council.quorum_not_met",
             candle_open_time=context.candle_open_time,
@@ -91,7 +144,7 @@ async def run_council_cycle(
             required=settings.council_min_successful_analysts,
             failed_analysts=failed_analysts,
         )
-        valid_responses = [r.response for r in succeeded]
+        valid_responses = [r.response for r in succeeded if r.response is not None]
         consensus = ConsensusResult(
             vote_tally=tally_votes(valid_responses) if valid_responses else {"LONG": 0, "SHORT": 0, "NEUTRAL": 0},
             consensus_bias=Bias.NEUTRAL,
@@ -111,7 +164,7 @@ async def run_council_cycle(
         )
         consensus_time_monotonic = time.monotonic()
     else:
-        valid_responses = [r.response for r in succeeded]
+        valid_responses = [r.response for r in succeeded if r.response is not None]
         consensus = compute_consensus(valid_responses, consensus_margin=settings.council_consensus_margin)
         consensus = consensus.model_copy(
             update={
@@ -125,8 +178,13 @@ async def run_council_cycle(
             }
         )
 
-        if not consensus.is_strong_consensus and settings.judge_enabled:
-            judge_response = await _run_judge(client, context, valid_responses)
+        remaining = deadline - (time.monotonic() - council_start_monotonic)
+        if not consensus.is_strong_consensus and settings.judge_enabled and remaining > 2.0:
+            try:
+                judge_response = await asyncio.wait_for(_run_judge(client, context, valid_responses), timeout=remaining)
+            except asyncio.TimeoutError:
+                logger.error("council.judge_deadline_exceeded", remaining=remaining)
+                judge_response = None
             if judge_response is not None:
                 consensus = apply_judge(consensus, judge_response)
         consensus_time_monotonic = time.monotonic()

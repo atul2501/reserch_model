@@ -21,6 +21,11 @@ class ExecutionRequest:
     quantity: float
     leverage: float
     reference_price: float
+    # Exits are reduce-only and carry the kind of trigger that produced them,
+    # because a stop/liquidation fills worse than a resting take-profit limit:
+    #   market (entries, signal exits) | stop | take_profit | liquidation
+    reduce_only: bool = False
+    order_kind: str = "market"
 
 
 @dataclass
@@ -45,3 +50,7 @@ class ExecutionEngine(ABC):
         MUST be idempotent on `client_order_id` — resubmitting the same id
         after a network retry must never produce a second fill."""
         raise NotImplementedError
+
+    async def aclose(self) -> None:
+        """Release any network resources (no-op for pure-simulation engines)."""
+        return None

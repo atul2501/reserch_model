@@ -36,6 +36,27 @@ class Settings(BaseSettings):
     hyperliquid_private_key: str = ""
     market_symbol: str = "SOL"
     market_timeframe: str = "1m"
+    # A candle is only "final" once its close time is at least this far in the
+    # past — guards against a snapshot taken a few ms after the boundary that
+    # still misses the last trades of the bar.
+    candle_finality_grace_ms: int = 1500
+    # After a candle boundary, poll until the exchange has published the
+    # closed bar (bounded) instead of skipping it forever.
+    candle_wait_deadline_seconds: float = 20.0
+    candle_poll_interval_seconds: float = 1.0
+    # A cycle that overran may leave several confirmed bars unprocessed; they
+    # are replayed in order (exits/stops only) up to this many bars.
+    max_catchup_bars: int = 5
+    # Continuity is verified over this many trailing confirmed bars. An
+    # unrecoverable hole halts NEW entries (never trade through a data gap).
+    gap_check_window_bars: int = 300
+    data_stale_threshold_seconds: int = 180
+    # WebSocket is the primary real-time candle stream; REST stays for warm-up,
+    # backfill and reconciliation and is always active as the fallback.
+    market_ws_enabled: bool = True
+    ws_ping_interval_seconds: float = 30.0
+    ws_stale_after_seconds: float = 90.0
+    funding_history_lookback_hours: int = 48
 
     # --- Ollama -------------------------------------------------------------
     ollama_base_url: str = ""
@@ -51,24 +72,71 @@ class Settings(BaseSettings):
     ollama_max_retries: int = 3
     ollama_concurrency: int = 10
 
+    # --- Worker ---------------------------------------------------------------
+    worker_lease_ttl_seconds: int = 90
+    worker_lease_heartbeat_seconds: int = 30
+
     # --- Population -----------------------------------------------------
     agent_count: int = 500
     agent_starting_balance: float = 100.0
 
     # --- Risk -------------------------------------------------------------
     max_leverage: float = 5.0
-    max_position_size: float = 0.5
+    max_position_size: float = 0.5   # max fraction of equity committed as MARGIN per position
+    # Hard cap on gross exposure (notional / equity) regardless of leverage x margin:
+    # equity being positive is never a licence for unlimited notional.
+    max_exposure_multiple: float = 2.0
+    # Pre-trade risk limit: the loss if the protective stop is hit may not exceed
+    # this fraction of equity (notional is reduced to fit). Independent of the
+    # DNA, so a fragile wide-stop/high-leverage DNA cannot bleed an account.
+    max_loss_per_trade_fraction: float = 0.05
     max_drawdown: float = 0.30
     max_daily_loss: float = 0.10
 
     # --- Database -----------------------------------------------------------
     database_url: str = "sqlite+aiosqlite:///./trading_lab.db"
     database_url_sync: str = "sqlite:///./trading_lab.db"
+    # Production: DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trading_lab
+    # (SQLite stays the default for local development and the test-suite.)
+    database_pool_size: int = 20
+    database_max_overflow: int = 10
+    database_pool_timeout_seconds: int = 30
+    database_pool_recycle_seconds: int = 1800
+    database_statement_timeout_ms: int = 30_000
 
     # --- Paper execution simulation ---------------------------------------
-    paper_fee_rate: float = 0.00045
-    paper_slippage_bps: float = 2.0
+    paper_fee_rate: float = 0.00045            # taker
+    paper_maker_fee_rate: float = 0.00015      # resting take-profit limit exits
+    paper_slippage_bps: float = 2.0            # base adverse slippage on market orders
+    # Extra adverse bps per $10k of notional (size-aware impact; 0 disables).
+    paper_slippage_impact_bps_per_10k: float = 0.5
+    # Stops/liquidations execute into a moving market: slippage is multiplied.
+    paper_stop_slippage_multiplier: float = 2.0
     paper_latency_ms: int = 150
+    paper_latency_jitter_ms: int = 50
+    # Simulated latency is REPORTED (and can drift the price) without sleeping;
+    # 500 sequential real sleeps would blow the 1-minute cycle budget.
+    paper_simulate_latency_sleep: bool = False
+    paper_latency_drift_bps_per_sec: float = 0.0
+    paper_partial_fill_probability: float = 0.0
+    paper_partial_fill_min_fraction: float = 0.5
+    paper_reject_probability: float = 0.0
+    # Hyperliquid's real minimum order value is $10; 0 disables the check.
+    paper_min_order_notional: float = 0.0
+    paper_quantity_step: float = 0.01          # lot size (SOL: 2 size decimals)
+    paper_random_seed: int = 1337
+    # Margin model (cross margin, one position per agent).
+    maintenance_margin_rate: float = 0.025
+    liquidation_fee_rate: float = 0.005        # penalty charged on the liquidated notional
+    # A liquidated account is wiped out (remaining collateral ~ maintenance
+    # margin): the agent dies permanently instead of lingering as a zombie.
+    liquidation_is_fatal: bool = True
+    # Death threshold: equity <= starting_balance * this fraction => DEAD.
+    agent_bankruptcy_equity_fraction: float = 0.0
+    # Volatility-based sizing: target ATR% per bar; scale clamped to [min, max].
+    sizing_vol_target_atr_pct: float = 0.0008
+    sizing_vol_scale_min: float = 0.25
+    sizing_vol_scale_max: float = 2.0
 
     # --- Council / evolution -----------------------------------------------
     council_enabled: bool = True
@@ -82,7 +150,47 @@ class Settings(BaseSettings):
     # response (e.g. 5/8 after some analysts fail) must never be treated as
     # an ordinary full-strength consensus.
     council_min_successful_analysts: int = 6
+    # How the council shapes (never dictates) an agent's decision:
+    #  - opposed with confidence >= veto threshold -> entry vetoed;
+    #  - opposed below it -> size reduced by penalty*confidence;
+    #  - aligned -> size raised by bonus*confidence (still clamped by the Risk Engine);
+    #  - council NEUTRAL -> size multiplied by the neutral modifier.
+    council_veto_confidence: float = 0.60
+    council_opposed_size_penalty: float = 0.50
+    council_aligned_size_bonus: float = 0.15
+    council_neutral_size_modifier: float = 0.75
+    # Hard wall-clock budget for a whole council cycle (must be < candle interval).
+    council_deadline_seconds: float = 45.0
+    council_analyst_timeout_seconds: float = 30.0
     evolution_interval_hours: int = 24
+    # --- Research pipeline (scheduled evolution; only runs when enough data exists) ---
+    research_window_candles: int = 20_160      # ~14 days of 1m bars per research epoch
+    research_min_candles: int = 3_000          # below this the pipeline SKIPS (never guesses)
+    research_train_fraction: float = 0.6
+    research_validation_fraction: float = 0.2  # remaining 20% is the protected final OOS slice
+    research_min_generation_age_hours: float = 12.0
+    research_min_closed_trades: int = 30       # need real paper history before selecting on it
+    research_survivor_fraction: float = 0.2
+    research_adversarial_top_k: int = 25
+    research_adversarial_bars: int = 1200
+    research_candidate_min_trades: int = 3
+    research_candidate_max_drawdown: float = 0.60
+    research_max_child_attempts: int = 3
+    research_poll_seconds: int = 300
+    research_seed: int = 20260101
+
+    # --- Fitness weights (configurable; every component is bounded, see fitness_engine) ---
+    fitness_w_return: float = 1.0
+    fitness_w_risk: float = 1.0
+    fitness_w_consistency: float = 1.0
+    fitness_w_robustness: float = 1.0
+    fitness_w_oos: float = 1.5            # VALIDATION-slice out-of-sample score (never the final OOS)
+    fitness_w_drawdown: float = 2.0
+    fitness_w_instability: float = 1.0
+    fitness_w_correlation: float = 0.3    # soft diversity pressure: lowers rank, never kills
+    fitness_w_expectancy: float = 0.5
+    fitness_w_regime: float = 1.0
+    fitness_w_adversarial: float = 1.0
 
     # --- Professional classification ----------------------------------------
     pro_min_trades: int = 200
@@ -118,6 +226,8 @@ class Settings(BaseSettings):
     champion_min_fitness_improvement: float = 0.05
     champion_min_stage_days: int = 14
     champion_min_observation_days: int = 14
+    champion_min_adversarial_robustness: float = 0.5
+    champion_min_paper_trade_count: int = 30
 
     # --- Adversarial testing ------------------------------------------------
     adversarial_max_acceptable_drawdown: float = 0.40
@@ -129,6 +239,14 @@ class Settings(BaseSettings):
     adversarial_execution_delay_jitter_ms: int = 500
 
     # --- Live trading safety gates -------------------------------------------
+    # Shadow mode: real order-book data, hypothetical fills, NO orders ever sent.
+    shadow_assumed_latency_ms: int = 250      # order-to-book latency we would face live
+    shadow_book_ttl_seconds: float = 2.0      # one book snapshot serves every agent in a cycle
+    shadow_max_book_levels: int = 20
+    # Live trading stays blocked until an operator explicitly signs off the launch
+    # checklist (exchange integration tested on testnet, reconciliation, idempotency
+    # test, emergency stop, auth, secrets) — on top of every gate below.
+    live_prerequisites_signed_off: bool = False
     live_trading_enabled: bool = False
     live_account_confirmed: bool = False
     load_agent_snapshot: str = ""
@@ -138,9 +256,16 @@ class Settings(BaseSettings):
     log_json: bool = True
 
     # --- API --------------------------------------------------------------
-    api_host: str = "0.0.0.0"
+    # Loopback by default; exposing the API on a public interface must be a
+    # deliberate deployment decision (set API_HOST explicitly behind TLS).
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173"
+    # Fail closed: with auth required and no API_KEYS configured, every
+    # protected request is rejected. Format: name:role:sha256hex[,...]
+    # (see `python -m scripts.hash_api_key`). Roles: viewer|researcher|operator|admin.
+    api_auth_required: bool = True
+    api_keys: str = ""
 
     @field_validator("agent_count")
     @classmethod
@@ -174,6 +299,7 @@ class Settings(BaseSettings):
             return True
         return bool(
             self.live_trading_enabled
+            and self.live_prerequisites_signed_off
             and self.live_account_confirmed
             and self.load_agent_snapshot
             and self.hyperliquid_account_address

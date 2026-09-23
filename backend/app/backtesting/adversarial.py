@@ -7,13 +7,17 @@ from __future__ import annotations
 
 import random
 import statistics
+import zlib
 from dataclasses import dataclass, field
 
 import pandas as pd
 
+from app.backtesting.data import prepare_backtest_data
 from app.backtesting.engine import BacktestResult, run_backtest
 from app.evolution.mutation import jitter
+from app.market.feature_engine import InsufficientDataError
 from app.schemas.strategy_dna import StrategyDNA
+from app.strategies.engine import dna_indicator_specs
 
 # ---------------------------------------------------------------------------
 # Candle stress transforms. Each takes a copy of an OHLCV DataFrame (columns
@@ -85,6 +89,20 @@ def inject_liquidity_reduction(candles: pd.DataFrame, magnitude: float, at_index
     return inject_abnormal_volume(candles, magnitude, at_index, length)
 
 
+def drop_random_candles(candles: pd.DataFrame, fraction: float, seed: int = 0) -> pd.DataFrame:
+    """Removes `fraction` of bars at random (missing-candle feed gaps): the
+    indicator windows then span discontinuous time, exactly as they would if
+    the worker traded through an unrecovered gap."""
+    keep = candles.sample(frac=1.0 - fraction, random_state=seed).sort_index()
+    return keep.reset_index(drop=True)
+
+
+def duplicate_random_candles(candles: pd.DataFrame, fraction: float, seed: int = 0) -> pd.DataFrame:
+    """Re-emits `fraction` of bars twice in a row (duplicate feed messages)."""
+    dup = candles.sample(frac=fraction, random_state=seed)
+    return pd.concat([candles, dup]).sort_index(kind="stable").reset_index(drop=True)
+
+
 # ---------------------------------------------------------------------------
 # DNA parameter perturbation, reusing mutation.py's jitter helper.
 # ---------------------------------------------------------------------------
@@ -128,6 +146,10 @@ class ScenarioResult:
 @dataclass
 class AdversarialReport:
     scenario_results: list[ScenarioResult] = field(default_factory=list)
+    # Scenario combinations that raised an unexpected error. These are FAILURES
+    # of the strategy under stress (recorded and failing the suite), never
+    # silently dropped from the worst-case statistics.
+    scenario_errors: list[str] = field(default_factory=list)
     worst_case_max_drawdown_pct: float = 0.0
     worst_case_net_return_pct: float = 0.0
     passed: bool = False
@@ -158,6 +180,9 @@ def run_adversarial_suite(
     global_max_drawdown: float = 0.30,
     global_max_daily_loss: float = 0.10,
     bypass_risk_engine: bool = False,
+    max_acceptable_drawdown: float | None = None,
+    min_acceptable_worst_case_return: float | None = None,
+    cost_multipliers: list[tuple[float, float]] | None = None,
 ) -> AdversarialReport:
     """Runs run_backtest across {stress scenario x fee/slippage multiplier x
     DNA variant} and aggregates worst-case metrics. Skips (rather than
@@ -172,21 +197,38 @@ def run_adversarial_suite(
     behavior; production call sites must never set it."""
     rng = rng or random.Random()
     variants = [dna] + perturb_dna_variants(dna, n_dna_variants, rng)
+    max_dd_limit = max_acceptable_drawdown if max_acceptable_drawdown is not None else MAX_ACCEPTABLE_DRAWDOWN
+    min_ret_limit = min_acceptable_worst_case_return if min_acceptable_worst_case_return is not None else MIN_ACCEPTABLE_WORST_CASE_RETURN
 
     mid = len(candles) // 2
-    scenarios: list[tuple[str, pd.DataFrame]] = [
-        ("baseline", candles),
-        ("volatility_spike", inject_volatility_spike(candles, magnitude=3.0, at_index=mid)),
-        ("gap_down_8pct", inject_gap(candles, gap_pct=-0.08, at_index=mid)),
-        ("stale_period_20", inject_stale_period(candles, length=20, at_index=mid)),
-        ("extreme_move_down_25pct", inject_extreme_move(candles, direction="down", magnitude=0.25, at_index=mid)),
-        ("abnormal_volume_spike_5x", inject_abnormal_volume(candles, magnitude=5.0, at_index=mid, length=20)),
-        ("liquidity_reduction", inject_liquidity_reduction(candles, magnitude=0.05, at_index=mid, length=20)),
+    # (name, frame, execution kwargs)
+    scenarios: list[tuple[str, pd.DataFrame, dict]] = [
+        ("baseline", candles, {}),
+        ("volatility_spike", inject_volatility_spike(candles, magnitude=3.0, at_index=mid), {}),
+        ("gap_down_8pct", inject_gap(candles, gap_pct=-0.08, at_index=mid), {}),
+        ("stale_period_20", inject_stale_period(candles, length=20, at_index=mid), {}),
+        ("extreme_move_down_25pct", inject_extreme_move(candles, direction="down", magnitude=0.25, at_index=mid), {}),
+        ("abnormal_volume_spike_5x", inject_abnormal_volume(candles, magnitude=5.0, at_index=mid, length=20), {}),
+        ("liquidity_reduction", inject_liquidity_reduction(candles, magnitude=0.05, at_index=mid, length=20), {}),
+        ("missing_candles_2pct", drop_random_candles(candles, 0.02, seed=1), {}),
+        ("duplicate_candles_2pct", duplicate_random_candles(candles, 0.02, seed=2), {}),
+        ("delayed_execution_3bars", candles, {"execution_delay_bars": 3}),
+        ("partial_fills_50pct", candles, {"fill_fraction": 0.5}),
+        ("rejected_or_unknown_orders_30pct", candles, {"entry_reject_probability": 0.3}),
     ]
-    fee_slippage_multipliers = [(1.0, 1.0), (2.0, 3.0)]  # normal, and a stressed cost environment
+    fee_slippage_multipliers = list(cost_multipliers) if cost_multipliers else [(1.0, 1.0), (2.0, 3.0)]
 
     results: list[ScenarioResult] = []
-    for scenario_name, stressed_candles in scenarios:
+    errors: list[str] = []
+    specs = dna_indicator_specs(dna)
+    for scenario_name, stressed_candles, exec_kwargs in scenarios:
+        try:
+            # Features are computed ONCE per scenario frame and shared by every
+            # cost multiplier x DNA-variant run (variants only perturb
+            # stops/sizing, never the declared indicators).
+            shared = prepare_backtest_data(stressed_candles, symbol=symbol, timeframe=timeframe, specs=specs)
+        except InsufficientDataError:
+            continue  # the stress transform left too few bars for warm-up: not evaluable
         for fee_mult, slip_mult in fee_slippage_multipliers:
             for idx, variant in enumerate(variants):
                 try:
@@ -203,8 +245,14 @@ def run_adversarial_suite(
                         global_max_position_size=global_max_position_size,
                         global_max_drawdown=global_max_drawdown,
                         global_max_daily_loss=global_max_daily_loss,
+                        data=shared,
+                        rng=random.Random(zlib.crc32(f"{scenario_name}:{idx}".encode())),  # stable across processes
+                        **exec_kwargs,
                     )
-                except Exception:
+                except InsufficientDataError:
+                    continue
+                except Exception as exc:  # unexpected: recorded as a failure, never swallowed
+                    errors.append(f"{scenario_name}[x{fee_mult}/{slip_mult}, v{idx}]: {type(exc).__name__}: {exc}"[:300])
                     continue
                 results.append(ScenarioResult(scenario_name, fee_mult, slip_mult, idx, result))
 
@@ -212,14 +260,17 @@ def run_adversarial_suite(
     worst_return = min((r.result.net_return_pct for r in results), default=-1.0)
 
     failure_reasons = []
-    if worst_dd > MAX_ACCEPTABLE_DRAWDOWN:
-        failure_reasons.append(f"worst_case_max_drawdown {worst_dd:.2%} > {MAX_ACCEPTABLE_DRAWDOWN:.0%}")
-    if worst_return < MIN_ACCEPTABLE_WORST_CASE_RETURN:
-        failure_reasons.append(f"worst_case_net_return {worst_return:.2%} < {MIN_ACCEPTABLE_WORST_CASE_RETURN:.0%}")
+    if worst_dd > max_dd_limit:
+        failure_reasons.append(f"worst_case_max_drawdown {worst_dd:.2%} > {max_dd_limit:.0%}")
+    if worst_return < min_ret_limit:
+        failure_reasons.append(f"worst_case_net_return {worst_return:.2%} < {min_ret_limit:.0%}")
     if not results:
         failure_reasons.append("no_scenario_produced_a_result")
+    if errors:
+        failure_reasons.append(f"{len(errors)} scenario run(s) raised errors: {errors[0]}")
 
     return AdversarialReport(
+        scenario_errors=errors,
         scenario_results=results,
         worst_case_max_drawdown_pct=worst_dd,
         worst_case_net_return_pct=worst_return,

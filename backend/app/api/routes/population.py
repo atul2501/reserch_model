@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,7 +25,10 @@ async def get_population_summary(db: AsyncSession = Depends(get_db)):
 
     active = [a for a in agents if a.status == AgentStatus.ACTIVE]
     dead = [a for a in agents if a.status == AgentStatus.DEAD]
+    retired = [a for a in agents if a.status == AgentStatus.RETIRED]
     professional = [a for a in agents if a.is_professional]
+    generations_total = (await db.execute(select(func.count()).select_from(Generation))).scalar_one()
+    equities = [a.equity for a in agents]
 
     return PopulationSummary(
         generation=generation_number,
@@ -36,4 +39,8 @@ async def get_population_summary(db: AsyncSession = Depends(get_db)):
         total_equity=sum(a.equity for a in agents),
         total_realized_pnl=sum(a.realized_pnl for a in agents),
         total_capital_allocated=latest_gen.total_capital_allocated if latest_gen else 0.0,
+        retired_count=len(retired), total_count=len(agents), generations_total=generations_total,
+        mean_equity=(sum(equities) / len(equities)) if equities else None,
+        best_equity=max(equities) if equities else None, worst_equity=min(equities) if equities else None,
+        total_fees_paid=sum(a.fees_paid for a in agents), total_funding_paid=sum(a.funding_paid for a in agents),
     )

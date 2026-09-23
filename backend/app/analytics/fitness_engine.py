@@ -29,6 +29,14 @@ class FitnessInputs:
     # locked-in rule is that correlation is a breeding-time diversity
     # signal, never a kill signal, so this stays an opt-in soft term.
     mean_pairwise_correlation: float | None = None
+    # --- v2 inputs (all optional: a missing input contributes 0, never a guess) ---
+    # Score of the VALIDATION slice (out-of-sample w.r.t. training). The protected
+    # FINAL OOS slice never appears here — it only gates promotion.
+    regime_robustness: float | None = None      # 0..1 from RegimeValidation classification
+    adversarial_robustness: float | None = None # 0..1 from the adversarial suite
+    profit_factor_score_input: float | None = None
+    starting_balance: float = 100.0
+    daily_consistency: float | None = None      # fraction of profitable days, 0..1
 
 
 @dataclass
@@ -44,6 +52,23 @@ class FitnessWeights:
     # fitness ranking by default, per the locked-in "diversity signal, not
     # a kill/rank signal" rule — set explicitly nonzero to opt in.
     correlation_penalty_weight: float = 0.0
+    # v2 terms (0 contribution when the input is missing)
+    expectancy_weight: float = 0.5
+    regime_weight: float = 1.0
+    adversarial_weight: float = 1.0
+
+    @classmethod
+    def from_settings(cls, settings=None) -> "FitnessWeights":
+        """Weights are configuration, not code: FITNESS_W_* environment variables."""
+        from app.core.config import get_settings
+        s = settings or get_settings()
+        return cls(
+            return_weight=s.fitness_w_return, risk_weight=s.fitness_w_risk, consistency_weight=s.fitness_w_consistency,
+            robustness_weight=s.fitness_w_robustness, oos_weight=s.fitness_w_oos,
+            drawdown_penalty_weight=s.fitness_w_drawdown, instability_penalty_weight=s.fitness_w_instability,
+            correlation_penalty_weight=s.fitness_w_correlation, expectancy_weight=s.fitness_w_expectancy,
+            regime_weight=s.fitness_w_regime, adversarial_weight=s.fitness_w_adversarial,
+        )
 
     def as_dict(self) -> dict[str, float]:
         return self.__dict__.copy()
@@ -60,6 +85,9 @@ class FitnessResult:
     drawdown_penalty: float
     instability_penalty: float
     correlation_penalty: float = 0.0
+    expectancy_score: float = 0.0
+    regime_score: float = 0.0
+    adversarial_score: float = 0.0
     weights_used: dict[str, float] = field(default_factory=dict)
 
 
@@ -93,8 +121,20 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
     # or no correlation data was supplied — see FitnessWeights' docstring.
     correlation_penalty = _clip(inputs.mean_pairwise_correlation or 0.0, lo=0.0, hi=1.0)
 
+    # v2 components — each bounded to [-1, 1] / [0, 1] so no single metric can
+    # dominate the composite, and each is 0 when its input is unavailable.
+    expectancy_score = 0.0
+    if inputs.expectancy is not None and inputs.starting_balance > 0:
+        # +0.5% of the starting balance per trade is "full marks".
+        expectancy_score = _clip(inputs.expectancy / (0.005 * inputs.starting_balance)) * sample_confidence
+    regime_score = _clip(inputs.regime_robustness or 0.0, lo=0.0, hi=1.0)
+    adversarial_score = _clip(inputs.adversarial_robustness or 0.0, lo=0.0, hi=1.0)
+
     fitness = (
-        w.return_weight * return_score
+        w.expectancy_weight * expectancy_score
+        + w.regime_weight * regime_score
+        + w.adversarial_weight * adversarial_score
+        + w.return_weight * return_score
         + w.risk_weight * risk_score
         + w.consistency_weight * consistency_score
         + w.robustness_weight * robustness_score
@@ -114,6 +154,9 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
         drawdown_penalty=drawdown_penalty,
         instability_penalty=instability_penalty,
         correlation_penalty=correlation_penalty,
+        expectancy_score=expectancy_score,
+        regime_score=regime_score,
+        adversarial_score=adversarial_score,
         weights_used=w.as_dict(),
     )
 

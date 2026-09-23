@@ -26,7 +26,18 @@ def dna_distance(a: StrategyDNA, b: StrategyDNA) -> float:
         (a.leverage_limit, b.leverage_limit, 20.0),
     ]
     diffs = [abs(x - y) / scale for x, y, scale in fields]
+    # Behavioural structure, not just scalar risk parameters: which indicators
+    # (with which periods) a strategy reads, and how it chooses direction.
+    specs_a, specs_b = _spec_set(a), _spec_set(b)
+    union = specs_a | specs_b
+    diffs.append(1.0 - (len(specs_a & specs_b) / len(union)) if union else 0.0)
+    diffs.append(0.0 if a.direction_mode == b.direction_mode else 1.0)
     return sum(diffs) / len(diffs)
+
+
+def _spec_set(dna: StrategyDNA) -> set:
+    from app.strategies.engine import dna_indicator_specs
+    return dna_indicator_specs(dna)
 
 
 def population_diversity_score(dnas: list[StrategyDNA]) -> float:

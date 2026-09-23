@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Float, ForeignKey, Integer, Uuid
+from sqlalchemy import JSON, Float, ForeignKey, Integer, Uuid, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -17,6 +17,9 @@ from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 
 class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "performance_metrics"
+    __table_args__ = (
+        Index("ix_performance_metrics_agent", 'agent_id'),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     as_of: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
@@ -54,6 +57,9 @@ class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class FitnessScore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "fitness_scores"
+    __table_args__ = (
+        Index("ix_fitness_scores_agent", 'agent_id'),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     as_of: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
@@ -66,5 +72,10 @@ class FitnessScore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     oos_score: Mapped[float] = mapped_column(Float, nullable=False)
     drawdown_penalty: Mapped[float] = mapped_column(Float, nullable=False)
     instability_penalty: Mapped[float] = mapped_column(Float, nullable=False)
+    # v2 (nullable so historical rows stay valid)
+    correlation_penalty: Mapped[float | None] = mapped_column(Float, nullable=True)
+    expectancy_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    regime_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    adversarial_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     weights_used: Mapped[dict] = mapped_column(JSON, nullable=False)

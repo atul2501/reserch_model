@@ -15,18 +15,33 @@ import app.models  # noqa: E402,F401
 
 
 @pytest_asyncio.fixture
-async def db_session():
+async def db_engine():
+    """The async engine behind `db_session` (tests that need extra independent sessions use it)."""
     from app.core.config import get_settings
 
     settings = get_settings()
     engine = create_async_engine(settings.database_url)
+    if settings.database_url.startswith("sqlite"):
+        # Enforce foreign keys exactly like PostgreSQL does, so fixtures that
+        # reference non-existent rows fail on SQLite too (not only on PG).
+        from sqlalchemy import event
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _fk_on(dbapi_connection, _):
+            cur = dbapi_connection.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-
+    yield engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db_session(db_engine):
+    session_factory = async_sessionmaker(bind=db_engine, expire_on_commit=False)
+    async with session_factory() as session:
+        yield session

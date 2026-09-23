@@ -135,6 +135,19 @@ tbody tr:hover { background: var(--surface-2); }
 
 .empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
 footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .03em; }
+
+/* --- v2 panels --- */
+#alert-banner { display:none; margin: 0 0 14px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--red);
+  background: rgba(241,107,124,.12); color: #ffd7dc; font-weight: 650; font-size: 13px; letter-spacing: .02em; }
+#alert-banner.warn { border-color: #e0b341; background: rgba(224,179,65,.12); color: #ffeab0; }
+.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.hcard { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.hcard .t { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
+.hcard .v { font-size: 13px; font-weight: 650; }
+.hcard .d { color: var(--muted); font-size: 10.5px; margin-top: 4px; line-height: 1.5; word-break: break-word; }
+.st-ok { color: var(--green); } .st-degraded { color: #e0b341; } .st-down { color: var(--red); } .st-unknown { color: var(--muted); }
+pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 10.5px; overflow: auto; max-height: 320px; }
+.agent-row { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -145,6 +158,47 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
   </header>
 
   <div class="grid" id="stat-cards"></div>
+
+  <div id="alert-banner" role="alert"></div>
+
+  <section>
+    <h2>System Health <span class="sub" id="health-sub">live via server-sent events</span></h2>
+    <div class="panel"><div class="hgrid" id="health-panel"></div></div>
+  </section>
+
+  <section>
+    <h2>Population <span class="sub">current generation</span></h2>
+    <div class="panel"><div class="hgrid" id="population-panel"></div></div>
+  </section>
+
+  <section>
+    <h2>AI Council <span class="sub">latest decision: analysts, consensus, failures, latency, judge</span></h2>
+    <div class="panel" id="council-panel"><div class="empty">no council decision yet</div></div>
+  </section>
+
+  <section>
+    <h2>Evolution <span class="sub">generations, parents, mutations, crossover, deaths, births</span></h2>
+    <div class="panel"><div class="hgrid" id="evolution-panel"></div>
+      <div class="table-scroll" style="margin-top:10px"><table id="generations-table"><thead><tr>
+        <th>Gen</th><th>Population</th><th>Active</th><th>Retired</th><th>Dead</th><th>Equity (all)</th><th>Triggered by</th><th>Created</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Agent Detail <span class="sub">click a leaderboard row (or enter an agent id): DNA, versions, equity curve, fitness, regime performance</span></h2>
+    <div class="panel">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="agent-input" type="text" placeholder="agent UUID (click a leaderboard row)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="agent-load" type="button">Load</button>
+      </div>
+      <div id="agent-detail"><div class="empty">select an agent</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Shadow Mode <span class="sub">expected vs actual market execution (no orders are ever sent)</span></h2>
+    <div class="panel"><div class="hgrid" id="shadow-panel"></div></div>
+  </section>
 
   <section>
     <h2>Market</h2>
@@ -389,15 +443,36 @@ const ago = (iso) => {
   return Math.floor(s/3600) + "h ago";
 };
 
+// All text that originates from the API (agent ids, reasons, death reasons,
+// council reasoning...) is untrusted: always pass it through esc() before it
+// is interpolated into an innerHTML template.
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// API key lives in sessionStorage only (cleared when the tab closes) and is
+// sent as a header — never in the URL.
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+function promptForApiKey() {
+  const k = window.prompt("API key (viewer role or higher):", "");
+  if (k) { try { sessionStorage.setItem("apiKey", k.trim()); } catch (e) {} }
+  return !!k;
+}
+
 async function get(path) {
-  const res = await fetch(path);
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) {
+    try { sessionStorage.removeItem("apiKey"); } catch (e) {}
+    throw new Error(path + " -> HTTP " + res.status + " (API key missing or insufficient)");
+  }
   if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
   return await res.json();
 }
 
 // One section failing must never freeze the others.
 async function section(name, fn) {
-  try { await fn(); } catch (e) { console.error(`section "${name}" failed:`, e); }
+  try { await fn(); } catch (e) { console.error(`section "${esc(name)}" failed:`, e); }
 }
 
 // Minimal dependency-free SVG line chart. `points` is [{v: number}, ...] in
@@ -460,7 +535,7 @@ function formatRule(method, value) {
   if (method === "fixed_pct") return `${fmt(value, 1)}%`;
   if (method === "atr_multiple") return `${fmt(value, 2)}x ATR`;
   if (method === "risk_reward_multiple") return `${fmt(value, 2)}R`;
-  return `${method} ${fmt(value, 2)}`;
+  return `${esc(method)} ${fmt(value, 2)}`;
 }
 
 document.getElementById("leaderboard-load-more").addEventListener("click", () => {
@@ -470,7 +545,7 @@ document.getElementById("leaderboard-load-more").addEventListener("click", () =>
 
 function healthBadge(ok, label) {
   const cls = ok === null || ok === undefined ? "grey" : (ok ? "green" : "red");
-  return `<span class="badge"><span class="dot ${cls}"></span>${label}</span>`;
+  return `<span class="badge"><span class="dot ${cls}"></span>${esc(label)}</span>`;
 }
 
 async function refresh() {
@@ -486,15 +561,17 @@ async function refresh() {
 
   await section("market", async () => {
     const m = await get("/api/market");
-    lastLivePrice = m.close_price;
+    lastLivePrice = m.live_price ?? m.close_price;
     document.getElementById("market-title").textContent = `${m.symbol} $${fmt(m.close_price)}`;
+    const cell = (t, v) => `<div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">${t}</div><div>${v}</div></div>`;
     document.getElementById("market-panel").innerHTML = `
-      <div class="grid" style="margin:0;grid-template-columns:repeat(5,minmax(0,1fr));">
-        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Price</div><div>$${fmt(m.close_price)}</div></div>
-        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Regime</div><div>${m.regime} (${pct(m.regime_confidence)})</div></div>
-        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volatility %ile</div><div>${pct(m.volatility_percentile)}</div></div>
-        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Volume Ratio</div><div>${fmt(m.volume_ratio)}x</div></div>
-        <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">Candle Time</div><div>${new Date(m.candle_open_time).toLocaleTimeString()}</div></div>
+      <div class="grid" style="margin:0;grid-template-columns:repeat(6,minmax(0,1fr));">
+        ${cell("Confirmed close", "$" + fmt(m.close_price))}
+        ${cell("Live price (forming)", m.live_price == null ? "-" : "$" + fmt(m.live_price))}
+        ${cell("Confirmed candle", new Date(m.candle_open_time).toISOString().slice(11, 19) + "Z")}
+        ${cell("Regime", esc(m.regime) + " (" + pct(m.regime_confidence) + ")")}
+        ${cell("Volatility %ile", pct(m.volatility_percentile))}
+        ${cell("Data freshness", (m.data_freshness_seconds == null ? "-" : m.data_freshness_seconds.toFixed(0) + "s") + (m.market_data_stale ? " <b style='color:var(--red)'>STALE</b>" : ""))}
       </div>`;
   });
 
@@ -549,7 +626,7 @@ async function refresh() {
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty">No closed trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(r => `
       <tr>
-        <td>${r.regime}</td>
+        <td>${esc(r.regime)}</td>
         <td class="num">${r.trade_count}</td>
         <td class="num">${r.win_count}</td>
         <td class="num">${pct(r.win_rate)}</td>
@@ -564,7 +641,7 @@ async function refresh() {
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty">No closed trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(r => `
       <tr>
-        <td>${r.side}</td>
+        <td>${esc(r.side)}</td>
         <td class="num">${r.trade_count}</td>
         <td class="num">${r.win_count}</td>
         <td class="num">${pct(r.win_rate)}</td>
@@ -595,7 +672,7 @@ async function refresh() {
       const rows = Object.entries(report.per_regime);
       tbody.innerHTML = rows.map(([regime, s]) => `
         <tr>
-          <td>${regime}</td>
+          <td>${esc(regime)}</td>
           <td class="num">${s.trade_count}</td>
           <td class="num ${s.pnl >= 0 ? 'pos' : 'neg'}">${dollar(s.pnl)}</td>
           <td class="num">${pct(s.roi)}</td>
@@ -638,7 +715,7 @@ async function refresh() {
       }
       tbody.innerHTML = report.transitions.map(t => `
         <tr>
-          <td>${t.from_stage} &rarr; ${t.to_stage}</td>
+          <td>${esc(t.from_stage)} &rarr; ${esc(t.to_stage)}</td>
           ${gapCell(t.net_return_pct)}
           ${gapCell(t.max_drawdown_pct)}
           ${gapCell(t.win_rate)}
@@ -680,7 +757,7 @@ async function refresh() {
       const rows = Object.entries(report.scenario_breakdown);
       tbody.innerHTML = rows.map(([scenario, s]) => `
         <tr>
-          <td>${scenario}</td>
+          <td>${esc(scenario)}</td>
           <td class="num">${pct(s.max_drawdown_pct)}</td>
           <td class="num ${s.net_return_pct >= 0 ? 'pos' : 'neg'}">${pct(s.net_return_pct)}</td>
         </tr>`).join("");
@@ -719,17 +796,17 @@ async function refresh() {
       ]);
       familyTbody.innerHTML = familyRows.length ? familyRows.map(r => `
         <tr>
-          <td>${r.family_a}</td>
-          <td>${r.family_b}</td>
+          <td>${esc(r.family_a)}</td>
+          <td>${esc(r.family_b)}</td>
           <td class="num">${pct(r.mean_correlation)}</td>
           <td class="num">${r.member_pair_count}</td>
         </tr>`).join("") : `<tr><td colspan="4" class="empty">No correlation data for this generation yet</td></tr>`;
       pairsTbody.innerHTML = pairRows.map(r => `
         <tr>
           <td>${r.agent_id_a.slice(0, 8)}</td>
-          <td>${r.strategy_family_a}</td>
+          <td>${esc(r.strategy_family_a)}</td>
           <td>${r.agent_id_b.slice(0, 8)}</td>
-          <td>${r.strategy_family_b}</td>
+          <td>${esc(r.strategy_family_b)}</td>
           <td class="num ${r.composite_correlation >= 0.8 ? 'neg' : ''}">${pct(r.composite_correlation)}</td>
         </tr>`).join("");
     });
@@ -743,10 +820,10 @@ async function refresh() {
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="4" class="empty">No champion has been promoted in any lineage yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(r => `
       <tr>
-        <td>${r.strategy_code}</td>
-        <td>${r.strategy_family}</td>
+        <td>${esc(r.strategy_code)}</td>
+        <td>${esc(r.strategy_family)}</td>
         <td class="num">v${r.champion_version_number}</td>
-        <td style="font-family:monospace; font-size:11px;">${r.strategy_id}</td>
+        <td style="font-family:monospace; font-size:11px;">${esc(r.strategy_id)}</td>
       </tr>`).join("");
   });
 
@@ -791,9 +868,9 @@ async function refresh() {
         `$${fmt(lastLivePrice)} <span class="${lastLivePrice >= p.entry_price ? 'pos' : 'neg'}">(${lastLivePrice >= p.entry_price ? '+' : ''}${pct((lastLivePrice - p.entry_price) / p.entry_price)})</span>`;
       return `
       <tr>
-        <td>${p.agent_identifier}</td>
-        <td>${p.strategy_family || "-"}</td>
-        <td><span class="pill ${p.side === 'LONG' ? 'side-long' : 'side-short'}">${p.side}</span></td>
+        <td>${esc(p.agent_identifier)}</td>
+        <td>${esc(p.strategy_family || "-")}</td>
+        <td><span class="pill ${p.side === 'LONG' ? 'side-long' : 'side-short'}">${esc(p.side)}</span></td>
         <td class="num">$${fmt(p.entry_price)}</td>
         <td class="num">${priceCell}</td>
         <td class="num">${fmt(p.quantity, 4)}</td>
@@ -812,12 +889,12 @@ async function refresh() {
     const tbody = document.querySelector("#leaderboard-table tbody");
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="11" class="empty">No agents yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(r => `
-      <tr>
+      <tr class="agent-row" data-agent-id="${esc(r.agent.id)}" title="click for agent detail">
         <td class="num">${r.rank}</td>
-        <td>${r.agent.identifier}</td>
+        <td>${esc(r.agent.identifier)}</td>
         <td><span class="pill ${r.agent.is_professional ? 'tier-pro' : 'tier-std'}">${r.agent.is_professional ? 'PRO' : 'std'}</span></td>
         <td class="num">${r.agent.generation}</td>
-        <td>${r.strategy_family || "-"}</td>
+        <td>${esc(r.strategy_family || "-")}</td>
         <td class="num">$${fmt(r.agent.balance)}</td>
         <td class="num">$${fmt(r.agent.equity)}</td>
         <td class="num ${r.agent.roi >= 0 ? 'pos' : 'neg'}">${pct(r.agent.roi)}</td>
@@ -839,14 +916,14 @@ async function refresh() {
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(t => `
       <tr>
-        <td>${t.agent_identifier}</td>
-        <td><span class="pill ${t.side === 'LONG' ? 'side-long' : 'side-short'}">${t.side}</span></td>
+        <td>${esc(t.agent_identifier)}</td>
+        <td><span class="pill ${t.side === 'LONG' ? 'side-long' : 'side-short'}">${esc(t.side)}</span></td>
         <td class="num">$${fmt(t.entry_price)}</td>
         <td class="num">$${fmt(t.exit_price)}</td>
         <td class="num">${fmt(t.quantity, 4)}</td>
         <td class="num">$${fmt(t.quantity * t.entry_price)}</td>
         <td class="num ${t.net_pnl >= 0 ? 'pos' : 'neg'}">${dollar(t.net_pnl)}</td>
-        <td>${t.exit_reason}</td>
+        <td>${esc(t.exit_reason)}</td>
         <td>${ago(t.opened_at)}</td>
         <td>${ago(t.closed_at)}</td>
       </tr>`).join("");
@@ -855,8 +932,161 @@ async function refresh() {
   document.getElementById("refresh-status").textContent = "last updated " + new Date().toLocaleTimeString();
 }
 
+
+// ---------------------------------------------------------------------------
+// v2: health / population / council / evolution / agent detail / shadow / SSE
+// ---------------------------------------------------------------------------
+const secs = v => (v === null || v === undefined) ? "-" : (v < 90 ? v.toFixed(0) + "s" : (v / 60).toFixed(1) + "m");
+const card = (t, status, main, detail) =>
+  `<div class="hcard"><div class="t">${esc(t)}</div><div class="v st-${esc(status)}">${esc(main)}</div><div class="d">${detail}</div></div>`;
+
+function renderHealth(st) {
+  if (!st || !st.database) return;
+  const w = st.worker || {}, m = st.market_data || {}, h = st.hyperliquid || {}, o = st.ollama || {}, c = st.council || {};
+  const lc = w.last_cycle || {};
+  const ollamaKeys = (o.keys || []).map(k => `key#${esc(k.key_index)}: ${esc(k.status)}${k.last_error_status ? " (" + esc(k.last_error_status) + ")" : ""}`).join("<br>") || "no key data";
+  document.getElementById("health-panel").innerHTML = [
+    card("Worker", w.status || "unknown", (w.status || "unknown").toUpperCase(),
+      `heartbeat ${secs(w.heartbeat_age_seconds)} ago<br>last cycle ${esc(lc.status || "-")} · ${secs(lc.completed_age_seconds)} ago<br>latency ${lc.latency_seconds != null ? lc.latency_seconds.toFixed(2) + "s" : "-"} · agents ${esc(lc.agents_processed ?? "-")}${lc.halt_reason ? "<br>halt: " + esc(lc.halt_reason) : ""}`),
+    card("Database", st.database.status, (st.database.dialect || "").toUpperCase() + " " + st.database.status.toUpperCase(), st.database.error ? esc(st.database.error) : "reachable"),
+    card("Market data", m.status || "unknown", (m.status || "unknown").toUpperCase(),
+      `${esc(m.symbol || "")} ${esc(m.timeframe || "")}<br>last confirmed candle ${m.last_confirmed_candle_open_time ? new Date(m.last_confirmed_candle_open_time).toISOString().slice(11, 19) + "Z" : "-"}<br>freshness ${secs(m.freshness_seconds)}${m.data_gap_halt ? "<br><b>DATA-GAP HALT active</b>" : ""}`),
+    card("Hyperliquid stream", h.status || "unknown", (h.status || "unknown").toUpperCase(),
+      h.websocket ? `ws ${h.websocket.connected ? "connected" : "disconnected"}${h.websocket.stale ? " (stale)" : ""}<br>reconnects ${esc(h.websocket.reconnects)} · dups ${esc(h.websocket.duplicates)}<br>REST fallback ${h.rest_fallback ? "ok" : "down"}` : "no stream data yet"),
+    card("Ollama", o.status || "unknown", (o.status || "unknown").toUpperCase(), ollamaKeys),
+    card("Council", (c.status === "COMPLETE" ? "ok" : (c.status === "INCOMPLETE" ? "degraded" : "unknown")), c.status || "no data",
+      c.candle_open_time ? "candle " + new Date(c.candle_open_time).toISOString().slice(11, 19) + "Z" : "runs every Nth candle"),
+    card("Mode", st.trading_mode === "live" ? "down" : "ok", (st.trading_mode || "").toUpperCase(),
+      Object.keys(st.flags || {}).length ? "flags: " + esc(Object.keys(st.flags).join(", ")) : "no halts"),
+  ].join("");
+
+  const banner = document.getElementById("alert-banner");
+  const msgs = [];
+  if (w.status === "down" || w.status === "unknown") msgs.push("TRADING WORKER IS NOT RUNNING — no decisions are being made (heartbeat " + secs(w.heartbeat_age_seconds) + " ago).");
+  if (m.status === "down") msgs.push("MARKET DATA IS STALE OR HAS AN UNRECOVERED GAP — new entries are blocked.");
+  if (st.database.status !== "ok") msgs.push("DATABASE UNREACHABLE.");
+  if (o.status === "down") msgs.push("OLLAMA CREDENTIALS UNHEALTHY — councils will be INCOMPLETE (no new trades).");
+  if ((st.flags || {}).kill_switch) msgs.push("KILL SWITCH ACTIVE — no new entries.");
+  banner.style.display = msgs.length ? "block" : "none";
+  banner.className = (w.status === "down" || st.database.status !== "ok" || w.status === "unknown") ? "" : "warn";
+  banner.innerHTML = msgs.map(esc).join("<br>");
+  document.getElementById("health-sub").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+let sse = null, sseAlive = false;
+async function startStream() {
+  // fetch-based SSE so the API key travels in a header (EventSource cannot set headers)
+  try {
+    const key = apiKey();
+    const res = await fetch("/api/stream?interval=2", { headers: key ? { "X-API-Key": key } : {} });
+    if (!res.ok || !res.body) throw new Error("stream HTTP " + res.status);
+    sseAlive = true;
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const block = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        const ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
+        if (ev === "status" && data) renderHealth(JSON.parse(data));
+        if (ev === "cycle") { refreshSlow(); }
+      }
+    }
+  } catch (e) { console.warn("stream failed, falling back to polling", e); }
+  sseAlive = false;
+  setTimeout(startStream, 5000);   // reconnect
+}
+
+async function pollHealth() {   // fallback while the stream is down
+  if (sseAlive) return;
+  try { renderHealth(await get("/api/system/status")); }
+  catch (e) { document.getElementById("alert-banner").style.display = "block"; document.getElementById("alert-banner").textContent = "DASHBOARD CANNOT REACH THE API: " + e.message; }
+}
+
+async function refreshSlow() {
+  await section("population", async () => {
+    const p = await get("/api/population");
+    const items = [["Generation", p.generation], ["Active", p.active_count], ["Dead", p.dead_count], ["Retired", p.retired_count],
+      ["Professional", p.professional_count], ["Generations run", p.generations_total], ["Total equity", "$" + fmt(p.total_equity)],
+      ["Mean equity", p.mean_equity == null ? "-" : "$" + fmt(p.mean_equity)], ["Best / worst", p.best_equity == null ? "-" : "$" + fmt(p.best_equity) + " / $" + fmt(p.worst_equity)],
+      ["Realized PnL", "$" + fmt(p.total_realized_pnl)], ["Fees / funding", "$" + fmt(p.total_fees_paid) + " / $" + fmt(p.total_funding_paid)]];
+    document.getElementById("population-panel").innerHTML = items.map(([t, v]) => card(t, "ok", String(v), "")).join("");
+  });
+  await section("council", async () => {
+    let c; try { c = await get("/api/council/latest"); } catch (e) { return; }
+    const rows = (c.analysts || []).map(a => `<tr><td>${esc(a.analyst)}</td><td>${esc(a.bias)}</td><td>${fmt(a.confidence)}</td><td>${a.valid ? "ok" : "FAILED"}</td><td>${esc(a.latency_ms)} ms</td><td style="white-space:normal;max-width:520px">${esc(a.reasoning)}</td></tr>`).join("");
+    const fails = Object.entries(c.failure_reasons || {}).map(([k, v]) => esc(k) + ": " + esc(v)).join("; ") || "none";
+    document.getElementById("council-panel").innerHTML =
+      `<div class="hgrid" style="margin-bottom:10px">${card("Status", c.status === "COMPLETE" ? "ok" : "degraded", c.status, "quorum " + (c.quorum_met ? "met" : "NOT met") + " · " + c.successful_analysts + "/" + c.expected_analysts + " analysts")}
+        ${card("Consensus", "ok", esc(c.consensus_bias) + " " + fmt(c.consensus_confidence), "votes " + esc(JSON.stringify(c.vote_tally)))}
+        ${card("Final", c.trade_allowed ? "ok" : "down", esc(c.final_bias) + " " + fmt(c.final_confidence), c.trade_allowed ? "entries allowed" : "NO NEW TRADES")}
+        ${card("Latency", "ok", (c.latency_seconds != null ? c.latency_seconds.toFixed(1) + "s" : "-"), "judge " + (c.judge_invoked ? "invoked" : "not needed"))}
+        ${card("Failures", fails === "none" ? "ok" : "degraded", fails, "")}</div>
+       <div class="table-scroll"><table><thead><tr><th>Analyst</th><th>Bias</th><th>Conf</th><th>Result</th><th>Latency</th><th>Reasoning</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  });
+  await section("evolution", async () => {
+    const sm = await get("/api/evolution/summary"), gens = await get("/api/evolution/generations");
+    const ec = sm.event_counts || {};
+    document.getElementById("evolution-panel").innerHTML = [
+      card("Births", "ok", String(sm.births), "crossover " + (ec.CROSSOVER || 0) + " · mutation " + (ec.MUTATION || 0) + " · novel " + (ec.NOVEL_GENERATION || 0)),
+      card("Promotions / rejections", "ok", (ec.PROMOTION || 0) + " / " + (ec.REJECTION || 0), "champion/challenger decisions"),
+      card("Last research run", sm.last_experiment ? (sm.last_experiment.status === "COMPLETED" ? "ok" : "degraded") : "unknown",
+        sm.last_experiment ? sm.last_experiment.status : "never", sm.last_experiment ? esc(sm.last_experiment.experiment_id) + "<br>code " + esc(sm.last_experiment.code_version) : "evolution is scheduled, not manual"),
+    ].join("");
+    document.querySelector("#generations-table tbody").innerHTML = gens.map(g => `<tr><td>${esc(g.number)}</td><td>${esc(g.population)}</td>
+      <td>${esc((g.by_status.ACTIVE || {}).count || 0)}</td><td>${esc((g.by_status.RETIRED || {}).count || 0)}</td><td>${esc(g.deaths)}</td>
+      <td>$${fmt(Object.values(g.by_status).reduce((a, x) => a + x.equity, 0))}</td><td>${esc(g.triggered_by)}</td><td>${ago(g.created_at)}</td></tr>`).join("");
+  });
+  await section("shadow", async () => {
+    const sh = await get("/api/shadow/summary");
+    document.getElementById("shadow-panel").innerHTML = sh.orders ? [
+      card("Hypothetical orders", "ok", String(sh.orders), "fill rate " + pct(sh.fill_rate) + " · partial " + sh.partial_fills),
+      card("Avg slippage vs signal", "ok", (sh.avg_slippage_bps ?? 0).toFixed(2) + " bps", "expected fill from the real book"),
+      card("Drift after latency", "ok", (sh.avg_drift_after_latency_bps ?? 0).toFixed(2) + " bps", "observed mid vs expected, avg latency " + (sh.avg_latency_ms ?? "-") + " ms"),
+      card("Sent to exchange", sh.sent_to_exchange === 0 ? "ok" : "down", String(sh.sent_to_exchange), "must always be 0"),
+    ].join("") : card("Shadow mode", "unknown", "inactive", "set TRADING_MODE=shadow to measure expected vs actual execution");
+  });
+}
+
+async function loadAgentDetail(id) {
+  const box = document.getElementById("agent-detail");
+  try {
+    const [dna, curve, fit, reg] = await Promise.all([get(`/api/agents/${encodeURIComponent(id)}/dna`), get(`/api/agents/${encodeURIComponent(id)}/equity-curve`),
+      get(`/api/agents/${encodeURIComponent(id)}/fitness`), get(`/api/agents/${encodeURIComponent(id)}/regime-performance`)]);
+    const pts = curve.points.map(p => ({ v: p.equity }));
+    const f0 = fit[0];
+    box.innerHTML = `<div class="hgrid">
+        ${card("Agent", "ok", esc(dna.agent), "generation " + esc(dna.generation))}
+        ${card("Strategy", "ok", esc(dna.strategy_code) + " v" + esc(dna.strategy_version), esc(dna.family) + " · stage " + esc(dna.stage) + (dna.champion_status ? " · " + esc(dna.champion_status) : ""))}
+        ${card("Lineage", "ok", dna.parent_a ? "child" : "founder", "parent A " + esc((dna.parent_a || "-").slice(0, 8)) + " · parent B " + esc((dna.parent_b || "-").slice(0, 8)) + "<br>experiment " + esc(dna.experiment_id || "-"))}
+        ${card("Equity / drawdown", "ok", "$" + fmt(curve.current_equity), "max drawdown " + pct(curve.max_drawdown))}
+        ${card("Fitness", "ok", f0 ? f0.fitness.toFixed(3) : "-", f0 ? `return ${f0.return.toFixed(2)} · risk ${f0.risk.toFixed(2)} · oos ${f0.oos.toFixed(2)} · regime ${(f0.regime || 0).toFixed(2)} · adv ${(f0.adversarial || 0).toFixed(2)} · corr −${(f0.correlation_penalty || 0).toFixed(2)}` : "not computed yet")}
+      </div>
+      <div class="chart-wrap" style="margin:10px 0"><svg id="agentChart"></svg></div>
+      <div class="table-scroll"><table><thead><tr><th>Regime</th><th>Trades</th><th>PnL</th><th>Win rate</th><th>Expectancy</th></tr></thead><tbody>
+        ${reg.map(r => `<tr><td>${esc(r.regime)}</td><td>${esc(r.trade_count)}</td><td>${dollar(r.pnl)}</td><td>${pct(r.win_rate)}</td><td>${dollar(r.expectancy)}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">no closed trades yet</td></tr>'}
+      </tbody></table></div>
+      <h3 style="margin:12px 0 6px;font-size:11px;color:var(--muted)">STRATEGY DNA</h3><pre class="dna">${esc(JSON.stringify(dna.dna, null, 2))}</pre>`;
+    renderLineChart(document.getElementById("agentChart"), pts, "#6ea8ff");
+  } catch (e) { box.innerHTML = `<div class="empty">could not load agent: ${esc(e.message)}</div>`; }
+}
+document.getElementById("agent-load").addEventListener("click", () => { const v = document.getElementById("agent-input").value.trim(); if (v) loadAgentDetail(v); });
+document.addEventListener("click", ev => {
+  const tr = ev.target.closest && ev.target.closest("tr.agent-row");
+  if (tr && tr.dataset.agentId) { document.getElementById("agent-input").value = tr.dataset.agentId; loadAgentDetail(tr.dataset.agentId); }
+});
+
+if (!apiKey()) promptForApiKey();
 refresh();
+refreshSlow();
+startStream();
+pollHealth();
 setInterval(refresh, 5000);
+setInterval(refreshSlow, 15000);
+setInterval(pollHealth, 5000);
 </script>
 </body>
 </html>

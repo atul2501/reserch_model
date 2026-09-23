@@ -21,6 +21,8 @@ class Decision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("agent_id", "market_candle_open_time", name="uq_decision_agent_candle"),
         Index("ix_decision_candle", "market_candle_open_time"),
+        Index("ix_decisions_strategy_version", "strategy_version_id"),
+        Index("ix_decisions_created_at", "created_at"),
     )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
@@ -41,9 +43,9 @@ class Decision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     agent_signal: Mapped[Bias] = mapped_column(SAEnum(Bias, name="decision_signal_enum"), nullable=False)
     agent_signal_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     agent_signal_reasoning: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    council_bias: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_council_bias_enum"), nullable=True)
+    council_bias: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_council_bias_enum", native_enum=False, length=16), nullable=True)
     council_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
-    final_signal: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_final_signal_enum"), nullable=True)
+    final_signal: Mapped[Bias | None] = mapped_column(SAEnum(Bias, name="decision_final_signal_enum", native_enum=False, length=16), nullable=True)
 
     risk_decision: Mapped[RiskDecision] = mapped_column(SAEnum(RiskDecision, name="decision_risk_enum"), nullable=False)
     risk_reasoning: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

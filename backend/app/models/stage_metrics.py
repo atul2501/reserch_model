@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Integer, Uuid
+from sqlalchemy import Float, ForeignKey, Integer, Uuid, Index
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,9 @@ class StageMetrics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     explicitly wants history."""
 
     __tablename__ = "stage_metrics"
+    __table_args__ = (
+        Index("ix_stage_metrics_version_stage", 'strategy_version_id', 'stage'),
+    )
 
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=False

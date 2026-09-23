@@ -54,7 +54,10 @@ class ScriptedClient:
         self.call_count = 0
         self.analysts_called: list[str] = []
 
-    async def generate_structured(self, *, system_prompt, user_prompt, response_model, temperature=0.2, max_retries_override=None):
+    def is_available(self) -> bool:
+        return True
+
+    async def generate_structured(self, *, system_prompt, user_prompt, response_model, temperature=0.2, max_retries_override=None, deadline_seconds=None):
         self.call_count += 1
         if self._delay:
             await asyncio.sleep(self._delay)

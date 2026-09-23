@@ -8,6 +8,7 @@ behavioral, trade-derived dimensions).
 from __future__ import annotations
 
 from app.schemas.strategy_dna import RuleSet, StrategyDNA
+from app.strategies.engine import dna_indicator_specs
 
 
 def _jaccard(a: set, b: set) -> float:
@@ -21,9 +22,10 @@ def feature_similarity(a: StrategyDNA, b: StrategyDNA) -> float:
     """Jaccard similarity over each DNA's (indicator name, sorted params)
     set plus its lookback_periods keys — 1.0 means the two strategies
     depend on an identical feature set, 0.0 means no overlap at all."""
-    set_a = {(ind.name, tuple(sorted(ind.params.items()))) for ind in a.indicators}
+    # Resolved indicator specs: EMA(20) and EMA(50) are DIFFERENT features.
+    set_a: set = set(dna_indicator_specs(a))
     set_a |= {f"lookback:{k}" for k in a.lookback_periods}
-    set_b = {(ind.name, tuple(sorted(ind.params.items()))) for ind in b.indicators}
+    set_b: set = set(dna_indicator_specs(b))
     set_b |= {f"lookback:{k}" for k in b.lookback_periods}
     return _jaccard(set_a, set_b)
 

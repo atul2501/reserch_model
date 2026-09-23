@@ -13,6 +13,7 @@ import httpx
 
 from app.schemas.strategy_dna import StrategyCandidate
 from app.services.ollama_client import OllamaClient, OllamaError
+from app.strategies.engine import unknown_features
 
 _SYSTEM_PROMPT = """You are the evolutionary research analyst for a crypto trading
 strategy laboratory. You will be given a summary of recent population
@@ -31,7 +32,10 @@ Respond with ONLY a JSON object matching this schema:
     "exit_rules": {"logic": "AND"|"OR", "conditions": [{"feature": "<feature_name>", "operator": "gt"|"lt"|"gte"|"lte"|"crosses_above"|"crosses_below", "value": <number>}]},
     "regime_preferences": ["TREND_UP"|"TREND_DOWN"|"RANGE"|"HIGH_VOLATILITY"|"LOW_VOLATILITY"|"BREAKOUT"|"BREAKDOWN"|"UNCERTAIN"],
     "risk_profile": {"max_leverage": <1-20>, "max_position_fraction": <0.01-1.0>, "max_daily_loss_fraction": <0.01-1.0>, "max_drawdown_fraction": <0.05-1.0>},
-    "position_sizing": {"method": "fixed_fraction", "fraction_of_equity": <0.001-1.0>},
+    "direction_mode": "auto"|"long_only"|"short_only"|"both",
+    "short_entry_rules": <same shape as entry_rules; REQUIRED when direction_mode is "both", else null>,
+    "short_exit_rules": <same shape as exit_rules, or null>,
+    "position_sizing": {"method": "fraction_of_equity"|"fixed_notional"|"volatility_based"|"risk_based", "fraction_of_equity": <0.001-1.0>},
     "stop_loss": {"enabled": true, "method": "atr_multiple", "value": <positive number>},
     "take_profit": {"enabled": true, "method": "risk_reward_multiple", "value": <positive number>},
     "trailing_stop": {"enabled": false, "activation_pct": 0, "trail_pct": 0},
@@ -42,7 +46,16 @@ Respond with ONLY a JSON object matching this schema:
   "expected_behavior": "<what this should do in which regimes>",
   "failure_conditions": ["<condition under which this strategy should be expected to fail>"]
 }
-Available feature names: close, ema_fast, ema_slow, sma_fast, sma_slow, ema_slope,
+Indicators are DYNAMIC: declare each one you use in "indicators" with its parameters and
+reference the produced key in rules. Available indicators (params -> feature keys):
+ema{period}->ema_P, sma{period}->sma_P, rsi{period}->rsi_P, roc{period}->roc_P,
+atr{period}->atr_P & atr_pct_P, bbands{period,std=2}->bb_upper_P/bb_middle_P/bb_lower_P/bb_width_P/bb_pct_b_P,
+macd{fast,slow,signal}->macd_F_S_G/macd_signal_F_S_G/macd_hist_F_S_G, donchian{period}->donchian_high_P/donchian_low_P,
+stoch{period}->stoch_k_P, zscore{period}->zscore_P, vwap{period (0=session)}->vwap_session|vwap_P and vwap_dev_*,
+volume_ratio{period}->volume_ratio_P, realized_vol{period}, adx{period}->adx_P/plus_di_P/minus_di_P,
+flow_imbalance{period}->flow_imbalance_P, oi_change{period}->oi_change_P, range_pct{period}, swing{period}->swing_high_P/swing_low_P.
+A rule that references a feature the DNA did not declare (and that is not a static feature below) is rejected.
+Static feature names: close, ema_fast, ema_slow, sma_fast, sma_slow, ema_slope,
 trend_strength, rsi_14, macd, macd_signal, macd_hist, roc_10, atr_14, realized_vol,
 volatility_percentile, bb_upper, bb_middle, bb_lower, bb_width, swing_high, swing_low,
 break_of_structure, higher_high, lower_high, higher_low, lower_low, nearest_support,
@@ -62,6 +75,10 @@ async def propose_candidate(client: OllamaClient, research_summary: dict) -> Str
             response_model=StrategyCandidate,
             temperature=0.6,
         )
-        return candidate
     except (OllamaError, httpx.HTTPError):
         return None
+    # A proposal whose rules reference undeclared/unknown features would
+    # silently never trade — reject it here rather than let it into the pipeline.
+    if unknown_features(candidate.dna):
+        return None
+    return candidate

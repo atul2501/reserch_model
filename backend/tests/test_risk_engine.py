@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import uuid
+
+import pytest
 from datetime import date
 
 from app.models.agent import Agent
@@ -139,3 +141,38 @@ def test_reduces_excessive_leverage():
     )
     assert result.approved_leverage <= 5.0
     assert "leverage_reduced_to_limit" in result.reasons
+
+
+def test_trading_halt_reason_rejects_new_entries_with_reason():
+    result = check_trade(
+        _base_input(trading_halt_reason="kill_switch"),
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+    )
+    assert result.decision == RiskDecision.REJECTED
+    assert result.reasons == ["trading_halted:kill_switch"]
+
+
+def test_risk_per_trade_limit_reduces_notional_so_a_stop_out_never_costs_more_than_the_limit():
+    # $100 equity, stop 10% away, limit 5% of equity at risk -> notional capped at $50 even though 0.5 x 3x = $150 was allowed.
+    inp = _base_input(proposed_notional=140.0, proposed_leverage=3.0, stop_distance_pct=0.10,
+                      dna=_dna(leverage_limit=3.0, risk_profile=RiskProfile(max_leverage=3.0, max_position_fraction=0.5)))
+    r = check_trade(inp, global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1)
+    assert r.decision == RiskDecision.REDUCED and r.approved_notional == pytest.approx(50.0)
+    assert "notional_reduced_to_risk_per_trade_limit" in r.reasons
+    assert r.approved_notional * 0.10 <= 100.0 * 0.05 + 1e-9
+
+
+def test_tight_stops_are_not_constrained_by_the_risk_per_trade_limit():
+    inp = _base_input(proposed_notional=30.0, stop_distance_pct=0.005)
+    r = check_trade(inp, global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1)
+    assert r.approved_notional == pytest.approx(20.0)  # limited only by max_position_fraction 0.2 x equity, not by risk
+
+
+def test_gross_exposure_and_available_margin_are_hard_caps():
+    dna = _dna(leverage_limit=3.0, risk_profile=RiskProfile(max_leverage=3.0, max_position_fraction=1.0))
+    exposure = check_trade(_base_input(dna=dna, proposed_notional=1000.0, proposed_leverage=3.0), global_max_leverage=5.0,
+                           global_max_position_size=1.0, global_max_drawdown=0.3, global_max_daily_loss=0.1)
+    assert exposure.approved_notional <= 100.0 * 2.0 + 1e-9          # max_exposure_multiple = 2x equity
+    margin = check_trade(_base_input(dna=dna, proposed_notional=1000.0, proposed_leverage=3.0, available_margin=10.0), global_max_leverage=5.0,
+                         global_max_position_size=1.0, global_max_drawdown=0.3, global_max_daily_loss=0.1)
+    assert margin.approved_notional <= 10.0 * 3.0 + 1e-9             # margin x leverage

@@ -77,8 +77,12 @@ class MarketContext(BaseModel):
     timeframe: str
     candle_open_time: int
     close_price: float
+    candle_open: float | None = None
     candle_high: float | None = None
     candle_low: float | None = None
+    # Exchange close time of the confirmed bar (ms) — the clock funding
+    # settlements and cooldowns are measured against (never wall-clock).
+    candle_close_time: int | None = None
 
     trend: TrendFeatures
     momentum: MomentumFeatures
@@ -101,4 +105,16 @@ class MarketContext(BaseModel):
             flat.update(section.model_dump(by_alias=False))
         flat["regime"] = self.regime.regime.value
         flat["regime_confidence"] = self.regime.confidence
+        if self.funding_rate is not None:
+            flat["funding_rate"] = self.funding_rate
+        if self.open_interest is not None:
+            flat["open_interest"] = self.open_interest
         return flat
+
+
+def static_feature_names() -> set[str]:
+    """Every feature key `MarketContext.flat_features()` can emit."""
+    names = {"close", "regime", "regime_confidence", "funding_rate", "open_interest"}
+    for model in (TrendFeatures, MomentumFeatures, VolatilityFeatures, StructureFeatures, VolumeFeatures, PriceActionFeatures):
+        names.update(model.model_fields)
+    return names

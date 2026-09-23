@@ -50,12 +50,18 @@ class LeaderboardEntry(BaseModel):
 
 class MarketSnapshot(BaseModel):
     symbol: str
-    close_price: float
+    close_price: float                   # close of the last CONFIRMED candle
     regime: MarketRegime
     regime_confidence: float
-    candle_open_time: int
+    candle_open_time: int                # open time of the last CONFIRMED candle
     volatility_percentile: float
     volume_ratio: float
+    timeframe: str = "1m"
+    confirmed_candle_close_time: int | None = None
+    data_freshness_seconds: float | None = None
+    market_data_stale: bool | None = None
+    live_price: float | None = None      # current OPEN candle close — display only, never traded on
+    live_candle_open_time: int | None = None
 
 
 class PopulationSummary(BaseModel):
@@ -67,6 +73,14 @@ class PopulationSummary(BaseModel):
     total_equity: float
     total_realized_pnl: float
     total_capital_allocated: float
+    retired_count: int = 0
+    total_count: int = 0
+    generations_total: int = 0
+    mean_equity: float | None = None
+    best_equity: float | None = None
+    worst_equity: float | None = None
+    total_fees_paid: float = 0.0
+    total_funding_paid: float = 0.0
 
 
 class CandlePoint(BaseModel):

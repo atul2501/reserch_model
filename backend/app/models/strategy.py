@@ -12,13 +12,14 @@ Identity rules (spec sections 16, 37, 54):
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import JSON, Float, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 from app.models.enums import ChampionStatus, StrategyFamily, StrategyStage
 
 
@@ -32,13 +33,22 @@ class Strategy(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     family: Mapped[StrategyFamily] = mapped_column(SAEnum(StrategyFamily, name="strategy_family_enum"), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str] = mapped_column(String(2048), default="", nullable=False)
+    # Root of the family tree this strategy descends from (== its own id for a
+    # founder). Champion/challenger competition is scoped to a LINEAGE, so a
+    # child is compared with its ancestors, not with itself.
+    lineage_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True, index=True)
 
     versions: Mapped[list["StrategyVersion"]] = relationship(back_populates="strategy")
 
 
 class StrategyVersion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "strategy_versions"
-    __table_args__ = (UniqueConstraint("strategy_id", "version", name="uq_strategy_version"),)
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "version", name="uq_strategy_version"),
+        Index("ix_strategy_versions_generation", "generation"),
+        Index("ix_strategy_versions_stage", "stage"),
+        Index("ix_strategy_versions_champion_status", "champion_status"),
+    )
 
     strategy_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("strategies.id"), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -46,8 +56,15 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     parent_strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=True
     )
+    # Second parent when this version was produced by crossover.
+    parent_b_strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("strategy_versions.id"), nullable=True
+    )
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
     mutation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    experiment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # When `stage` last changed — real time-in-stage for promotion gates.
+    stage_entered_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     # Full strategy DNA payload — validated against app.schemas.strategy.StrategyDNA
     # before insertion. This column is never mutated after creation.
@@ -100,5 +117,38 @@ class AgentSnapshot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     fitness: Mapped[float | None] = mapped_column(Float, nullable=True)
     performance_metrics: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
-    software_version: Mapped[str] = mapped_column(String(32), nullable=False)
-    schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    software_version: Mapped[str] = mapped_column(String(64), nullable=False)  # code version
+    schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    strategy_version_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    experiment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dataset_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+# --------------------------------------------------------------------------- #
+# Immutability guards (ORM level). The database enforces the same rules with
+# triggers created by the T7 migration, so a raw UPDATE cannot bypass them.
+# --------------------------------------------------------------------------- #
+from sqlalchemy import event  # noqa: E402
+from sqlalchemy.orm import attributes  # noqa: E402
+
+
+class ImmutableRecordError(RuntimeError):
+    pass
+
+
+@event.listens_for(AgentSnapshot, "before_update")
+def _snapshot_is_write_once(mapper, connection, target):  # pragma: no cover - trivial
+    raise ImmutableRecordError("agent_snapshots rows are immutable; create a new snapshot instead")
+
+
+@event.listens_for(AgentSnapshot, "before_delete")
+def _snapshot_is_undeletable(mapper, connection, target):  # pragma: no cover - trivial
+    raise ImmutableRecordError("agent_snapshots rows are immutable and cannot be deleted")
+
+
+@event.listens_for(StrategyVersion, "before_update")
+def _dna_is_immutable(mapper, connection, target):
+    if attributes.get_history(target, "dna", passive=attributes.PASSIVE_NO_INITIALIZE).has_changes():
+        raise ImmutableRecordError("StrategyVersion.dna is immutable; create a new StrategyVersion instead")

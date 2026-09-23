@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Uuid, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -19,6 +19,10 @@ from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 
 class AgentCorrelation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "agent_correlations"
+    __table_args__ = (
+        Index("ix_agent_corr_a", 'agent_id_a'),
+        Index("ix_agent_corr_b", 'agent_id_b'),
+    )
 
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
     agent_id_a: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)

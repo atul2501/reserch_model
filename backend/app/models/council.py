@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy import JSON, BigInteger, Float, ForeignKey, Integer, String, Uuid, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -15,6 +15,9 @@ class CouncilDecision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """One consensus outcome for one candle — shared by all agents."""
 
     __tablename__ = "council_decisions"
+    __table_args__ = (
+        Index("ix_council_decisions_candle", 'market_candle_open_time'),
+    )
 
     market_candle_open_time: Mapped[int] = mapped_column(BigInteger, nullable=False)
     market_timestamp: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

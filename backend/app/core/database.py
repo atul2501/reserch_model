@@ -18,10 +18,19 @@ class Base(DeclarativeBase):
 _settings = get_settings()
 _is_sqlite = _settings.database_url.startswith("sqlite")
 
-_engine_kwargs = {"pool_pre_ping": True}
+_engine_kwargs: dict = {"pool_pre_ping": True}
 if not _is_sqlite:
-    _engine_kwargs["pool_size"] = 20
-    _engine_kwargs["max_overflow"] = 10
+    _engine_kwargs.update(
+        pool_size=_settings.database_pool_size,
+        max_overflow=_settings.database_max_overflow,
+        pool_timeout=_settings.database_pool_timeout_seconds,
+        pool_recycle=_settings.database_pool_recycle_seconds,  # survive server-side idle disconnects
+    )
+    if _settings.database_url.startswith("postgresql+asyncpg"):
+        # A runaway query must not hold a pooled connection (and locks) forever.
+        _engine_kwargs["connect_args"] = {
+            "server_settings": {"statement_timeout": str(_settings.database_statement_timeout_ms)}
+        }
 
 engine = create_async_engine(_settings.database_url, **_engine_kwargs)
 
@@ -32,6 +41,11 @@ if _is_sqlite:
     def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        # API and worker are separate processes sharing this file: WAL lets
+        # readers proceed during a write and busy_timeout turns transient
+        # lock contention into a short wait instead of "database is locked".
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
 AsyncSessionLocal = async_sessionmaker(

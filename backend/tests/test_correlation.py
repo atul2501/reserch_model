@@ -7,6 +7,8 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+
+from tests.helpers_agents import closed_position
 from sqlalchemy import select
 
 from app.analytics.fitness_engine import FitnessInputs, FitnessWeights, compute_fitness
@@ -92,7 +94,7 @@ async def _seed_agent(db_session, *, generation: int, family: StrategyFamily, dn
 async def _add_trade(db_session, agent: Agent, *, side: Side, net_pnl: float, closed_at: datetime, holding_minutes: int = 5):
     db_session.add(
         Trade(
-            agent_id=agent.id, position_id=uuid.uuid4(), symbol="SOL", side=side, quantity=1.0,
+            agent_id=agent.id, position_id=closed_position(db_session, agent), symbol="SOL", side=side, quantity=1.0,
             entry_price=100.0, exit_price=100.0 + net_pnl, gross_pnl=net_pnl, fees=0.0, net_pnl=net_pnl,
             opened_at=closed_at - timedelta(minutes=holding_minutes), closed_at=closed_at,
             holding_seconds=holding_minutes * 60, exit_reason="signal",

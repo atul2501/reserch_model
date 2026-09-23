@@ -36,6 +36,14 @@ class RiskCheckInput:
     # must never skip invoking check_trade just because they already know
     # the council failed (spec: "do not bypass the Risk Engine").
     council_trade_allowed: bool = True
+    # Non-None when the system is halted for new entries (operator kill
+    # switch, unrecoverable market-data gap...). Exits are never blocked.
+    trading_halt_reason: str | None = None
+    # Margin the agent can still commit (equity - used margin). When given,
+    # required margin (notional / leverage) may never exceed it.
+    available_margin: float | None = None
+    # Fractional distance from entry to the protective stop (None => no stop known).
+    stop_distance_pct: float | None = None
 
 
 @dataclass
@@ -51,6 +59,9 @@ def check_trade(inp: RiskCheckInput, *, global_max_leverage: float, global_max_p
     reasons: list[str] = []
 
     # Hard blockers — reject outright, no reduction possible.
+    if inp.trading_halt_reason:
+        return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, [f"trading_halted:{inp.trading_halt_reason}"])
+
     if not inp.council_trade_allowed:
         return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, ["council_incomplete_no_new_trades"])
 
@@ -83,8 +94,21 @@ def check_trade(inp: RiskCheckInput, *, global_max_leverage: float, global_max_p
     if leverage < inp.proposed_leverage:
         reasons.append("leverage_reduced_to_limit")
 
-    max_notional_by_fraction = inp.equity * min(inp.dna.risk_profile.max_position_fraction, global_max_position_size)
+    # `max_position_fraction` bounds the MARGIN committed (fraction of equity);
+    # notional = margin * leverage, so leverage is a real exposure multiplier
+    # (and liquidation a real risk), not a decorative field.
+    max_margin = inp.equity * min(inp.dna.risk_profile.max_position_fraction, global_max_position_size)
+    if inp.available_margin is not None:
+        max_margin = min(max_margin, inp.available_margin)
+    max_notional_by_fraction = max_margin * leverage
+    from app.core.config import get_settings  # local import keeps this module dependency-light
+    max_notional_by_fraction = min(max_notional_by_fraction, inp.equity * get_settings().max_exposure_multiple)
     notional = min(inp.proposed_notional, max_notional_by_fraction)
+    if inp.stop_distance_pct is not None and 0 < inp.stop_distance_pct <= 1.0:
+        max_by_risk = inp.equity * get_settings().max_loss_per_trade_fraction / inp.stop_distance_pct
+        if max_by_risk < notional:
+            notional = max_by_risk
+            reasons.append("notional_reduced_to_risk_per_trade_limit")
     if inp.dna.position_sizing.max_notional is not None:
         notional = min(notional, inp.dna.position_sizing.max_notional)
     if notional < inp.proposed_notional:

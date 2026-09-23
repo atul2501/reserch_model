@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from app.evolution.promotion_service import MIN_STAGE_DAYS, evaluate_and_promote
+from tests.helpers_agents import add_promotion_evidence
 from app.models.agent import Agent
 from app.models.enums import ChampionStatus, EvolutionEventType, StrategyFamily, StrategyStage
 from app.models.evolution import EvolutionEvent
@@ -158,6 +159,7 @@ async def test_promotes_and_retires_previous_champion_when_all_gates_pass(db_ses
     )
     db_session.add(_passing_metrics(challenger.id, computed_at=now))
     db_session.add(_agent_with_fitness(challenger.id, fitness=0.40, identifier="GEN02-AG0001"))
+    await add_promotion_evidence(db_session, challenger.id)
     await db_session.commit()
 
     decision = await evaluate_and_promote(db_session, challenger.id, stage=StrategyStage.PAPER)

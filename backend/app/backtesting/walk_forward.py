@@ -8,9 +8,11 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from app.backtesting.data import prepare_backtest_data
 from app.backtesting.engine import BacktestResult, run_backtest
 from app.market.feature_engine import MIN_CANDLES_REQUIRED
 from app.schemas.strategy_dna import StrategyDNA
+from app.strategies.engine import dna_indicator_specs
 
 
 @dataclass
@@ -79,37 +81,29 @@ def run_walk_forward(
     window_index = 0
     start = 0
 
+    # Features (static + this DNA's indicators) are computed ONCE for the whole
+    # dataset and every window re-uses them — walk-forward is then a cheap set
+    # of index slices rather than N full feature recomputations.
+    data = prepare_backtest_data(
+        candles, symbol=symbol, timeframe=timeframe, specs=dna_indicator_specs(dna)
+    ) if n >= MIN_CANDLES_REQUIRED + 5 else None
+
     while start + train_window + test_window <= n:
         test_start = start + train_window
         test_end = test_start + test_window
-
-        # The engine starts trading MIN_CANDLES_REQUIRED candles into
-        # whatever slice it's given. Feeding it the full [start:test_end]
-        # slice would let it start trading ~(train_window - MIN_CANDLES_REQUIRED)
-        # candles before test_start, leaking in-sample trades into the
-        # "out-of-sample" scoring. Instead we hand it only enough lookback
-        # for feature warmup so its first tradeable candle lands exactly at
-        # test_start.
-        slice_start = max(0, test_start - MIN_CANDLES_REQUIRED)
-        test_slice = candles.iloc[slice_start:test_end].reset_index(drop=True)
+        # Trading is restricted to [test_start, test_end): the engine never opens
+        # a position before test_start, so no in-sample trade leaks into the
+        # out-of-sample scoring. (`train_window` only positions the window —
+        # DNA is fixed, this is a rolling out-of-time test, not re-optimisation.)
         result = run_backtest(
-            test_slice,
-            dna,
-            symbol=symbol,
-            timeframe=timeframe,
-            starting_equity=starting_equity,
-            fee_rate=fee_rate,
-            slippage_bps=slippage_bps,
+            candles, dna, symbol=symbol, timeframe=timeframe, starting_equity=starting_equity,
+            fee_rate=fee_rate, slippage_bps=slippage_bps, data=data,
+            start_index=test_start, end_index=test_end,
         )
-
         windows.append(
             WalkForwardWindow(
-                window_index=window_index,
-                train_start=start,
-                train_end=start + train_window,
-                test_start=test_start,
-                test_end=test_end,
-                result=result,
+                window_index=window_index, train_start=start, train_end=start + train_window,
+                test_start=test_start, test_end=test_end, result=result,
             )
         )
         window_index += 1

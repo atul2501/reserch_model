@@ -8,6 +8,8 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+
+from tests.helpers_agents import closed_position
 from sqlalchemy import select
 
 from app.analytics.fitness_service import compute_and_persist_agent_fitness
@@ -59,7 +61,7 @@ async def _seed_agent_with_trades(db_session, *, generation: int, net_pnls: list
         db_session.add(
             Trade(
                 agent_id=agent.id,
-                position_id=uuid.uuid4(),
+                position_id=closed_position(db_session, agent),
                 symbol="SOL",
                 side=Side.LONG,
                 quantity=1.0,

@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
@@ -15,6 +16,7 @@ from app.agents.lifecycle import create_generation
 from app.core.config import get_settings
 from app.core.database import session_scope
 from app.core.logging import configure_logging, get_logger
+from app.models.enums import StrategyStage
 from app.models.strategy import Generation, Strategy, StrategyVersion
 from app.strategies.factory import generate_population_dna
 
@@ -37,6 +39,7 @@ async def bootstrap() -> None:
             strategy = Strategy(code=code, family=dna.strategy_family, name=code)
             db.add(strategy)
             await db.flush()
+            strategy.lineage_id = strategy.id  # every founder starts its own lineage
 
             version = StrategyVersion(
                 strategy_id=strategy.id,
@@ -44,6 +47,8 @@ async def bootstrap() -> None:
                 generation=next_generation_number,
                 dna=dna.model_dump(mode="json"),
                 proposed_by="system",
+                stage=StrategyStage.PAPER,          # the population trades on paper from birth
+                stage_entered_at=datetime.now(timezone.utc),
             )
             db.add(version)
             await db.flush()

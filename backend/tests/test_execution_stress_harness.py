@@ -63,7 +63,11 @@ async def test_partial_fill_probability_produces_partially_filled_orders_with_re
 
 
 @pytest.mark.asyncio
-async def test_extra_latency_is_added_on_top_of_base_latency():
+async def test_extra_latency_is_added_on_top_of_base_latency(monkeypatch):
+    # Paper latency is jittered per order id; pin jitter to 0 so baseline and
+    # stressed runs (different random order ids) are directly comparable.
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "paper_latency_jitter_ms", 0)
     baseline = await run_execution_stress_scenario(_requests(3), PaperExecutionAdapter())
     stressed_adapter = StressedExecutionAdapter(extra_latency_ms=500, rng=random.Random(3))
     stressed = await run_execution_stress_scenario(_requests(3), stressed_adapter)

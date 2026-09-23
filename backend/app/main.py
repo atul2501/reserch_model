@@ -29,6 +29,10 @@ async def lifespan(app: FastAPI):
     configure_logging()
     settings = get_settings()
     logger.info("app.startup", trading_mode=settings.trading_mode.value, agent_count=settings.agent_count)
+    if settings.api_auth_required and not settings.api_keys:
+        logger.warning("app.api_auth_no_keys_configured", detail="every protected request will be rejected; set API_KEYS")
+    if not settings.api_auth_required:
+        logger.warning("app.api_auth_disabled", detail="API_AUTH_REQUIRED=false — development only")
     yield
     logger.info("app.shutdown")
 
@@ -43,11 +47,26 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,  # API keys travel in headers, never cookies
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "X-API-Key", "Content-Type"],
     )
+
+    @app.middleware("http")
+    async def _security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Cache-Control", "no-store")
+        return response
+
     app.include_router(api_router)
+
+    @app.get("/livez", include_in_schema=False)
+    async def livez():
+        # Unauthenticated, data-free liveness probe for process supervisors.
+        return {"status": "alive"}
 
     @app.get("/")
     async def frontend():

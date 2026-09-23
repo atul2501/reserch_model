@@ -239,8 +239,10 @@ async def test_second_order_from_the_same_agent_gets_a_distinct_client_order_id(
     )
 
     orders = (await db_session.execute(select(Order).where(Order.agent_id == agent.id))).scalars().all()
-    assert len(orders) == 2
-    assert orders[0].client_order_id != orders[1].client_order_id
+    # entry, reduce-only exit (exits now go through the ExecutionEngine), entry
+    assert len(orders) == 3
+    assert sum(1 for o in orders if not o.reduce_only) == 2 and sum(1 for o in orders if o.reduce_only) == 1
+    assert len({o.client_order_id for o in orders}) == 3
     assert all("None" not in o.client_order_id for o in orders)
 
 

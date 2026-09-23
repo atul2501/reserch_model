@@ -4,6 +4,7 @@ persists the result — this is the caller run_adversarial_suite never had.
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -11,6 +12,7 @@ import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backtesting.adversarial import compute_robustness_score, run_adversarial_suite
+from app.core.config import get_settings
 from app.models.adversarial import AdversarialTestReport
 from app.models.strategy import StrategyVersion
 from app.schemas.strategy_dna import StrategyDNA
@@ -40,7 +42,9 @@ async def run_and_persist_adversarial_suite(
         raise ValueError(f"strategy_version {strategy_version_id} not found")
     dna = StrategyDNA.model_validate(version.dna)
 
-    report = run_adversarial_suite(
+    # CPU-heavy: off the event loop so lease heartbeats / SSE keep running.
+    report = await asyncio.to_thread(
+        run_adversarial_suite,
         dna,
         candles,
         symbol=symbol,
@@ -53,6 +57,9 @@ async def run_and_persist_adversarial_suite(
         global_max_position_size=global_max_position_size,
         global_max_drawdown=global_max_drawdown,
         global_max_daily_loss=global_max_daily_loss,
+        max_acceptable_drawdown=get_settings().adversarial_max_acceptable_drawdown,
+        min_acceptable_worst_case_return=get_settings().adversarial_min_acceptable_worst_case_return,
+        cost_multipliers=[(1.0, 1.0), (get_settings().adversarial_fee_stress_multiplier, get_settings().adversarial_slippage_stress_multiplier)],
     )
 
     scenario_breakdown: dict[str, dict[str, float]] = {}

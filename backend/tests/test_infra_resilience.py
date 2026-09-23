@@ -41,6 +41,9 @@ class _AlwaysFailsClient:
     def __init__(self, exc: Exception):
         self._exc = exc
 
+    def is_available(self) -> bool:
+        return True
+
     async def generate_structured(self, **kwargs):
         raise self._exc
 

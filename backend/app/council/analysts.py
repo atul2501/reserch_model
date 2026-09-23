@@ -77,7 +77,9 @@ def build_prompt(analyst: str, context: MarketContext) -> tuple[str, str]:
     return system_prompt, user_prompt
 
 
-async def run_analyst(client: OllamaClient, analyst: str, context: MarketContext) -> AnalystRunResult:
+async def run_analyst(
+    client: OllamaClient, analyst: str, context: MarketContext, *, deadline_seconds: float | None = None
+) -> AnalystRunResult:
     """Never raises — one bad or unreachable Ollama call must never block
     the rest of the council or crash the whole trading cycle (spec section
     41: on failure, fall back toward HOLD rather than propagate). Catches
@@ -91,7 +93,8 @@ async def run_analyst(client: OllamaClient, analyst: str, context: MarketContext
     system_prompt, user_prompt = build_prompt(analyst, context)
     try:
         response, stats = await client.generate_structured(
-            system_prompt=system_prompt, user_prompt=user_prompt, response_model=AnalystResponse
+            system_prompt=system_prompt, user_prompt=user_prompt, response_model=AnalystResponse,
+            deadline_seconds=deadline_seconds,
         )
         completed_at = datetime.now(timezone.utc)
         return AnalystRunResult(

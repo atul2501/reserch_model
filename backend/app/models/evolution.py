@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Enum as SAEnum
+from sqlalchemy import Enum as SAEnum, Index
 from sqlalchemy import JSON, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,6 +14,9 @@ from app.models.enums import EvolutionEventType, PopulationEventType, Population
 
 class EvolutionEvent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "evolution_events"
+    __table_args__ = (
+        Index("ix_evolution_events_created", 'created_at'),
+    )
 
     event_type: Mapped[EvolutionEventType] = mapped_column(
         SAEnum(EvolutionEventType, name="evolution_event_type_enum"), nullable=False

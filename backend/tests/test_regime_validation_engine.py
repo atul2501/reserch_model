@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
+from tests.helpers_agents import closed_position
 from sqlalchemy import select
 
 from app.api.routes.trades import get_regime_performance
@@ -170,13 +172,13 @@ async def test_compute_regime_breakdown_live_agrees_with_the_by_regime_route(db_
     trade_2_closed = now - timedelta(minutes=10)  # after RANGE record
     db_session.add_all([
         Trade(
-            agent_id=agent.id, position_id=uuid.uuid4(), symbol="SOL", side=Side.LONG, quantity=1.0,
+            agent_id=agent.id, position_id=closed_position(db_session, agent), symbol="SOL", side=Side.LONG, quantity=1.0,
             entry_price=100.0, exit_price=105.0, gross_pnl=5.0, fees=0.0, net_pnl=5.0,
             opened_at=trade_1_closed - timedelta(minutes=5), closed_at=trade_1_closed,
             holding_seconds=300, exit_reason="signal",
         ),
         Trade(
-            agent_id=agent.id, position_id=uuid.uuid4(), symbol="SOL", side=Side.SHORT, quantity=1.0,
+            agent_id=agent.id, position_id=closed_position(db_session, agent), symbol="SOL", side=Side.SHORT, quantity=1.0,
             entry_price=100.0, exit_price=98.0, gross_pnl=2.0, fees=0.0, net_pnl=2.0,
             opened_at=trade_2_closed - timedelta(minutes=5), closed_at=trade_2_closed,
             holding_seconds=300, exit_reason="signal",

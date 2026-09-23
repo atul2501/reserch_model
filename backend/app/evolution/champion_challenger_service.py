@@ -75,7 +75,7 @@ async def advance_pipeline_stage(
     previous = await latest_challenger_evaluation(db, strategy_version_id)
     current_stage = previous.pipeline_stage if previous is not None else "candidate"
 
-    if current_stage in ("promoted", "rejected"):
+    if previous is not None and current_stage in ("promoted", "rejected"):
         return previous
 
     now = datetime.now(timezone.utc)

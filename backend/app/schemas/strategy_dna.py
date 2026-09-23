@@ -59,7 +59,13 @@ class RuleSet(BaseModel):
 
 
 class PositionSizing(BaseModel):
-    method: str = Field(default="fixed_fraction", pattern="^(fixed_fraction|fixed_notional|volatility_scaled|kelly_fraction)$")
+    # fixed_fraction == fraction_of_equity, volatility_scaled == volatility_based,
+    # kelly_fraction == risk_based (stop-distance risk sizing). Both spellings
+    # are accepted and normalised by app.execution.sizing.
+    method: str = Field(
+        default="fixed_fraction",
+        pattern="^(fixed_fraction|fraction_of_equity|fixed_notional|volatility_scaled|volatility_based|kelly_fraction|risk_based)$",
+    )
     fraction_of_equity: float = Field(default=0.05, ge=0.001, le=1.0)
     max_notional: float | None = Field(default=None, ge=0)
 
@@ -110,10 +116,22 @@ class StrategyDNA(BaseModel):
     strategy_family: StrategyFamily
 
     indicators: list[IndicatorConfig] = Field(min_length=1, max_length=20)
+    # METADATA ONLY (kept for backward compatibility and used solely by the
+    # correlation engine's structural similarity). Indicator periods that drive
+    # behaviour live in `indicators[].params` (e.g. {"name": "ema", "params": {"period": 20}}).
     lookback_periods: dict[str, int] = Field(default_factory=dict)
 
     entry_rules: RuleSet
     exit_rules: RuleSet
+    # Direction semantics (see app.strategies.engine):
+    #   auto       (legacy default) direction is resolved by the strategy FAMILY;
+    #   long_only  entry_rules open LONG;   short_only entry_rules open SHORT;
+    #   both       entry_rules open LONG and short_entry_rules open SHORT.
+    direction_mode: str = Field(default="auto", pattern="^(auto|long_only|short_only|both)$")
+    short_entry_rules: RuleSet | None = None
+    # Side-aware exit for SHORT positions when direction_mode == "both"
+    # (falls back to exit_rules when omitted).
+    short_exit_rules: RuleSet | None = None
 
     regime_preferences: list[MarketRegime] = Field(default_factory=list, max_length=8)
 
@@ -133,6 +151,12 @@ class StrategyDNA(BaseModel):
     def _leverage_consistency(self) -> "StrategyDNA":
         if self.leverage_limit > self.risk_profile.max_leverage:
             raise ValueError("leverage_limit cannot exceed risk_profile.max_leverage")
+        return self
+
+    @model_validator(mode="after")
+    def _direction_consistency(self) -> "StrategyDNA":
+        if self.direction_mode == "both" and self.short_entry_rules is None:
+            raise ValueError("direction_mode='both' requires short_entry_rules")
         return self
 
     @field_validator("indicators")

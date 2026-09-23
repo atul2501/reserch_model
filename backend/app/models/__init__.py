@@ -7,14 +7,15 @@ from app.models.correlation import AgentCorrelation, CorrelationConvergenceSnaps
 from app.models.council import CouncilAnalysis, CouncilDecision
 from app.models.decision import Decision
 from app.models.evolution import EvolutionEvent, PopulationEvent
-from app.models.market import MarketCandle, MarketFeatureSet, MarketRegimeRecord
+from app.models.market import FundingRate, MarketCandle, MarketFeatureSet, MarketRegimeRecord
 from app.models.metrics import FitnessScore, PerformanceMetric
 from app.models.reality_gap import RealityGapReport
+from app.models.research import Experiment, OosEvaluation, ResearchEpoch
 from app.models.regime_validation import RegimeValidationReport
 from app.models.stage_metrics import StageMetrics
 from app.models.strategy import AgentSnapshot, Generation, Strategy, StrategyVersion
-from app.models.system import SystemEvent, WorkerCycle, WorkerLease
-from app.models.trading import Order, Position, Trade
+from app.models.system import SystemEvent, SystemFlag, SystemStatus, WorkerCycle, WorkerLease
+from app.models.trading import FundingPayment, Order, Position, Trade
 
 __all__ = [
     "AdversarialTestReport",
@@ -28,12 +29,16 @@ __all__ = [
     "Decision",
     "EvolutionEvent",
     "PopulationEvent",
+    "FundingRate",
     "MarketCandle",
     "MarketFeatureSet",
     "MarketRegimeRecord",
     "FitnessScore",
     "PerformanceMetric",
     "RealityGapReport",
+    "Experiment",
+    "OosEvaluation",
+    "ResearchEpoch",
     "RegimeValidationReport",
     "StageMetrics",
     "AgentSnapshot",
@@ -41,8 +46,11 @@ __all__ = [
     "Strategy",
     "StrategyVersion",
     "SystemEvent",
+    "SystemFlag",
+    "SystemStatus",
     "WorkerCycle",
     "WorkerLease",
+    "FundingPayment",
     "Order",
     "Position",
     "Trade",

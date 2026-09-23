@@ -56,6 +56,9 @@ class GenerationCorrelationReport:
     pct_agents_above_max_correlation: float = 0.0
     family_distribution: dict[str, int] = field(default_factory=dict)
     family_pair_correlations: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict)
+    # Mean composite correlation of each agent to ALL its peers (computed over the
+    # full pair set, not just the persisted top-N) — feeds fitness as soft diversity pressure.
+    agent_mean_correlation: dict[uuid.UUID, float] = field(default_factory=dict)
 
 
 # Weights for the composite score — behavioral dimensions (does this agent
@@ -111,6 +114,7 @@ async def compute_generation_correlation_report(
     )
 
     pairs: list[PairCorrelation] = []
+    corr_sum: dict[uuid.UUID, float] = {aid: 0.0 for aid in agent_ids}
     for i in range(len(agent_ids)):
         for j in range(i + 1, len(agent_ids)):
             id_a, id_b = agent_ids[i], agent_ids[j]
@@ -143,6 +147,8 @@ async def compute_generation_correlation_report(
                     composite_correlation=_composite(values),
                 )
             )
+            corr_sum[id_a] += pairs[-1].composite_correlation
+            corr_sum[id_b] += pairs[-1].composite_correlation
 
     mean_correlation = sum(p.composite_correlation for p in pairs) / len(pairs) if pairs else 0.0
     above_threshold_agent_ids: set[uuid.UUID] = set()
@@ -168,6 +174,7 @@ async def compute_generation_correlation_report(
         pct_agents_above_max_correlation=pct_above,
         family_distribution=family_distribution(list(dna_by_agent_id.values())),
         family_pair_correlations=family_pair_correlations,
+        agent_mean_correlation={aid: total / (len(agent_ids) - 1) for aid, total in corr_sum.items()},
     )
 
 

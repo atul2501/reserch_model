@@ -11,6 +11,10 @@ class AgentStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
     DEAD = "DEAD"
+    # Set when a newer generation supersedes this one. Distinct from DEAD: the
+    # agent did not fail, its generation simply ended (open positions were
+    # closed at the last price and final results are frozen).
+    RETIRED = "RETIRED"
 
 
 class TradingMode(str, enum.Enum):

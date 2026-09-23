@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import text
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.market.market_data_service import MarketDataService
+from app.core.security import Principal, Role, require_role
+from app.core.system_flags import KILL_SWITCH, active_flags, set_flag
+from app.core.runtime_status import compute_system_status
 from app.schemas.api import SystemHealth
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -14,30 +17,45 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 @router.get("/health", response_model=SystemHealth)
 async def health(db: AsyncSession = Depends(get_db)):
+    """Backward-compatible summary (the rich picture is /api/system/status). No
+    outbound HTTP client is created per request any more."""
     settings = get_settings()
-
-    database_ok = True
-    try:
-        await db.execute(text("SELECT 1"))
-    except Exception:
-        database_ok = False
-
-    market_service = MarketDataService()
-    stale = None
-    age = None
-    try:
-        age = await market_service.latest_candle_age_seconds(db)
-        stale = await market_service.is_stale(db)
-    except Exception:
-        pass
-    finally:
-        await market_service.aclose()
-
-    return SystemHealth(
+    status = await compute_system_status(db)
+    database_ok = status["database"]["status"] == "ok"
+    md = status.get("market_data", {})
+    payload = SystemHealth(
         database_ok=database_ok,
         hyperliquid_configured=bool(settings.hyperliquid_api_url),
         ollama_configured=bool(settings.ollama_base_url and settings.ollama_model),
         trading_mode=settings.trading_mode.value,
-        market_data_stale=stale,
-        last_candle_age_seconds=age,
+        market_data_stale=None if not database_ok or md.get("status") == "unknown" else md.get("status") == "down",
+        last_candle_age_seconds=md.get("freshness_seconds"),
     )
+    if not database_ok:
+        # A dead database must be visible to load balancers/monitors, not a 200.
+        return JSONResponse(status_code=503, content=payload.model_dump(mode="json"))
+    return payload
+
+
+class KillSwitchRequest(BaseModel):
+    active: bool
+    reason: str = Field(default="", max_length=500)
+
+
+@router.get("/flags")
+async def get_flags(db: AsyncSession = Depends(get_db)):
+    return {"active_flags": await active_flags(db)}
+
+
+@router.post("/kill-switch")
+async def set_kill_switch(
+    body: KillSwitchRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_role(Role.OPERATOR)),
+):
+    """Emergency stop. Blocks every NEW entry across the population (exits and
+    risk management keep running). Requires operator or admin — a viewer key
+    never gets control-plane access."""
+    await set_flag(db, KILL_SWITCH, body.active, reason=body.reason or None, set_by=principal.name)
+    await db.commit()
+    return {"kill_switch": body.active, "set_by": principal.name}

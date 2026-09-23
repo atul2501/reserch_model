@@ -75,3 +75,20 @@ class MarketRegimeRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     detector_version: Mapped[str] = mapped_column(String(16), default="v1", nullable=False)
     detail: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class FundingRate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Exchange-published funding rate per settlement interval (hourly on
+    Hyperliquid). This is the ONLY source funding accrual may use — it must
+    never be inferred from a single "current" value stamped on old candles."""
+
+    __tablename__ = "funding_rates"
+    __table_args__ = (
+        UniqueConstraint("symbol", "time_ms", name="uq_funding_symbol_time"),
+        Index("ix_funding_symbol_time", "symbol", "time_ms"),
+    )
+
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    time_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)  # settlement time, unix ms UTC
+    rate: Mapped[float] = mapped_column(Float, nullable=False)  # fraction per interval, + = longs pay shorts
+    premium: Mapped[float | None] = mapped_column(Float, nullable=True)

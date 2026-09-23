@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date
+from sqlalchemy import Date, Index
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Float, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,6 +21,10 @@ from app.models.enums import AgentStatus
 
 class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "agents"
+    __table_args__ = (
+        Index("ix_agents_generation_status", 'generation', 'status'),
+        Index("ix_agents_strategy_version", 'strategy_version_id'),
+    )
 
     # Human-readable identity, e.g. GEN01-AG0001. Never reused (spec 53).
     identifier: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)

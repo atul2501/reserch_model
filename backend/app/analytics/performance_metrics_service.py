@@ -18,12 +18,15 @@ from app.models.metrics import PerformanceMetric
 from app.models.trading import Trade
 
 
-async def compute_agent_performance_metric(db: AsyncSession, agent: Agent, *, as_of: datetime | None = None) -> PerformanceMetric:
+async def compute_agent_performance_metric(
+    db: AsyncSession, agent: Agent, *, as_of: datetime | None = None, trades: list[Trade] | None = None
+) -> PerformanceMetric:
     """Builds (does not persist) a PerformanceMetric snapshot for `agent`
     from its full closed-trade history. Caller adds + commits."""
-    trades = (
-        await db.execute(select(Trade).where(Trade.agent_id == agent.id).order_by(Trade.closed_at))
-    ).scalars().all()
+    if trades is None:
+        trades = list(
+            (await db.execute(select(Trade).where(Trade.agent_id == agent.id).order_by(Trade.closed_at))).scalars().all()
+        )
 
     stats = compute_trade_stats([t.net_pnl for t in trades], [t.holding_seconds for t in trades])
 
@@ -63,8 +66,10 @@ async def compute_agent_performance_metric(db: AsyncSession, agent: Agent, *, as
     )
 
 
-async def compute_and_persist_agent_performance_metric(db: AsyncSession, agent: Agent, *, as_of: datetime | None = None) -> PerformanceMetric:
-    metric = await compute_agent_performance_metric(db, agent, as_of=as_of)
+async def compute_and_persist_agent_performance_metric(
+    db: AsyncSession, agent: Agent, *, as_of: datetime | None = None, trades: list[Trade] | None = None
+) -> PerformanceMetric:
+    metric = await compute_agent_performance_metric(db, agent, as_of=as_of, trades=trades)
     db.add(metric)
     return metric
 

@@ -1,209 +1,45 @@
-"""The main trading cycle worker (spec section 61's end-to-end pipeline):
+"""The main trading worker (spec section 61's end-to-end pipeline).
 
-    Hyperliquid -> MarketDataService -> feature engine -> regime detector
-        -> AI council (every N candles) -> shared MarketContext
-        -> decision loop (all active agents) -> risk engine -> execution
-        -> PnL / equity update -> extinction check
+    Hyperliquid -> MarketDataService -> confirmed candle -> features/regime
+        -> AI council (cadence) -> shared context -> all agents (DNA) -> risk
+        -> execution -> PnL / equity -> extinction check
 
-Runs as a long-lived background process, separate from the FastAPI process
-(see app/main.py docstring) so a dashboard restart never interrupts trading.
+Runs as a long-lived process separate from the FastAPI process so a
+dashboard restart never interrupts trading. The heavy lifting lives in
+`app.worker.cycle` (testable, injectable); this file is the process shell:
+lease, candle-boundary scheduling, graceful shutdown.
 
 Usage:
-    python -m scripts.run_cycle          # loop forever, one cycle per candle close
-    python -m scripts.run_cycle --once   # run a single cycle and exit (for cron/testing)
+    python -m scripts.run_cycle          # loop forever, one cycle per confirmed candle
+    python -m scripts.run_cycle --once   # process pending confirmed candle(s) and exit
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
-import time
-import uuid
+import signal
 
-from sqlalchemy import select
-
-from app.agents.decision_loop import run_decision_cycle
-from app.agents.lifecycle import is_population_extinct, record_extinction
 from app.core.config import get_settings
-from app.core.database import session_scope
+from app.core.database import AsyncSessionLocal
 from app.core.logging import configure_logging, get_logger
-from app.council.service import run_council_cycle, should_run_council
 from app.execution.router import LiveSafetyGateError, get_execution_engine
-from app.market.feature_engine import InsufficientDataError, compute_features
+from app.market.hyperliquid_client import HyperliquidClient
+from app.market.hyperliquid_ws import HyperliquidWebSocket
+from app.market.ws_ingest import WsCandleIngestor
 from app.market.market_data_service import MarketDataService
-from app.models.market import MarketFeatureSet, MarketRegimeRecord
-from app.models.system import WorkerCycle, WorkerLease
-from app.models.enums import Bias
-from app.models.strategy import Generation
-from app.schemas.market_context import MarketContext
 from app.services.ollama_client import OllamaClient
+from app.core import metrics
+from app.core.runtime_status import WORKER, publish_status
+from app.worker.cycle import run_pending_cycles
+from app.worker.status import build_worker_payload
+from app.worker.lease import LeaseKeeper
+from app.worker.scheduler import last_confirmed_open_time, seconds_until_next_confirmation
 
 logger = get_logger(__name__)
 
-_prev_context: MarketContext | None = None
-_candle_index = 0
-_worker_id = str(uuid.uuid4())
 
-
-async def _acquire_or_refresh_lease(db, *, ttl_seconds: int = 180) -> bool:
-    """Best-effort durable single-worker lease. Database decision/cycle
-    uniqueness remains the final idempotency barrier if two processes race."""
-    now = time.time()
-    lease = await db.get(WorkerLease, "decision-worker")
-    if lease is not None and lease.owner_id != _worker_id and lease.expires_at > now:
-        logger.error("cycle.worker_lease_held", owner_id=lease.owner_id)
-        return False
-    if lease is None:
-        db.add(WorkerLease(name="decision-worker", owner_id=_worker_id, expires_at=now + ttl_seconds))
-    else:
-        lease.owner_id = _worker_id
-        lease.expires_at = now + ttl_seconds
-    await db.commit()
-    return True
-
-
-async def run_one_cycle(market_service: MarketDataService, ollama_client: OllamaClient) -> None:
-    global _prev_context, _candle_index
-    settings = get_settings()
-
-    async with session_scope() as db:
-        if not await _acquire_or_refresh_lease(db):
-            return
-        await market_service.sync_recent_candles(db)
-
-        if await market_service.is_stale(db):
-            logger.error("cycle.market_data_stale_skipping")
-            return
-
-        candles = await market_service.get_recent_candles(db, limit=300, confirmed_only=True)
-        try:
-            context = compute_features(candles, symbol=settings.market_symbol, timeframe=settings.market_timeframe)
-        except InsufficientDataError as exc:
-            logger.warning("cycle.insufficient_data", detail=str(exc))
-            return
-
-        cycle_id = f"{context.symbol}:{context.timeframe}:{context.candle_open_time}"
-        existing_cycle = await db.execute(
-            select(WorkerCycle).where(WorkerCycle.cycle_id == cycle_id)
-        )
-        if existing_cycle.scalar_one_or_none() is not None:
-            logger.info("cycle.duplicate_confirmed_candle_skipped", cycle_id=cycle_id)
-            return
-        cycle_started = time.time()
-        cycle = WorkerCycle(
-            cycle_id=cycle_id,
-            candle_timestamp=context.candle_open_time,
-            cycle_started_at=cycle_started,
-        )
-        db.add(cycle)
-        await db.flush()
-
-        db.add(
-            MarketFeatureSet(
-                symbol=context.symbol,
-                timeframe=context.timeframe,
-                candle_open_time=context.candle_open_time,
-                features=context.model_dump(mode="json"),
-            )
-        )
-        db.add(
-            MarketRegimeRecord(
-                symbol=context.symbol,
-                timeframe=context.timeframe,
-                candle_open_time=context.candle_open_time,
-                regime=context.regime.regime,
-                confidence=context.regime.confidence,
-                detector_version=context.regime.detector_version,
-                detail={
-                    "volatility_percentile": context.volatility.volatility_percentile,
-                    "volume_ratio": context.volume.volume_ratio,
-                },
-            )
-        )
-        await db.commit()
-
-        # Both reset fresh every call (local vars, not module globals): a
-        # council decision is only ever attached to Decision rows made
-        # THIS candle, on THIS call. A candle where the council doesn't run
-        # at all (should_run_council is False) gets council_decision_id=None
-        # and council_trade_allowed=True (unchanged, pre-existing behavior)
-        # rather than silently reusing a previous candle's result — that's
-        # what "prevent a stale council result from being used for a later
-        # market candle" means here: no cross-candle carry-forward, ever.
-        council_decision_id = None
-        council_trade_allowed = True
-        if settings.council_enabled and should_run_council(_candle_index, settings.council_interval_candles):
-            consensus = await run_council_cycle(db, ollama_client, context)
-            council_decision_id = consensus.council_decision_id
-            council_trade_allowed = consensus.trade_allowed
-            logger.info(
-                "cycle.council_decision",
-                final_bias=consensus.final_bias.value,
-                confidence=consensus.final_confidence,
-                judge_invoked=consensus.judge_invoked,
-                council_status=consensus.council_status,
-                quorum_met=consensus.quorum_met,
-                expected_analysts=consensus.expected_analysts,
-                successful_analysts=consensus.successful_analysts,
-                failed_analysts=consensus.failed_analysts,
-                failure_reasons=consensus.failure_reasons,
-                trade_allowed=consensus.trade_allowed,
-                council_start=consensus.council_start,
-                consensus_time=consensus.consensus_time,
-                total_council_latency=consensus.total_council_latency,
-            )
-            if not consensus.quorum_met:
-                logger.warning(
-                    "cycle.council_incomplete_no_new_trades",
-                    candle_open_time=context.candle_open_time,
-                    successful_analysts=consensus.successful_analysts,
-                    required=settings.council_min_successful_analysts,
-                )
-
-        latest_generation = (
-            await db.execute(select(Generation).order_by(Generation.number.desc()).limit(1))
-        ).scalar_one_or_none()
-
-        if latest_generation is not None:
-            market_age = await market_service.latest_candle_age_seconds(db)
-            processed = await run_decision_cycle(
-                db,
-                get_execution_engine(settings),
-                context,
-                _prev_context,
-                generation=latest_generation.number,
-                council_decision_id=council_decision_id,
-                global_max_leverage=settings.max_leverage,
-                global_max_position_size=settings.max_position_size,
-                global_max_drawdown=settings.max_drawdown,
-                global_max_daily_loss=settings.max_daily_loss,
-                market_data_age_seconds=market_age,
-                council_trade_allowed=council_trade_allowed,
-                council_bias=consensus.final_bias if council_decision_id is not None else None,
-                council_confidence=consensus.final_confidence if council_decision_id is not None else None,
-            )
-            logger.info(
-                "cycle.agents_processed", count=processed, generation=latest_generation.number,
-                council_trade_allowed=council_trade_allowed,
-            )
-
-            if processed > 0 and await is_population_extinct(db, latest_generation.number):
-                # Spec section 15/52: record extinction; a human/researcher
-                # (or a separate scheduled job) must run the bootstrap script
-                # to spin up the next generation after reviewing the report —
-                # this loop does NOT auto-recreate a population silently.
-                await record_extinction(
-                    db,
-                    latest_generation.number,
-                    report={"note": "TODO: populate full extinction report (spec section 52)"},
-                )
-
-        cycle.cycle_completed_at = time.time()
-        cycle.cycle_latency_seconds = cycle.cycle_completed_at - cycle_started
-        cycle.completed = True
-        await db.commit()
-
-        _prev_context = context
-        _candle_index += 1
+class WorkerAlreadyActive(RuntimeError):
+    pass
 
 
 async def main(run_once: bool = False) -> None:
@@ -213,32 +49,94 @@ async def main(run_once: bool = False) -> None:
     ollama_client = OllamaClient()
 
     try:
-        get_execution_engine(settings)  # fail fast if live mode is misconfigured
+        execution_engine = get_execution_engine(settings)  # fail fast if live mode is misconfigured; built ONCE and reused
     except LiveSafetyGateError as exc:
         logger.critical("cycle.live_safety_gate_failed", error=str(exc))
         raise
 
-    interval_seconds = 60 if settings.market_timeframe == "1m" else 300
+    interval_ms = HyperliquidClient.timeframe_to_ms(settings.market_timeframe)
+    grace_ms = settings.candle_finality_grace_ms
 
-    try:
-        while True:
-            try:
-                await run_one_cycle(market_service, ollama_client)
-            except Exception:
-                logger.exception("cycle.unhandled_error")
-            if run_once:
-                break
-            # Align wake-up to the next exchange candle boundary rather than
-            # adding an interval after variable council/DB work completes.
-            now = time.time()
-            await asyncio.sleep(max(0.25, interval_seconds - (now % interval_seconds) + 0.25))
-    finally:
+    lease = LeaseKeeper(
+        AsyncSessionLocal,
+        ttl_seconds=settings.worker_lease_ttl_seconds,
+        heartbeat_seconds=settings.worker_lease_heartbeat_seconds,
+    )
+    if not await lease.acquire():
+        logger.critical("worker.already_active_refusing_to_trade")
         await market_service.aclose()
         await ollama_client.aclose()
+        raise WorkerAlreadyActive("another decision worker holds the lease")
+
+    ws_task: asyncio.Task | None = None
+    ws: HyperliquidWebSocket | None = None
+    if settings.market_ws_enabled:
+        ws = HyperliquidWebSocket(
+            settings.hyperliquid_ws_url, settings.market_symbol, settings.market_timeframe,
+            WsCandleIngestor(AsyncSessionLocal, market_service), interval_ms=interval_ms,
+            ping_interval=settings.ws_ping_interval_seconds, stale_after=settings.ws_stale_after_seconds,
+        )
+        ws_task = asyncio.create_task(ws.run(), name="hyperliquid-ws")
+
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except NotImplementedError:  # pragma: no cover (non-POSIX)
+            pass
+
+    try:
+        while not stop.is_set():
+            target = last_confirmed_open_time(HyperliquidClient.now_ms(), interval_ms, grace_ms)
+            outcomes = []
+            try:
+                async with AsyncSessionLocal() as db:
+                    outcomes = await run_pending_cycles(
+                        db, market_service, ollama_client, execution_engine=execution_engine,
+                        lease_lost=lambda: lease.is_lost, target_open_time=target,
+                    )
+                for o in outcomes:
+                    metrics.inc("worker_cycles", status=o.status)
+                    if o.latency_seconds is not None:
+                        metrics.observe("cycle_latency_seconds", o.latency_seconds)
+                    logger.info(
+                        "cycle.done", cycle_id=o.cycle_id, status=o.status, agents=o.agents_processed,
+                        council=o.council_status, halt=o.halt_reason, latency=o.latency_seconds,
+                    )
+            except Exception:
+                logger.exception("cycle.unhandled_error")
+            try:  # publish runtime state for the API/dashboard (never allowed to break the loop)
+                async with AsyncSessionLocal() as db:
+                    await publish_status(db, WORKER, build_worker_payload(ollama_client, ws, execution_engine, outcomes))
+            except Exception:
+                logger.warning("worker.status_publish_failed")
+            if lease.is_lost:
+                logger.critical("worker.lease_lost_exiting")
+                break
+            if run_once:
+                break
+            delay = seconds_until_next_confirmation(HyperliquidClient.now_ms(), interval_ms, grace_ms)
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=max(0.05, delay))
+            except asyncio.TimeoutError:
+                pass
+    finally:
+        if ws is not None and ws_task is not None:
+            ws.stop()
+            try:
+                await asyncio.wait_for(ws_task, timeout=5)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                ws_task.cancel()
+        await lease.close()
+        await execution_engine.aclose()
+        await market_service.aclose()
+        await ollama_client.aclose()
+        logger.info("worker.stopped")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
+    parser.add_argument("--once", action="store_true", help="process pending confirmed candle(s) and exit")
     args = parser.parse_args()
     asyncio.run(main(run_once=args.once))

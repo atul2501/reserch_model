@@ -71,6 +71,31 @@ class HyperliquidClient:
             raise HyperliquidError(f"unexpected candleSnapshot response shape: {type(data)}")
         return data
 
+    async def get_funding_history(self, coin: str, start_time_ms: int, end_time_ms: int | None = None) -> list[dict[str, Any]]:
+        """Returns Hyperliquid's published funding settlements:
+        [{"coin", "fundingRate", "premium", "time"}] (hourly)."""
+        payload: dict[str, Any] = {"type": "fundingHistory", "coin": coin, "startTime": start_time_ms}
+        if end_time_ms is not None:
+            payload["endTime"] = end_time_ms
+        try:
+            data = await self._post_info(payload)
+        except httpx.HTTPStatusError as exc:
+            raise HyperliquidError(f"fundingHistory failed: {exc}") from exc
+        if not isinstance(data, list):
+            raise HyperliquidError(f"unexpected fundingHistory response shape: {type(data)}")
+        return data
+
+    async def get_l2_book(self, coin: str) -> dict[str, Any]:
+        """Public read-only order book snapshot: {"coin","time","levels":[bids, asks]}
+        with each level {"px","sz","n"}. (Info endpoint only — never /exchange.)"""
+        try:
+            data = await self._post_info({"type": "l2Book", "coin": coin})
+        except httpx.HTTPStatusError as exc:
+            raise HyperliquidError(f"l2Book failed: {exc}") from exc
+        if not isinstance(data, dict) or "levels" not in data:
+            raise HyperliquidError(f"unexpected l2Book response shape: {type(data)}")
+        return data
+
     async def get_meta_and_funding(self, coin: str) -> dict[str, Any]:
         """Fetches perp metadata + current funding/open-interest context."""
         try:

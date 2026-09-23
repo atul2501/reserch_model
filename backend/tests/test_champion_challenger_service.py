@@ -9,6 +9,8 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+
+from tests.helpers_agents import add_promotion_evidence
 from sqlalchemy import select
 
 from app.api.routes.champion_challenger import list_challengers
@@ -200,6 +202,7 @@ async def test_champion_comparison_promotes_via_the_single_real_promotion_gate(d
     evaluate_and_promote — no second gate is reimplemented here."""
     version = await _seed_version(db_session, stage=StrategyStage.PAPER)
     await _seed_evaluation(db_session, version.id, pipeline_stage="champion_comparison")
+    await add_promotion_evidence(db_session, version.id)
     db_session.add(
         StageMetrics(
             strategy_version_id=version.id, stage=StrategyStage.PAPER,
@@ -233,6 +236,7 @@ async def test_fragile_regime_classification_tightens_criteria_without_hard_veto
     check doesn't even apply) still promotes."""
     version = await _seed_version(db_session, stage=StrategyStage.PAPER)
     await _seed_evaluation(db_session, version.id, pipeline_stage="champion_comparison")
+    await add_promotion_evidence(db_session, version.id, regime="FRAGILE")
     db_session.add(
         StageMetrics(
             strategy_version_id=version.id, stage=StrategyStage.PAPER,

@@ -19,7 +19,7 @@ BACKEND_DIR="$ROOT_DIR/backend"
 VENV_DIR="$BACKEND_DIR/.venv"
 PID_DIR="$BACKEND_DIR/.run"
 LOG_DIR="$BACKEND_DIR/logs"
-SERVICES=(worker api)
+SERVICES=(worker research api)
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
@@ -114,8 +114,11 @@ cmd_start() {
   echo "==> Starting trading worker (restart-on-crash, logging to $LOG_DIR/worker.log)"
   supervise worker "$VENV_DIR/bin/python" -m scripts.run_cycle
 
+  echo "==> Starting research/evolution scheduler (own lease; only acts when its gates pass; logging to $LOG_DIR/research.log)"
+  supervise research "$VENV_DIR/bin/python" -m scripts.run_research
+
   echo "==> Starting API + frontend (restart-on-crash, logging to $LOG_DIR/api.log)"
-  supervise api "$VENV_DIR/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8000
+  supervise api "$VENV_DIR/bin/uvicorn" app.main:app --host "${API_HOST:-127.0.0.1}" --port "${API_PORT:-8000}"
 
   sleep 1
   cmd_status

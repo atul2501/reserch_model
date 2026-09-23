@@ -11,10 +11,16 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict
 
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backtesting.stage_metrics_service import latest_stage_metrics
+from app.backtesting.stage_metrics_service import compute_reality_gap, latest_stage_metrics
+from app.models.adversarial import AdversarialTestReport
+from app.models.metrics import FitnessScore
+from app.models.regime_validation import RegimeValidationReport
+from app.models.strategy import Strategy
 from app.evolution.champion import CandidateMetrics, PromotionCriteria, PromotionDecision, evaluate_promotion
 from app.models.agent import Agent
 from app.models.enums import ChampionStatus, EvolutionEventType, StrategyStage
@@ -39,7 +45,7 @@ async def evaluate_and_promote(
     promoting it to CHAMPION within its Strategy lineage. If promoted, sets
     the previous champion's status to RETIRED and this version's to
     CHAMPION, and commits. Returns the decision either way."""
-    criteria = criteria or PromotionCriteria()
+    criteria = criteria or PromotionCriteria.from_settings()
 
     challenger_version = await db.get(StrategyVersion, strategy_version_id)
     if challenger_version is None:
@@ -50,43 +56,38 @@ async def evaluate_and_promote(
         return PromotionDecision(promote=False, reasons=["no_stage_metrics_recorded"])
 
     track_record_reasons: list[str] = []
-    days_in_stage = (challenger_stage_metrics.computed_at - challenger_version.created_at).days
-    if days_in_stage < MIN_STAGE_DAYS:
-        track_record_reasons.append(
-            f"stage_track_record {days_in_stage}d < required {MIN_STAGE_DAYS}d"
-        )
+    # Real time in the current stage (not "created -> metrics computed").
+    entered = challenger_version.stage_entered_at or challenger_version.created_at
+    days_in_stage = (datetime.now(timezone.utc) - entered).days
+    required_days = max(criteria.min_observation_days, 0) if criteria.min_observation_days else MIN_STAGE_DAYS
+    if days_in_stage < required_days:
+        track_record_reasons.append(f"stage_track_record {days_in_stage}d < required {required_days}d")
 
-    challenger_fitness = await _average_agent_fitness(db, strategy_version_id)
-    challenger_metrics = CandidateMetrics(
-        trade_count=challenger_stage_metrics.trade_count,
-        oos_score=challenger_stage_metrics.oos_score,
-        walk_forward_consistency=challenger_stage_metrics.walk_forward_consistency,
-        max_drawdown=challenger_stage_metrics.max_drawdown_pct,
-        profit_factor=challenger_stage_metrics.profit_factor,
-        fitness=challenger_fitness,
-    )
+    challenger_metrics = await _candidate_metrics(db, challenger_version, challenger_stage_metrics, stage)
 
+    # Champion competition is scoped to a LINEAGE (a child is judged against its
+    # ancestors), falling back to the strategy itself for pre-lineage rows.
+    strategy = await db.get(Strategy, challenger_version.strategy_id)
+    lineage_id = (strategy.lineage_id if strategy is not None and strategy.lineage_id else challenger_version.strategy_id)
+    lineage_strategy_ids = [
+        r for (r,) in (
+            await db.execute(select(Strategy.id).where((Strategy.lineage_id == lineage_id) | (Strategy.id == lineage_id)))
+        ).all()
+    ] or [challenger_version.strategy_id]
     current_champion = (
         await db.execute(
             select(StrategyVersion).where(
-                StrategyVersion.strategy_id == challenger_version.strategy_id,
+                StrategyVersion.strategy_id.in_(lineage_strategy_ids),
                 StrategyVersion.champion_status == ChampionStatus.CHAMPION,
             )
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
 
     champion_metrics = None
     if current_champion is not None:
         champion_stage_metrics = await latest_stage_metrics(db, current_champion.id, stage)
         if champion_stage_metrics is not None:
-            champion_metrics = CandidateMetrics(
-                trade_count=champion_stage_metrics.trade_count,
-                oos_score=champion_stage_metrics.oos_score,
-                walk_forward_consistency=champion_stage_metrics.walk_forward_consistency,
-                max_drawdown=champion_stage_metrics.max_drawdown_pct,
-                profit_factor=champion_stage_metrics.profit_factor,
-                fitness=await _average_agent_fitness(db, current_champion.id),
-            )
+            champion_metrics = await _candidate_metrics(db, current_champion, champion_stage_metrics, stage)
 
     decision = evaluate_promotion(challenger_metrics, champion_metrics, criteria)
     decision.reasons = decision.reasons + track_record_reasons
@@ -116,6 +117,16 @@ async def evaluate_and_promote(
         if current_champion is not None:
             current_champion.champion_status = ChampionStatus.RETIRED
         challenger_version.champion_status = ChampionStatus.CHAMPION
+        # Freeze exactly what was promoted (immutable, provenance-complete).
+        best_agent = (
+            await db.execute(
+                select(Agent).where(Agent.strategy_version_id == challenger_version.id)
+                .order_by(Agent.fitness.desc().nulls_last()).limit(1)
+            )
+        ).scalars().first()
+        if best_agent is not None:
+            from app.research.snapshots import create_agent_snapshot
+            await create_agent_snapshot(db, best_agent, challenger_version, experiment_id=challenger_version.experiment_id)
 
     await db.commit()
 
@@ -129,3 +140,52 @@ async def _average_agent_fitness(db: AsyncSession, strategy_version_id: uuid.UUI
         )
     ).scalar_one_or_none()
     return float(avg_fitness) if avg_fitness is not None else 0.0
+
+
+async def _candidate_metrics(db: AsyncSession, version: StrategyVersion, stage_row, stage: StrategyStage) -> CandidateMetrics:
+    """Assembles ALL promotion evidence for a version. The final OOS score comes
+    from the protected lockbox (OUT_OF_SAMPLE row), walk-forward from its own row."""
+    oos_row = await latest_stage_metrics(db, version.id, StrategyStage.OUT_OF_SAMPLE)
+    wfo_row = await latest_stage_metrics(db, version.id, StrategyStage.WALK_FORWARD)
+    adversarial = (
+        await db.execute(
+            select(AdversarialTestReport).where(AdversarialTestReport.strategy_version_id == version.id)
+            .order_by(AdversarialTestReport.computed_at.desc()).limit(1)
+        )
+    ).scalar_one_or_none()
+    regime = (
+        await db.execute(
+            select(RegimeValidationReport).where(RegimeValidationReport.strategy_version_id == version.id)
+            .order_by(RegimeValidationReport.computed_at.desc()).limit(1)
+        )
+    ).scalar_one_or_none()
+    mean_corr = (
+        await db.execute(
+            select(func.avg(FitnessScore.correlation_penalty)).join(Agent, Agent.id == FitnessScore.agent_id)
+            .where(Agent.strategy_version_id == version.id, FitnessScore.correlation_penalty.is_not(None))
+        )
+    ).scalar_one_or_none()
+
+    degradation = None
+    try:
+        gap = await compute_reality_gap(db, version.id, StrategyStage.BACKTEST, stage)
+        ret = gap.get("net_return_pct", {})
+        if ret.get("from") is not None and ret.get("to") is not None:
+            base = abs(ret["from"]) or 1e-9
+            degradation = (ret["from"] - ret["to"]) / base if ret["from"] > 0 else (0.0 if ret["to"] >= ret["from"] else 1.0)
+    except ValueError:
+        degradation = None  # a stage has no metrics yet -> missing evidence, handled by the gate
+
+    return CandidateMetrics(
+        trade_count=stage_row.trade_count,
+        oos_score=oos_row.oos_score if oos_row is not None else stage_row.oos_score,
+        walk_forward_consistency=wfo_row.walk_forward_consistency if wfo_row is not None else stage_row.walk_forward_consistency,
+        max_drawdown=stage_row.max_drawdown_pct,
+        profit_factor=stage_row.profit_factor,
+        fitness=await _average_agent_fitness(db, version.id),
+        adversarial_robustness=adversarial.robustness_score if adversarial is not None else None,
+        regime_classification=regime.classification if regime is not None else None,
+        mean_correlation=float(mean_corr) if mean_corr is not None else None,
+        reality_gap_return_degradation=degradation,
+        paper_trade_count=stage_row.trade_count,
+    )

@@ -106,6 +106,7 @@ def test_router_allows_live_mode_only_when_every_gate_passes():
     settings = Settings(
         trading_mode=TradingMode.LIVE,
         live_trading_enabled=True,
+        live_prerequisites_signed_off=True,
         live_account_confirmed=True,
         load_agent_snapshot="snap-1",
         hyperliquid_account_address="0xabc",

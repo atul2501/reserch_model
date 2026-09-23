@@ -3,10 +3,13 @@ chain report built on top of stage_metrics_service's existing pairwise
 compute_reality_gap, and the richer cost/latency StageMetrics fields."""
 from __future__ import annotations
 
+import itertools
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+
+from tests.helpers_agents import closed_position
 from sqlalchemy import select
 
 from app.backtesting.engine import BacktestResult, BacktestTrade
@@ -57,11 +60,14 @@ async def _seed_strategy_and_agent(db_session) -> tuple[uuid.UUID, Agent]:
     return version.id, agent
 
 
+_candle_counter = itertools.count(1)
+
+
 def _decision(*, agent_id, strategy_version_id, risk_decision, risk_reasoning, order_id=None, trade_id=None, market_timestamp=None):
     return Decision(
         agent_id=agent_id,
         strategy_version_id=strategy_version_id,
-        market_candle_open_time=1,
+        market_candle_open_time=next(_candle_counter),
         market_timestamp=market_timestamp or datetime.now(timezone.utc),
         market_context={},
         agent_signal=Bias.LONG,
@@ -221,7 +227,7 @@ async def test_compute_live_stage_metrics_populates_cost_and_latency_fields(db_s
     db_session.add(filled_order)
     db_session.add(
         Trade(
-            agent_id=agent.id, position_id=uuid.uuid4(), symbol="SOL", side=Side.LONG, quantity=1.0,
+            agent_id=agent.id, position_id=closed_position(db_session, agent), symbol="SOL", side=Side.LONG, quantity=1.0,
             entry_price=100.0, exit_price=106.0, gross_pnl=6.0, fees=0.5, funding=0.1, slippage_cost=0.3,
             net_pnl=5.1, opened_at=now - timedelta(minutes=5), closed_at=now,
             holding_seconds=300, exit_reason="signal", stage=StrategyStage.PAPER,

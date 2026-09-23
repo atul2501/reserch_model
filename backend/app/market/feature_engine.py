@@ -28,6 +28,8 @@ from app.schemas.market_context import (
 
 MIN_CANDLES_REQUIRED = 210  # enough for a 200-period SMA/EMA plus warmup
 
+_TIMEFRAME_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000}
+
 
 class InsufficientDataError(ValueError):
     pass
@@ -180,8 +182,10 @@ def compute_features(candles: pd.DataFrame, symbol: str, timeframe: str) -> Mark
         timeframe=timeframe,
         candle_open_time=int(df["open_time"].iloc[-1]),
         close_price=float(close.iloc[-1]),
+        candle_open=float(open_.iloc[-1]),
         candle_high=float(high.iloc[-1]),
         candle_low=float(low.iloc[-1]),
+        candle_close_time=int(df["open_time"].iloc[-1]) + _TIMEFRAME_MS.get(timeframe, 60_000) - 1,
         funding_rate=(float(df["funding_rate"].iloc[-1]) if "funding_rate" in df and pd.notna(df["funding_rate"].iloc[-1]) else None),
         open_interest=(float(df["open_interest"].iloc[-1]) if "open_interest" in df and pd.notna(df["open_interest"].iloc[-1]) else None),
         trend=TrendFeatures(

@@ -1,0 +1,23 @@
+[Unit]
+Description=Trading Lab research/evolution worker (scheduled, single instance via DB lease)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=trading
+Group=trading
+WorkingDirectory=/opt/trading-lab/backend
+Environment="PYTHONUNBUFFERED=1"
+# Secrets live OUTSIDE the repo (root-owned, mode 0600) — never in git.
+EnvironmentFile=-/etc/trading-lab/env
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ExecStart=/opt/trading-lab/.venv/bin/python -m scripts.run_research
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Uuid, Index
+from sqlalchemy import JSON, BigInteger, Boolean, Float, ForeignKey, Integer, String, UniqueConstraint, Uuid, Index, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -15,7 +15,11 @@ from app.models.enums import ExecutionVenue, OrderStatus, Side, StrategyStage
 
 class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "orders"
-    __table_args__ = (Index("ix_orders_agent_created", "agent_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_orders_agent_created", "agent_id", "created_at"),
+        Index("ix_orders_status", "status"),
+        Index("ix_orders_decision", "decision_id"),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     # Orders <-> Decisions is a logical circular reference (Order references
@@ -57,10 +61,28 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     raw_venue_response: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
+    # Fill quality (spec: paper realism). `filled_quantity` < `quantity` on a
+    # partial fill; `reduce_only` marks exits; `order_kind` is
+    # market|stop|take_profit|liquidation.
+    filled_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    filled_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fee: Mapped[float | None] = mapped_column(Float, nullable=True)
+    slippage_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reduce_only: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    order_kind: Mapped[str] = mapped_column(String(16), default="market", nullable=False)
+
 
 class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "positions"
-    __table_args__ = (Index("ix_positions_agent_open", "agent_id", "is_open"),)
+    __table_args__ = (
+        Index("ix_positions_agent_open", "agent_id", "is_open"),
+        # DB-level "one open position per agent": the final barrier against a
+        # duplicate entry regardless of what any Python check believed.
+        Index(
+            "uq_position_one_open_per_agent", "agent_id", unique=True,
+            sqlite_where=text("is_open = 1"), postgresql_where=text("is_open"),
+        ),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -74,6 +96,17 @@ class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     peak_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     trough_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_funding_time: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+    # Cost basis carried to the closing Trade so realized PnL includes the
+    # entry fee, entry slippage and every funding settlement.
+    entry_order_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("orders.id"), nullable=True)
+    entry_fee: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    entry_slippage_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    funding_accrued: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    liquidation_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    entry_candle_open_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    entry_regime: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    trailing_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     stop_loss_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     take_profit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -92,6 +125,11 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     Trade even if it resulted from multiple fills."""
 
     __tablename__ = "trades"
+    __table_args__ = (
+        Index("ix_trades_agent_closed", 'agent_id', 'closed_at'),
+        Index("ix_trades_closed_at", 'closed_at'),
+        Index("ix_trades_stage", 'stage'),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     position_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("positions.id"), nullable=False)
@@ -127,3 +165,23 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     stage: Mapped[StrategyStage | None] = mapped_column(
         SAEnum(StrategyStage, name="trade_stage_enum"), nullable=True
     )
+
+
+class FundingPayment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One funding settlement charged to (or credited to) one position. The
+    (position, settlement time) unique constraint makes accrual idempotent:
+    a retried cycle can never charge the same settlement twice."""
+
+    __tablename__ = "funding_payments"
+    __table_args__ = (
+        UniqueConstraint("position_id", "funding_time_ms", name="uq_funding_payment_position_time"),
+        Index("ix_funding_payments_agent", "agent_id"),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    position_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("positions.id"), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    funding_time_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    funding_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    position_notional: Mapped[float] = mapped_column(Float, nullable=False)
+    payment: Mapped[float] = mapped_column(Float, nullable=False)  # + = agent paid, - = agent received
