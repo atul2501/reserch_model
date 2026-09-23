@@ -81,6 +81,10 @@ class PopulationSummary(BaseModel):
     worst_equity: float | None = None
     total_fees_paid: float = 0.0
     total_funding_paid: float = 0.0
+    total_trades: int = 0            # closed trades, all generations, all time
+    generation_trades: int = 0       # closed trades by the current generation's agents
+    open_positions: int = 0          # positions currently open (current generation)
+    win_rate: float | None = None    # winning share of the current generation's closed trades
 
 
 class CandlePoint(BaseModel):

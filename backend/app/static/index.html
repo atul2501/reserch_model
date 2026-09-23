@@ -595,7 +595,11 @@ async function refresh() {
       <div class="card"><div class="label">Dead Agents</div><div class="value num">${p.dead_count}</div></div>
       <div class="card"><div class="label">Professional</div><div class="value num">${p.professional_count}</div></div>
       <div class="card"><div class="label">Total Equity</div><div class="value num">$${fmt(p.total_equity)}</div></div>
-      <div class="card"><div class="label">Total Realized PnL</div><div class="value num ${p.total_realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.total_realized_pnl)}</div></div>`;
+      <div class="card"><div class="label">Total Realized PnL</div><div class="value num ${p.total_realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.total_realized_pnl)}</div></div>
+      <div class="card"><div class="label">Total Trades (all time)</div><div class="value num">${Number(p.total_trades).toLocaleString()}</div></div>
+      <div class="card"><div class="label">Trades (this generation)</div><div class="value num">${Number(p.generation_trades).toLocaleString()}</div></div>
+      <div class="card"><div class="label">Open Positions</div><div class="value num">${p.open_positions}</div></div>
+      <div class="card"><div class="label">Win Rate (this gen)</div><div class="value num">${p.win_rate == null ? "-" : pct(p.win_rate)}</div></div>`;
     lastActiveCount = p.active_count;
   });
 
@@ -1018,7 +1022,7 @@ async function refreshSlow() {
     const items = [["Generation", p.generation], ["Active", p.active_count], ["Dead", p.dead_count], ["Retired", p.retired_count],
       ["Professional", p.professional_count], ["Generations run", p.generations_total], ["Total equity", "$" + fmt(p.total_equity)],
       ["Mean equity", p.mean_equity == null ? "-" : "$" + fmt(p.mean_equity)], ["Best / worst", p.best_equity == null ? "-" : "$" + fmt(p.best_equity) + " / $" + fmt(p.worst_equity)],
-      ["Realized PnL", "$" + fmt(p.total_realized_pnl)], ["Fees / funding", "$" + fmt(p.total_fees_paid) + " / $" + fmt(p.total_funding_paid)]];
+      ["Realized PnL", "$" + fmt(p.total_realized_pnl)], ["Total trades", Number(p.total_trades).toLocaleString()], ["Open positions", String(p.open_positions)], ["Fees / funding", "$" + fmt(p.total_fees_paid) + " / $" + fmt(p.total_funding_paid)]];
     document.getElementById("population-panel").innerHTML = items.map(([t, v]) => card(t, "ok", String(v), "")).join("");
   });
   await section("council", async () => {

@@ -240,3 +240,17 @@ async def test_ollama_health_endpoint_needs_operator_and_never_leaks_key_values(
     r = await api.get("/api/system/ollama", headers={"X-API-Key": O})
     assert r.status_code == 200 and r.json()["keys"][0]["key_index"] == 0
     assert "key_value" not in r.text and "Bearer" not in r.text
+
+
+async def test_population_reports_trade_counts_open_positions_and_win_rate(db_session, api):
+    from app.execution.paper_adapter import PaperExecutionAdapter
+    agents = await make_agents(db_session, [make_dna(), make_dna()])
+    eng = PaperExecutionAdapter()
+    c1 = make_context(1, 100.0, rsi=65.0)
+    await cycle(db_session, eng, c1)                                           # both enter
+    empty = (await api.get("/api/population")).json()
+    assert empty["total_trades"] == 0 and empty["open_positions"] == 2 and empty["win_rate"] is None
+    await cycle(db_session, eng, make_context(2, 103.0, rsi=30.0), c1)         # both exit in profit
+    pop = (await api.get("/api/population")).json()
+    assert pop["total_trades"] == 2 and pop["generation_trades"] == 2
+    assert pop["open_positions"] == 0 and pop["win_rate"] == 1.0
