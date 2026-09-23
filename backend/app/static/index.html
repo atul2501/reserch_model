@@ -459,11 +459,17 @@ function promptForApiKey() {
   return !!k;
 }
 
+let keyPromptShown = false;   // ask at most once per page load, and only if the server actually demands a key
+
 async function get(path) {
   const key = apiKey();
   const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
   if (res.status === 401 || res.status === 403) {
     try { sessionStorage.removeItem("apiKey"); } catch (e) {}
+    if (!keyPromptShown) {          // auth is enabled on this server: ask once, then retry
+      keyPromptShown = true;
+      if (promptForApiKey()) return await get(path);
+    }
     throw new Error(path + " -> HTTP " + res.status + " (API key missing or insufficient)");
   }
   if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
@@ -1079,7 +1085,6 @@ document.addEventListener("click", ev => {
   if (tr && tr.dataset.agentId) { document.getElementById("agent-input").value = tr.dataset.agentId; loadAgentDetail(tr.dataset.agentId); }
 });
 
-if (!apiKey()) promptForApiKey();
 refresh();
 refreshSlow();
 startStream();
