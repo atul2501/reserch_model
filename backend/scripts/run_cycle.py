@@ -22,7 +22,7 @@ import signal
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import get_settings
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, use_immediate_transactions
 from app.core.logging import configure_logging, get_logger
 from app.execution.router import LiveSafetyGateError, get_execution_engine
 from app.market.hyperliquid_client import HyperliquidClient
@@ -47,6 +47,7 @@ class WorkerAlreadyActive(RuntimeError):
 
 async def main(run_once: bool = False) -> None:
     configure_logging()
+    use_immediate_transactions()  # SQLite writer process: queue on the write lock instead of failing (database.py)
     settings = get_settings()
     market_service = MarketDataService()
     ollama_client = OllamaClient()

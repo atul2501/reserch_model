@@ -16,7 +16,7 @@ import asyncio
 import signal
 
 from app.core.config import get_settings
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, use_immediate_transactions
 from app.core.logging import configure_logging, get_logger
 from app.market.market_data_service import MarketDataService
 from app.research.pipeline import run_research_cycle
@@ -28,6 +28,7 @@ RESEARCH_LEASE = "research-worker"
 
 async def main(*, once: bool, force: bool) -> None:
     configure_logging()
+    use_immediate_transactions()  # SQLite writer process: queue on the write lock instead of failing (database.py)
     settings = get_settings()
     lease = LeaseKeeper(
         AsyncSessionLocal, name=RESEARCH_LEASE, ttl_seconds=max(300, settings.worker_lease_ttl_seconds),

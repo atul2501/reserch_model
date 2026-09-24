@@ -42,6 +42,23 @@ if not _is_sqlite:
     if _settings.database_url.startswith("postgresql+asyncpg"):
         _engine_kwargs["connect_args"] = postgres_connect_args(_settings)
 
+SQLITE_BUSY_TIMEOUT_MS = 15000
+_begin_statement = "BEGIN"
+
+
+def use_immediate_transactions() -> None:
+    """SQLite writer processes (worker, research scheduler): take the write lock at BEGIN.
+
+    A deferred BEGIN takes a read snapshot at the first SELECT; if another connection commits before this
+    transaction's first write, SQLite refuses the read->write upgrade at once (SQLITE_BUSY_SNAPSHOT) and does NOT
+    wait `busy_timeout`. BEGIN IMMEDIATE acquires the lock up front, where the busy timeout is honoured, so
+    concurrent writers queue instead of failing. The API keeps deferred BEGIN so dashboard reads never take it.
+    No effect on other databases."""
+    global _begin_statement
+    if _is_sqlite:
+        _begin_statement = "BEGIN IMMEDIATE"
+
+
 def configure_sqlite_engine(sync_engine, *, wal: bool = True) -> None:
     """Make SQLite behave like the production database for transactions.
 
@@ -59,12 +76,12 @@ def configure_sqlite_engine(sync_engine, *, wal: bool = True) -> None:
         cursor.execute("PRAGMA foreign_keys=ON")
         if wal:
             cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
         cursor.close()
 
     @event.listens_for(sync_engine, "begin")
     def _on_begin(conn):
-        conn.exec_driver_sql("BEGIN")
+        conn.exec_driver_sql(_begin_statement)
 
 
 engine = create_async_engine(_settings.database_url, **_engine_kwargs)
