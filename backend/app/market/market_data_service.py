@@ -220,11 +220,16 @@ class MarketDataService:
             old = by_time.get(r["open_time"])
             if old is None:
                 continue
-            if any(abs(getattr(old, k) - r[k]) > 1e-9 for k in ("open", "high", "low", "close", "volume")):
+            diff = {
+                k: {"stored": getattr(old, k), "incoming": r[k]}
+                for k in ("open", "high", "low", "close", "volume")
+                if abs(getattr(old, k) - r[k]) > 1e-9
+            }
+            if diff:
                 metrics.inc("candle_revision_ignored", incoming_final=str(bool(r["is_final"])).lower())
                 logger.error(
                     "market_data.confirmed_candle_revision_ignored", open_time=r["open_time"], symbol=self._symbol,
-                    incoming_final=bool(r["is_final"]),
+                    incoming_final=bool(r["is_final"]), diff=diff,
                 )
 
     async def verify_candle_final(self, db: AsyncSession, open_time: int, *, expected_close: float | None = None) -> None:
