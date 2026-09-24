@@ -17,6 +17,13 @@ python -m scripts.bootstrap_population        # only if the database has no gene
 SQLite (dev/tests) runs in WAL mode; production must use PostgreSQL (pool, `statement_timeout`, partial
 unique indexes, immutability triggers).
 
+### PostgreSQL sizing and timeouts
+Three processes share the server: keep `3 x (DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW)` under ~90% of
+`max_connections` and set `DATABASE_SERVER_MAX_CONNECTIONS` to match (the app refuses to start otherwise).
+`lock_timeout` and `idle_in_transaction_session_timeout` are applied to every pooled connection. Lease expiry is
+judged by the **database** clock on PostgreSQL. The `b7d1f3a9c5e2` migration adds CHECK constraints and **pre-flights
+existing rows**: if any violate a constraint it aborts, changes nothing and lists the offenders - repair them, re-run.
+
 ## Health
 | Symptom | Where to look |
 |---|---|
@@ -36,15 +43,40 @@ Set `active: false` to resume. Exits and stops always keep running.
 ```bash
 python -m scripts.run_research --force        # one cycle now (ignores interval/age/history gates)
 python -m scripts.run_research --once         # run only if due
+python -m scripts.run_research --new-oos-epoch --reason "monthly refresh"   # OPERATOR ACTION: seal a NEW holdout
 ```
 Every run (including skips and failures) is an `experiments` row; see `/api/evolution/experiments`.
-A previously consumed OOS slice cannot be reused: a *new* epoch (new data) is required.
+The OOS holdout is **frozen**: it does not move as candles arrive. Renew it deliberately (the reason is recorded
+permanently); the old epoch and its evaluations are kept. The log warns when the sealed holdout is older than
+`RESEARCH_EPOCH_MAX_AGE_DAYS`. An `epoch_integrity_error` skip means stored candles no longer match what was sealed.
+
+## Ollama credentials (no restart needed)
+The worker re-reads `OLLAMA_API_KEY(S)` every `OLLAMA_KEY_REFRESH_SECONDS`; `kill -HUP <worker pid>` forces an
+immediate reload that re-tries **every** key. A key that already returned 401/403 stays disabled until its value
+changes (so a bad key is never hammered).
+
+## Switching TRADING_MODE
+Positions remember the venue that opened them. Switching (e.g. paper -> shadow) with positions still open blocks new
+entries (`venue_mismatch` halt reason) until they close; exits keep running. Prefer switching when flat.
+
+## Behaviour change to know about: next-open fills
+Paper entries/exits now fill at the **next bar's open** (`PAPER_FILL_TIMING=next_open`). Historical paper statistics
+were produced with same-bar-close fills and are **not directly comparable**; trailing stops also count the bar's own
+extreme by default. Set `PAPER_FILL_TIMING=signal_close` / `TRAILING_STOP_USES_SAME_BAR_EXTREME=false` only to
+reproduce old numbers.
+
+## Secrets hygiene
+`python -m scripts.secret_scan` (also run by CI and the pre-commit hook) fails on key-shaped values in any tracked
+or untracked-but-not-ignored file. Credentials that were ever committed must be **rotated**; see
+[security.md](security.md) and `scripts/purge_secrets_from_history.sh` (dry-run by default; never pushes).
 
 ## Tests
 ```bash
 cd backend && .venv/bin/python -m pytest -q                       # SQLite
-DATABASE_URL=postgresql+asyncpg://… .venv/bin/python -m pytest -q # PostgreSQL (also runs tests/test_postgres.py)
+DATABASE_URL=postgresql+asyncpg://… .venv/bin/python -m pytest -q # the whole suite on PostgreSQL
+TEST_POSTGRES_ADMIN_URL=postgresql://postgres@127.0.0.1:55432/postgres .venv/bin/python -m pytest -q tests/test_postgres*.py
 ```
+CI (`.github/workflows/ci.yml`) runs the suite with a real PostgreSQL 16 service so the PG tests never skip.
 
 ## Database size / `decisions` growth
 Before this fix every agent wrote a `decisions` row on every candle (500 x 1/min = ~720k rows/day), 99% of them

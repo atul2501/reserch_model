@@ -49,6 +49,9 @@ class CouncilDecision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # --- Latency audit --------------------------------------------------
     council_start: Mapped[float | None] = mapped_column(Float, nullable=True)  # unix epoch seconds
     total_council_latency_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    council_completed_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # unix epoch seconds
+    consensus_time_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
 
 
 class CouncilAnalysis(Base, UUIDPrimaryKeyMixin, TimestampMixin):

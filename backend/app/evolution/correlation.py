@@ -18,26 +18,34 @@ def _jaccard(a: set, b: set) -> float:
     return len(a & b) / len(union) if union else 1.0
 
 
+def feature_set(dna: StrategyDNA) -> set:
+    """Resolved indicator specs (EMA(20) and EMA(50) are DIFFERENT features) plus the lookback_periods keys."""
+    out: set = set(dna_indicator_specs(dna))
+    out |= {f"lookback:{k}" for k in dna.lookback_periods}
+    return out
+
+
 def feature_similarity(a: StrategyDNA, b: StrategyDNA) -> float:
     """Jaccard similarity over each DNA's (indicator name, sorted params)
     set plus its lookback_periods keys — 1.0 means the two strategies
     depend on an identical feature set, 0.0 means no overlap at all."""
-    # Resolved indicator specs: EMA(20) and EMA(50) are DIFFERENT features.
-    set_a: set = set(dna_indicator_specs(a))
-    set_a |= {f"lookback:{k}" for k in a.lookback_periods}
-    set_b: set = set(dna_indicator_specs(b))
-    set_b |= {f"lookback:{k}" for k in b.lookback_periods}
-    return _jaccard(set_a, set_b)
+    return _jaccard(feature_set(a), feature_set(b))
 
 
 def _condition_set(ruleset: RuleSet) -> set[tuple[str, str, float | str]]:
     return {(c.feature, c.operator, c.value) for c in ruleset.conditions}
 
 
+def ruleset_signature(rs: RuleSet) -> tuple[frozenset, str]:
+    return frozenset(_condition_set(rs)), rs.logic
+
+
+def ruleset_signature_similarity(sa: tuple[frozenset, str], sb: tuple[frozenset, str]) -> float:
+    return (_jaccard(sa[0], sb[0]) + (1.0 if sa[1] == sb[1] else 0.0)) / 2
+
+
 def _ruleset_similarity(a: RuleSet, b: RuleSet) -> float:
-    jaccard = _jaccard(_condition_set(a), _condition_set(b))
-    logic_match = 1.0 if a.logic == b.logic else 0.0
-    return (jaccard + logic_match) / 2
+    return ruleset_signature_similarity(ruleset_signature(a), ruleset_signature(b))
 
 
 def entry_condition_similarity(a: StrategyDNA, b: StrategyDNA) -> float:

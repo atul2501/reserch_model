@@ -12,25 +12,33 @@ selects or breeds strategies. This module is the ONLY code that reads it:
 """
 from __future__ import annotations
 
+import asyncio
+
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backtesting.data import prepare_backtest_data
-from app.backtesting.engine import BacktestResult, run_backtest
+from app.backtesting.engine import ENGINE_VERSION, BacktestResult, run_backtest
 from app.backtesting.stage_metrics_service import persist_backtest_metrics
 from app.core.config import get_settings
 from app.models.enums import StrategyStage
 from app.models.research import OosEvaluation, ResearchEpoch
-from app.models.strategy import StrategyVersion
-from app.research.registry import finish_experiment, register_experiment
+from app.models.strategy import Strategy, StrategyVersion
+from app.research.registry import code_version, finish_experiment, parameter_hash, register_experiment
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.engine import dna_indicator_specs
 
 
 class OosAlreadyConsumedError(RuntimeError):
     """This strategy version already used this dataset's final OOS slice."""
+
+
+class OosLineageExhaustedError(OosAlreadyConsumedError):
+    """This strategy LINEAGE (a family of mutated/crossed descendants) already used its quota of evaluations against
+    this holdout. Repeatedly evaluating close relatives against the same OOS slice is adaptive tuning: it is refused
+    until an operator renews the epoch."""
 
 
 def _clip(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -74,18 +82,39 @@ async def evaluate_oos_once(
             f"strategy_version {version.id} already consumed the OOS slice of {epoch.epoch_id}"
         )
 
+    strategy = await db.get(Strategy, version.strategy_id)
+    lineage_id = (strategy.lineage_id or strategy.id) if strategy is not None else version.strategy_id
+    lineage_versions = select(StrategyVersion.id).join(Strategy, Strategy.id == StrategyVersion.strategy_id).where(
+        (Strategy.lineage_id == lineage_id) | (Strategy.id == lineage_id)
+    )
+    used = (await db.execute(
+        select(func.count()).select_from(OosEvaluation).where(
+            OosEvaluation.dataset_fingerprint == epoch.dataset_fingerprint, OosEvaluation.strategy_version_id.in_(lineage_versions),
+        )
+    )).scalar_one()
+    if used >= s.research_oos_max_evaluations_per_lineage:
+        raise OosLineageExhaustedError(
+            f"lineage {lineage_id} already used {used} OOS evaluation(s) of {epoch.epoch_id} "
+            f"(limit {s.research_oos_max_evaluations_per_lineage}); renew the epoch to open a fresh holdout"
+        )
+
     dna = StrategyDNA.model_validate(version.dna)
     oos_start = int((full_candles["open_time"] > epoch.validation_end_ms).idxmax())
-    data = prepare_backtest_data(
-        full_candles, symbol=epoch.symbol, timeframe=epoch.timeframe, specs=dna_indicator_specs(dna), funding=funding
-    )
-    result = run_backtest(
-        full_candles, dna, symbol=epoch.symbol, timeframe=epoch.timeframe, starting_equity=s.agent_starting_balance,
-        fee_rate=s.paper_fee_rate, slippage_bps=s.paper_slippage_bps, enforce_risk_engine=True,
-        global_max_leverage=s.max_leverage, global_max_position_size=s.max_position_size,
-        global_max_drawdown=s.max_drawdown, global_max_daily_loss=s.max_daily_loss,
-        data=data, start_index=oos_start,
-    )
+
+    def _simulate():
+        data = prepare_backtest_data(
+            full_candles, symbol=epoch.symbol, timeframe=epoch.timeframe, specs=dna_indicator_specs(dna), funding=funding
+        )
+        return run_backtest(
+            full_candles, dna, symbol=epoch.symbol, timeframe=epoch.timeframe, starting_equity=s.agent_starting_balance,
+            fee_rate=s.paper_fee_rate, slippage_bps=s.paper_slippage_bps, enforce_risk_engine=True,
+            global_max_leverage=s.max_leverage, global_max_position_size=s.max_position_size,
+            global_max_drawdown=s.max_drawdown, global_max_daily_loss=s.max_daily_loss,
+            data=data, start_index=oos_start,
+        )
+
+    # CPU-heavy: off the event loop so lease heartbeats / SSE keep running.
+    result = await asyncio.to_thread(_simulate)
     score = compute_oos_score(result, min_trades=s.research_candidate_min_trades)
 
     exp = await register_experiment(
@@ -99,6 +128,15 @@ async def evaluate_oos_once(
         metrics={"net_return_pct": result.net_return_pct, "max_drawdown_pct": result.max_drawdown_pct,
                  "profit_factor": None if result.profit_factor in (None, float("inf")) else result.profit_factor,
                  "trade_count": len(result.trades), "win_rate": result.win_rate},
+        lineage_id=lineage_id, code_version=code_version(), random_seed=exp.random_seed,
+        provenance={
+            "epoch_id": epoch.epoch_id, "engine_version": ENGINE_VERSION, "parameter_hash": parameter_hash(),
+            "strategy_version_id": str(version.id), "strategy_version": version.version, "generation": version.generation,
+            "train_period": {"start_ms": epoch.start_ms, "end_ms": epoch.train_end_ms},
+            "validation_period": {"start_ms": epoch.train_end_ms, "end_ms": epoch.validation_end_ms},
+            "oos_period": {"start_ms": epoch.oos_start_ms, "end_ms": epoch.oos_end_ms},
+            "oos_fingerprint": epoch.oos_fingerprint,
+        },
     )
     db.add(row)
     metrics_row = persist_backtest_metrics(version.id, StrategyStage.OUT_OF_SAMPLE, result)

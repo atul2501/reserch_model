@@ -17,6 +17,8 @@ from app.models.enums import Bias, ExecutionVenue, OrderStatus, RiskDecision, Si
 from app.models.trading import FundingPayment, Order, Position
 from tests.helpers_agents import cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 @pytest.fixture(autouse=True)
 def _fast(monkeypatch):

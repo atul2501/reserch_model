@@ -13,6 +13,8 @@ from app.models.trading import Position
 from app.schemas.strategy_dna import CooldownConfig, StopLossConfig, TakeProfitConfig
 from tests.helpers_agents import MINUTE, cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 @pytest.fixture(autouse=True)
 def _fast(monkeypatch):
@@ -59,8 +61,9 @@ async def test_cooldown_is_counted_in_bars_of_the_configured_timeframe(db_sessio
     eng = PaperExecutionAdapter()
     await _trade_round_trip(db_session, eng, 1, None, exit_close=90.0)
     await db_session.refresh(agent)
-    exit_close_dt = make_context(2, 1).candle_open_time + MINUTE - 1
-    assert agent.cooldown_until.timestamp() * 1000 == pytest.approx(exit_close_dt + 2 * MINUTE, abs=1)
+    exit_bar_open = make_context(2, 1).candle_open_time
+    # an exit in bar X blocks entry signals for bars X .. X+N-1 (same rule as the backtest)
+    assert agent.cooldown_until.timestamp() * 1000 == pytest.approx(exit_bar_open + 2 * MINUTE, abs=1)
 
 
 async def test_no_cooldown_configured_allows_immediate_reentry(db_session):

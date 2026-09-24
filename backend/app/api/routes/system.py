@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.logging import get_logger
+from app.models.enums import SystemEventSeverity
+from app.models.system import SystemEvent
 from app.core.database import get_db
 from app.core.security import Principal, Role, require_role
 from app.core.system_flags import KILL_SWITCH, active_flags, set_flag
@@ -13,6 +16,7 @@ from app.core.runtime_status import compute_system_status
 from app.schemas.api import SystemHealth
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+logger = get_logger(__name__)
 
 
 @router.get("/health", response_model=SystemHealth)
@@ -49,6 +53,7 @@ async def get_flags(db: AsyncSession = Depends(get_db)):
 
 @router.post("/kill-switch")
 async def set_kill_switch(
+    request: Request,
     body: KillSwitchRequest,
     db: AsyncSession = Depends(get_db),
     principal: Principal = Depends(require_role(Role.OPERATOR)),
@@ -56,6 +61,18 @@ async def set_kill_switch(
     """Emergency stop. Blocks every NEW entry across the population (exits and
     risk management keep running). Requires operator or admin — a viewer key
     never gets control-plane access."""
+    was_active = KILL_SWITCH in await active_flags(db)
     await set_flag(db, KILL_SWITCH, body.active, reason=body.reason or None, set_by=principal.name)
+    # AUDIT: the flag row only holds the latest value, so every change is also written as an append-only event
+    # (who, when, from -> to, why, from where) and logged.
+    client = request.client.host if request.client else "unknown"
+    db.add(SystemEvent(
+        component="api", severity=SystemEventSeverity.WARNING if body.active else SystemEventSeverity.INFO,
+        message=f"kill_switch {'ENGAGED' if body.active else 'released'} by {principal.name}",
+        detail={"action": "kill_switch", "was_active": was_active, "now_active": body.active, "principal": principal.name,
+                "role": principal.role.name, "reason": body.reason or None, "client": client},
+    ))
     await db.commit()
+    logger.warning("api.kill_switch_changed", principal=principal.name, was_active=was_active, now_active=body.active,
+                   reason=body.reason or None, client=client)
     return {"kill_switch": body.active, "set_by": principal.name}

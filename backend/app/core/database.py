@@ -18,6 +18,19 @@ class Base(DeclarativeBase):
 _settings = get_settings()
 _is_sqlite = _settings.database_url.startswith("sqlite")
 
+def postgres_connect_args(settings) -> dict:
+    """asyncpg session settings: a runaway query, a lock wait or a forgotten open transaction must not hold a pooled
+    connection (and its locks) forever."""
+    return {
+        "server_settings": {
+            "statement_timeout": str(settings.database_statement_timeout_ms),
+            "lock_timeout": str(settings.database_lock_timeout_ms),
+            "idle_in_transaction_session_timeout": str(settings.database_idle_in_transaction_timeout_ms),
+            "application_name": "trading-lab",
+        }
+    }
+
+
 _engine_kwargs: dict = {"pool_pre_ping": True}
 if not _is_sqlite:
     _engine_kwargs.update(
@@ -27,26 +40,37 @@ if not _is_sqlite:
         pool_recycle=_settings.database_pool_recycle_seconds,  # survive server-side idle disconnects
     )
     if _settings.database_url.startswith("postgresql+asyncpg"):
-        # A runaway query must not hold a pooled connection (and locks) forever.
-        _engine_kwargs["connect_args"] = {
-            "server_settings": {"statement_timeout": str(_settings.database_statement_timeout_ms)}
-        }
+        _engine_kwargs["connect_args"] = postgres_connect_args(_settings)
+
+def configure_sqlite_engine(sync_engine, *, wal: bool = True) -> None:
+    """Make SQLite behave like the production database for transactions.
+
+    * foreign keys are enforced (SQLite ignores them by default);
+    * WAL + busy_timeout: API and worker are separate processes sharing the file;
+    * explicit BEGIN (SQLAlchemy's documented recipe for pysqlite/aiosqlite). Without it the driver does not
+      emit BEGIN before a SAVEPOINT, so RELEASE of the outermost per-agent savepoint silently COMMITS the
+      whole transaction: "rolled back" work persisted and fenced-off workers could not be rolled back.
+    """
+
+    @event.listens_for(sync_engine, "connect")
+    def _on_connect(dbapi_connection, connection_record):
+        dbapi_connection.isolation_level = None  # we emit BEGIN ourselves (see _on_begin)
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        if wal:
+            cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+
+    @event.listens_for(sync_engine, "begin")
+    def _on_begin(conn):
+        conn.exec_driver_sql("BEGIN")
+
 
 engine = create_async_engine(_settings.database_url, **_engine_kwargs)
 
 if _is_sqlite:
-    # SQLite disables foreign-key enforcement by default; the schema relies
-    # on FKs, so turn it on for every new DBAPI connection.
-    @event.listens_for(engine.sync_engine, "connect")
-    def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        # API and worker are separate processes sharing this file: WAL lets
-        # readers proceed during a write and busy_timeout turns transient
-        # lock contention into a short wait instead of "database is locked".
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=5000")
-        cursor.close()
+    configure_sqlite_engine(engine.sync_engine)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

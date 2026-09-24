@@ -159,6 +159,19 @@ class StrategyDNA(BaseModel):
             raise ValueError("direction_mode='both' requires short_entry_rules")
         return self
 
+    def behavioural_problems(self) -> list[str]:
+        """Combinations the schema ACCEPTS but that silently do nothing (or something surprising) at runtime. Enforced
+        on every CREATION path (breeding gate, extinction founders, researcher) - deliberately NOT a model validator, so
+        DNA persisted before this rule existed keeps loading (and keeps its open positions protected)."""
+        problems: list[str] = []
+        if self.trailing_stop.enabled and self.trailing_stop.trail_pct <= 0:
+            problems.append("trailing_stop.enabled with trail_pct=0 never trails (a dead switch)")
+        if self.short_exit_rules is not None and self.direction_mode != "both":
+            problems.append("short_exit_rules is only used when direction_mode == 'both'")
+        if self.take_profit.enabled and self.take_profit.method == "risk_reward_multiple" and not self.stop_loss.enabled:
+            problems.append("a risk_reward_multiple take_profit needs an enabled stop_loss to measure risk against")
+        return problems
+
     @field_validator("indicators")
     @classmethod
     def _unique_indicator_names(cls, v: list[IndicatorConfig]) -> list[IndicatorConfig]:
@@ -166,20 +179,6 @@ class StrategyDNA(BaseModel):
         if len(names) != len(set(names)):
             raise ValueError("duplicate indicator configuration in DNA")
         return v
-
-
-class StrategyIdentity(BaseModel):
-    """Versioning/lineage metadata that travels alongside a StrategyDNA
-    payload but is not itself part of the DNA (spec section 10)."""
-
-    strategy_id: uuid.UUID
-    strategy_version: int = Field(ge=1)
-    parent_strategy_id: uuid.UUID | None = None
-    generation: int = Field(ge=1)
-    mutation_id: uuid.UUID | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    model_config = {"extra": "forbid"}
 
 
 class StrategyCandidate(BaseModel):

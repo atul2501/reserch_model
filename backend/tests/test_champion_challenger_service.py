@@ -14,8 +14,8 @@ from tests.helpers_agents import add_promotion_evidence
 from sqlalchemy import select
 
 from app.api.routes.champion_challenger import list_challengers
+from app.core.config import get_settings
 from app.evolution.champion_challenger_service import (
-    MIN_OBSERVATION_DAYS,
     advance_pipeline_stage,
     latest_challenger_evaluation,
 )
@@ -27,6 +27,8 @@ from app.models.regime_validation import RegimeValidationReport
 from app.models.stage_metrics import StageMetrics
 from app.models.strategy import Strategy, StrategyVersion
 from app.schemas.strategy_dna import Condition, RuleSet, StrategyDNA
+
+MIN_OBSERVATION_DAYS = get_settings().champion_min_observation_days   # the CONFIGURED window, not a constant
 
 
 async def _seed_version(
@@ -84,8 +86,7 @@ async def test_candidate_advances_to_validation_with_backtest_metrics(db_session
         StageMetrics(
             strategy_version_id=version.id, stage=StrategyStage.BACKTEST,
             net_return_pct=0.15, max_drawdown_pct=0.05, win_rate=0.6, profit_factor=1.8,
-            trade_count=120, computed_at=datetime.now(timezone.utc),
-        )
+            trade_count=120, computed_at=datetime.now(timezone.utc), observed_days=14.0)
     )
     await db_session.commit()
 
@@ -208,8 +209,7 @@ async def test_champion_comparison_promotes_via_the_single_real_promotion_gate(d
             strategy_version_id=version.id, stage=StrategyStage.PAPER,
             net_return_pct=0.30, max_drawdown_pct=0.05, win_rate=0.7, profit_factor=2.0,
             trade_count=150, oos_score=0.8, walk_forward_consistency=0.8,
-            computed_at=datetime.now(timezone.utc),
-        )
+            computed_at=datetime.now(timezone.utc), observed_days=14.0)
     )
     db_session.add(
         Agent(
@@ -242,8 +242,7 @@ async def test_fragile_regime_classification_tightens_criteria_without_hard_veto
             strategy_version_id=version.id, stage=StrategyStage.PAPER,
             net_return_pct=0.30, max_drawdown_pct=0.05, win_rate=0.7, profit_factor=2.0,
             trade_count=150, oos_score=0.8, walk_forward_consistency=0.8,
-            computed_at=datetime.now(timezone.utc),
-        )
+            computed_at=datetime.now(timezone.utc), observed_days=14.0)
     )
     db_session.add(
         Agent(
@@ -311,8 +310,7 @@ async def test_promotion_never_mutates_strategy_version_dna(db_session):
             strategy_version_id=version.id, stage=StrategyStage.PAPER,
             net_return_pct=0.30, max_drawdown_pct=0.05, win_rate=0.7, profit_factor=2.0,
             trade_count=150, oos_score=0.8, walk_forward_consistency=0.8,
-            computed_at=datetime.now(timezone.utc),
-        )
+            computed_at=datetime.now(timezone.utc), observed_days=14.0)
     )
     db_session.add(
         Agent(

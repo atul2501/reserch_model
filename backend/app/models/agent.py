@@ -45,6 +45,9 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     realized_pnl: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     fees_paid: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     funding_paid: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Loss a close could not be covered by the account (the balance is floored at 0, never hidden): see
+    # app/execution/accounting.py. Cash identity for a flat agent: balance == starting + realized_pnl + bad_debt.
+    bad_debt: Mapped[float] = mapped_column(Float, default=0.0, nullable=False, server_default="0")
 
     peak_equity: Mapped[float] = mapped_column(Float, nullable=False)
     max_drawdown: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
@@ -58,6 +61,8 @@ class Agent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     daily_trade_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_trade_time: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     cooldown_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # DEPRECATED: the 'professional' tier classifier was removed (it was never called). The column stays because the API
+    # response and dashboard still carry the field; it is always False.
     is_professional: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Highest equity multiple milestone reached (2, 3, 5, 10, ...). Section 16:

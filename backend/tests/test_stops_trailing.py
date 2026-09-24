@@ -13,6 +13,8 @@ from app.models.trading import Order, Position, Trade
 from app.schemas.strategy_dna import StopLossConfig, TakeProfitConfig, TrailingStopConfig
 from tests.helpers_agents import cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 def L(**kw):
     base = dict(side=Side.LONG, entry_price=100.0, stop_loss_price=98.0, take_profit_price=104.0, trailing_distance=None,
@@ -144,3 +146,43 @@ async def test_gap_down_fills_at_the_open_in_the_worker(db_session):
     trade = (await db_session.execute(select(Trade).where(Trade.agent_id == agent.id))).scalar_one()
     assert trade.exit_reason == "stop_loss"
     assert trade.exit_price < pos.stop_loss_price - 2.0                          # filled near 95 (open), not at ~99
+
+
+# --- same-bar extreme (worst-case intrabar path) for trailing stops ---------------------------------------------------
+
+
+def test_default_rule_counts_the_current_bars_own_rally_when_it_trades_back_through_the_stop():
+    lv = L(stop_loss_price=None, take_profit_price=None, trailing_distance=2.0, peak_price=100.0)
+    bar = Bar(100.0, 106.0, 103.5, 104.0)      # rallies to 106 (stop -> 104) and trades back down to 103.5
+    assert evaluate_bar(lv, bar) is None                                             # legacy: prior peak (100 -> 98) => no exit
+    hit = evaluate_bar(lv, bar, same_bar_extreme=True)
+    assert hit.exit_reason == "trailing_stop" and hit.trigger_price == pytest.approx(104.0)
+
+
+def test_same_bar_extreme_can_arm_trailing_within_the_bar_that_produced_the_rally():
+    lv = L(stop_loss_price=None, take_profit_price=None, trailing_distance=1.0, trailing_activation_pct=2.0, peak_price=100.0)
+    bar = Bar(100.0, 103.0, 101.5, 102.0)      # +3% rally arms trailing; stop 102.0; low 101.5 breaches it
+    assert evaluate_bar(lv, bar) is None
+    assert evaluate_bar(lv, bar, same_bar_extreme=True).exit_reason == "trailing_stop"
+
+
+def test_same_bar_extreme_short_mirrors_and_never_creates_a_phantom_exit():
+    lv = L(side=Side.SHORT, stop_loss_price=None, take_profit_price=None, trailing_distance=2.0, trough_price=100.0)
+    # a bar that only trades below the resulting stop (trough 94 -> stop 96): high 95.5 never reaches it
+    assert evaluate_bar(lv, Bar(94.5, 95.5, 94.0, 95.0), same_bar_extreme=True) is None
+    worst_case = evaluate_bar(lv, Bar(100.0, 100.5, 94.0, 95.0), same_bar_extreme=True)         # fell to 94, then back to 100.5
+    assert worst_case.exit_reason == "trailing_stop"
+    bounce = evaluate_bar(lv, Bar(100.0, 96.5, 94.0, 96.0), same_bar_extreme=True)              # trough 94 -> stop 96; high 96.5
+    assert bounce.exit_reason == "trailing_stop" and bounce.trigger_price == pytest.approx(96.0)
+
+
+def test_a_bar_that_never_reaches_the_stop_is_unaffected_by_the_mode():
+    lv = L(stop_loss_price=None, take_profit_price=None, trailing_distance=2.0, peak_price=100.0)
+    calm = Bar(100.0, 103.0, 101.5, 102.5)     # peak 103 -> stop 101; low 101.5 stays above
+    assert evaluate_bar(lv, calm) is None and evaluate_bar(lv, calm, same_bar_extreme=True) is None
+
+
+def test_production_default_is_the_conservative_rule_and_engines_honour_the_setting(monkeypatch):
+    from app.core.config import Settings
+
+    assert Settings.model_fields["trailing_stop_uses_same_bar_extreme"].default is True

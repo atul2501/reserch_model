@@ -80,7 +80,7 @@ async def test_500_agents_one_cycle_is_fast_query_bounded_and_ollama_free(db_ses
         prev = None
         for i in range(n - 12, n):                   # 12 consecutive confirmed candles
             frame = df.iloc[: i + 1]
-            ctx = compute_features(frame, "SOL", "1m")
+            ctx = compute_features(frame, "SOL", "1m").model_copy(update={"is_final": True})  # a confirmed bar
             before, t0 = len(selects), time.monotonic()
             processed = await cycle(db_session, engine_, ctx, prev, candles=frame)
             elapsed_each.append(time.monotonic() - t0)

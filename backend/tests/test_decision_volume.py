@@ -15,6 +15,8 @@ from app.models.trading import Order, Trade
 from scripts.prune_decisions import count_noop, prune_noop_decisions, strip_context
 from tests.helpers_agents import cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 @pytest.fixture(autouse=True)
 def _fast(monkeypatch):
@@ -131,5 +133,5 @@ async def test_strip_context_nulls_the_duplicated_snapshot_on_kept_rows(db_sessi
 def test_row_size_regression_guard_the_snapshot_is_not_copied_per_decision():
     import inspect
     from app.agents import decision_loop
-    src = inspect.getsource(decision_loop._process_agent)
+    src = inspect.getsource(decision_loop._process_agent_inner)
     assert "market_context=None" in src and "model_dump(mode=\"json\")" not in src.split("Decision(")[1].split(")")[0]

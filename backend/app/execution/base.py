@@ -44,6 +44,35 @@ class ExecutionResult:
 class ExecutionEngine(ABC):
     venue: ExecutionVenue
 
+    @property
+    def fill_timing(self) -> str:
+        """`immediate`: an order is filled when submitted (shadow/live: against the real book, now).
+        `next_open`: an order decided on the close of bar N is filled at the OPEN of bar N+1 (paper research model)."""
+        return "immediate"
+
+    # --- rollback-aware idempotency -------------------------------------------------------------
+    # An order id is "claimed" when an order is submitted, BEFORE the database transaction that records it
+    # commits. If that transaction (an agent's savepoint, or the whole cycle) rolls back, the id must be
+    # released again; otherwise the deterministic retry of the same candle would be refused as a duplicate
+    # (silently suppressing entries and, worse, stranding exits). Ids claimed in a transaction that
+    # commits stay claimed for good.
+    def _seen_ids(self) -> set[str]:
+        return set()  # engines with an in-process guard override this
+
+    def _track(self, agent_id: str, client_order_id: str) -> None:
+        self.__dict__.setdefault("_uncommitted", {}).setdefault(agent_id, set()).add(client_order_id)
+
+    def discard_uncommitted(self, agent_id: str | None = None) -> None:
+        """The transaction holding these orders rolled back: release their ids (one agent, or every agent)."""
+        tracked: dict[str, set[str]] = self.__dict__.setdefault("_uncommitted", {})
+        agents = list(tracked) if agent_id is None else [agent_id]
+        for a in agents:
+            self._seen_ids().difference_update(tracked.pop(a, set()))
+
+    def commit_cycle(self) -> None:
+        """The cycle's transaction committed: the claimed ids are now durable (DB unique constraint)."""
+        self.__dict__.setdefault("_uncommitted", {}).clear()
+
     @abstractmethod
     async def submit_order(self, request: ExecutionRequest) -> ExecutionResult:
         """Submits an order and returns its fill result. Implementations

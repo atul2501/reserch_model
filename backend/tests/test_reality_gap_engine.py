@@ -103,7 +103,7 @@ async def test_compute_missed_trade_stats_distinguishes_skip_reject_and_unfilled
     # 3. Approved, order filled — a successful entry, contributes to latency.
     filled_order = Order(
         agent_id=agent.id, client_order_id=f"filled-{uuid.uuid4().hex}", symbol="SOL", side=Side.LONG,
-        quantity=1.0, venue=ExecutionVenue.PAPER, status=OrderStatus.FILLED,
+        quantity=1.0, venue=ExecutionVenue.PAPER, status=OrderStatus.FILLED, filled_price=100.0, filled_quantity=1.0,
         filled_at=now + timedelta(seconds=2), latency_ms=150,
     )
     db_session.add(filled_order)
@@ -222,7 +222,7 @@ async def test_compute_live_stage_metrics_populates_cost_and_latency_fields(db_s
 
     filled_order = Order(
         agent_id=agent.id, client_order_id=f"o-{uuid.uuid4().hex}", symbol="SOL", side=Side.LONG,
-        quantity=1.0, venue=ExecutionVenue.PAPER, status=OrderStatus.FILLED, latency_ms=200,
+        quantity=1.0, venue=ExecutionVenue.PAPER, status=OrderStatus.FILLED, filled_price=100.0, filled_quantity=1.0, latency_ms=200,
     )
     db_session.add(filled_order)
     db_session.add(

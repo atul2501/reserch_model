@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from app.core.config import get_settings
 from app.models.agent import Agent
 from app.models.enums import RiskDecision, Side
 from app.schemas.strategy_dna import StrategyDNA
 
-MAX_STALE_DATA_SECONDS = 180
 ABNORMAL_VOLATILITY_ATR_PCT_THRESHOLD = 0.08  # ATR as % of price
 
 
@@ -65,7 +65,7 @@ def check_trade(inp: RiskCheckInput, *, global_max_leverage: float, global_max_p
     if not inp.council_trade_allowed:
         return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, ["council_incomplete_no_new_trades"])
 
-    if inp.market_data_age_seconds is not None and inp.market_data_age_seconds > MAX_STALE_DATA_SECONDS:
+    if inp.market_data_age_seconds is not None and inp.market_data_age_seconds > get_settings().data_stale_threshold_seconds:
         return RiskCheckResult(RiskDecision.REJECTED, 0.0, 0.0, ["stale_market_data"])
 
     if inp.equity <= 0:
@@ -101,7 +101,6 @@ def check_trade(inp: RiskCheckInput, *, global_max_leverage: float, global_max_p
     if inp.available_margin is not None:
         max_margin = min(max_margin, inp.available_margin)
     max_notional_by_fraction = max_margin * leverage
-    from app.core.config import get_settings  # local import keeps this module dependency-light
     max_notional_by_fraction = min(max_notional_by_fraction, inp.equity * get_settings().max_exposure_multiple)
     notional = min(inp.proposed_notional, max_notional_by_fraction)
     if inp.stop_distance_pct is not None and 0 < inp.stop_distance_pct <= 1.0:

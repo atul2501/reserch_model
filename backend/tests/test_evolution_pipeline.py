@@ -19,6 +19,7 @@ from app.models.stage_metrics import StageMetrics
 from app.models.strategy import AgentSnapshot, Generation, Strategy, StrategyVersion
 from app.models.adversarial import AdversarialTestReport
 from app.models.regime_validation import RegimeValidationReport
+from app.evolution.rng import derive_seed
 from app.research import dataset as ds
 from app.research.pipeline import evaluate_gates, run_research_cycle
 from app.strategies.factory import generate_population_dna
@@ -115,7 +116,7 @@ async def test_full_pipeline_produces_a_validated_next_generation_and_protects_o
     # ---- experiment registry ------------------------------------------------ #
     exp = (await db_session.execute(select(Experiment).where(Experiment.experiment_id == report.experiment_id))).scalar_one()
     epoch = (await db_session.execute(select(ResearchEpoch).where(ResearchEpoch.epoch_id == report.epoch_id))).scalar_one()
-    assert exp.status == "COMPLETED" and exp.dataset_fingerprint == epoch.dataset_fingerprint and exp.random_seed == cfg.research_seed
+    assert exp.status == "COMPLETED" and exp.dataset_fingerprint == epoch.dataset_fingerprint and exp.random_seed == derive_seed(cfg.research_seed, epoch.epoch_id, 1)
     assert exp.code_version and exp.schema_version and exp.oos_period["start_ms"] == epoch.validation_end_ms
 
     # ---- new generation: fresh $100, old one frozen, dead never revived ------- #
@@ -136,7 +137,8 @@ async def test_full_pipeline_produces_a_validated_next_generation_and_protects_o
 
     # ---- evolution events: crossover/mutation/novel with both parents recorded --- #
     events = (await db_session.execute(select(EvolutionEvent).where(EvolutionEvent.generation == 2))).scalars().all()
-    assert len(events) == N_AGENTS
+    elites = report.counts.get("elites_carried", 0)   # challengers under observation are carried forward unchanged
+    assert elites >= 1 and len(events) == N_AGENTS - elites and len(new_versions) == N_AGENTS - elites
     assert {e.event_type for e in events} <= {EvolutionEventType.CROSSOVER, EvolutionEventType.MUTATION, EvolutionEventType.NOVEL_GENERATION}
     crossovers = [e for e in events if e.event_type == EvolutionEventType.CROSSOVER]
     assert crossovers and all(e.parent_strategy_version_id and e.parent_strategy_version_id_2 for e in crossovers)
@@ -183,9 +185,13 @@ async def test_pipeline_uses_a_seeded_rng_so_children_are_reproducible(db_sessio
                                                      rng=random.Random(cfg.research_seed))
         versions = (await db_session.execute(select(StrategyVersion).where(StrategyVersion.id.in_(res.strategy_version_ids)))).scalars().all()
         outs.append(sorted(str(v.dna) for v in versions))
+        strategy_ids = {v.strategy_id for v in versions}
         for v in versions:                      # clean between the two runs
             await db_session.execute(EvolutionEvent.__table__.delete().where(EvolutionEvent.child_strategy_version_id == v.id))
             await db_session.delete(v)
+        await db_session.flush()
+        for sid in strategy_ids:                # seed-derived strategy codes are reproducible too, so remove the rows
+            await db_session.delete(await db_session.get(Strategy, sid))
         await db_session.commit()
     assert outs[0] == outs[1]
 

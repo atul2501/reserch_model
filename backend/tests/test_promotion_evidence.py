@@ -87,12 +87,12 @@ async def _promo_setup(db, *, days=30):
     version.stage_entered_at = datetime.now(timezone.utc) - timedelta(days=days)
     now = datetime.now(timezone.utc)
     db.add(StageMetrics(strategy_version_id=vid, stage=StrategyStage.PAPER, net_return_pct=0.28, max_drawdown_pct=0.05, win_rate=0.6,
-                        profit_factor=2.0, trade_count=150, computed_at=now))
+                        profit_factor=2.0, trade_count=150, computed_at=now, observed_days=14.0))
     db.add(StageMetrics(strategy_version_id=vid, stage=StrategyStage.OUT_OF_SAMPLE, net_return_pct=0.1, max_drawdown_pct=0.05,
                         trade_count=40, oos_score=0.85, computed_at=now))
     db.add(StageMetrics(strategy_version_id=vid, stage=StrategyStage.WALK_FORWARD, net_return_pct=0.1, max_drawdown_pct=0.05,
                         trade_count=60, walk_forward_consistency=0.8, computed_at=now))
-    await add_promotion_evidence(db, vid, backtest_return=0.30)
+    await add_promotion_evidence(db, vid, backtest_return=0.30, with_oos=False)   # the OOS row above is the evidence
     await db.commit()
     return version
 
@@ -128,7 +128,7 @@ async def test_child_is_compared_with_its_lineage_champion_not_with_itself(db_se
     parent.champion_status = ChampionStatus.CHAMPION
     now = datetime.now(timezone.utc)
     db_session.add(StageMetrics(strategy_version_id=parent.id, stage=StrategyStage.PAPER, net_return_pct=0.2, max_drawdown_pct=0.05,
-                                profit_factor=2.0, trade_count=150, computed_at=now))
+                                profit_factor=2.0, trade_count=150, computed_at=now, observed_days=14.0))
     parent_agent.fitness = 0.9
     await db_session.commit()
 
@@ -145,7 +145,7 @@ async def test_child_is_compared_with_its_lineage_champion_not_with_itself(db_se
                          equity=100.0, peak_equity=100.0, day_start_equity=100.0, day_start_date=now.date(), fitness=0.5))
     db_session.add_all([
         StageMetrics(strategy_version_id=child.id, stage=StrategyStage.PAPER, net_return_pct=0.28, max_drawdown_pct=0.05,
-                     profit_factor=2.0, trade_count=150, computed_at=now),
+                     profit_factor=2.0, trade_count=150, computed_at=now, observed_days=14.0),
         StageMetrics(strategy_version_id=child.id, stage=StrategyStage.OUT_OF_SAMPLE, net_return_pct=0.1, max_drawdown_pct=0.05,
                      trade_count=40, oos_score=0.85, computed_at=now),
         StageMetrics(strategy_version_id=child.id, stage=StrategyStage.WALK_FORWARD, net_return_pct=0.1, max_drawdown_pct=0.05,

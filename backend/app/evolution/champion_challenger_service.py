@@ -32,11 +32,11 @@ from app.evolution.champion import PromotionCriteria
 from app.evolution.promotion_service import evaluate_and_promote
 from app.models.adversarial import AdversarialTestReport
 from app.models.champion_challenger import ChallengerEvaluation
-from app.models.enums import StrategyStage
+from app.models.enums import ChampionStatus, StrategyStage
 from app.models.regime_validation import RegimeValidationReport
 from app.models.strategy import StrategyVersion
 
-MIN_OBSERVATION_DAYS = 14  # matches promotion_service.MIN_STAGE_DAYS's existing track-record convention
+# The observation window is `PromotionCriteria.min_observation_days` (CHAMPION_MIN_OBSERVATION_DAYS), never a constant here.
 
 _LIVE_DATA_STAGES = (
     StrategyStage.PAPER, StrategyStage.SHADOW, StrategyStage.SMALL_LIVE, StrategyStage.APPROVED_LIVE,
@@ -72,6 +72,7 @@ async def advance_pipeline_stage(
     if version is None:
         raise ValueError(f"strategy_version {strategy_version_id} not found")
 
+    criteria = criteria or PromotionCriteria.from_settings()
     previous = await latest_challenger_evaluation(db, strategy_version_id)
     current_stage = previous.pipeline_stage if previous is not None else "candidate"
 
@@ -114,7 +115,7 @@ async def advance_pipeline_stage(
             next_stage = "observation"
 
     elif current_stage == "observation":
-        required_days = min_observation_days or MIN_OBSERVATION_DAYS
+        required_days = min_observation_days if min_observation_days is not None else criteria.min_observation_days
         days_observed = (now - previous.entered_stage_at).days if previous else 0
         if days_observed < required_days:
             blocking_reasons.append(f"observation_track_record {days_observed}d < required {required_days}d")
@@ -123,7 +124,7 @@ async def advance_pipeline_stage(
 
     elif current_stage == "champion_comparison":
         adjusted_criteria, advisory = await _build_advisory_criteria(
-            db, strategy_version_id, criteria or PromotionCriteria()
+            db, strategy_version_id, criteria
         )
         metrics_snapshot["advisory"] = advisory
         decision = await evaluate_and_promote(db, strategy_version_id, stage=promotion_stage, criteria=adjusted_criteria)
@@ -138,12 +139,18 @@ async def advance_pipeline_stage(
         strategy_version_id=strategy_version_id,
         pipeline_stage=next_stage,
         entered_stage_at=now if next_stage != current_stage else (previous.entered_stage_at if previous else now),
-        min_observation_days_required=MIN_OBSERVATION_DAYS if next_stage == "observation" else None,
+        min_observation_days_required=criteria.min_observation_days if next_stage == "observation" else None,
         metrics_snapshot=metrics_snapshot,
         blocking_reasons=blocking_reasons,
         computed_at=now,
     )
     db.add(row)
+    # The pipeline stage is REAL state: it drives which versions are carried forward (elitism) and which are never
+    # parents again.
+    if next_stage == "challenger" and version.champion_status is None:
+        version.champion_status = ChampionStatus.CHALLENGER
+    elif next_stage == "rejected" and version.champion_status != ChampionStatus.CHAMPION:
+        version.champion_status = ChampionStatus.REJECTED
     return row
 
 

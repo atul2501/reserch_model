@@ -3,13 +3,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
+from collections import Counter
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import metrics
+from starlette.background import BackgroundTask
+
+from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal, get_db
 from app.core.runtime_status import WORKER, compute_system_status, read_status
 from app.core.security import Principal, Role, require_role
@@ -19,6 +24,34 @@ from app.models.enums import AgentStatus
 from app.models.trading import Order, Trade
 
 router = APIRouter(tags=["status"])
+
+_active_streams: Counter[str] = Counter()
+
+
+class _StreamSlot:
+    """One concurrent-SSE slot; release() is idempotent (generator finally + response background task)."""
+
+    def __init__(self, principal: str) -> None:
+        self.principal = principal
+        self._released = False
+        _active_streams[principal] += 1
+
+    def release(self) -> None:
+        if not self._released:
+            self._released = True
+            _active_streams[self.principal] -= 1
+            if _active_streams[self.principal] <= 0:
+                del _active_streams[self.principal]
+
+
+def _acquire_stream_slot(principal: str) -> _StreamSlot:
+    settings = get_settings()
+    if sum(_active_streams.values()) >= settings.api_max_sse_streams or (
+        _active_streams[principal] >= settings.api_max_sse_streams_per_principal
+    ):
+        metrics.inc("sse_rejected")
+        raise HTTPException(status_code=429, detail="too many concurrent streams", headers={"Retry-After": "30"})
+    return _StreamSlot(principal)
 
 
 @router.get("/api/system/status")
@@ -74,27 +107,40 @@ async def prometheus_metrics(db: AsyncSession = Depends(get_db), _: Principal = 
 
 
 @router.get("/api/stream")
-async def stream(request: Request, _: Principal = Depends(require_role(Role.VIEWER)), interval: float = 2.0, max_events: int | None = None):
+async def stream(request: Request, principal: Principal = Depends(require_role(Role.VIEWER)), interval: float = 2.0, max_events: int | None = None):
     """Server-Sent Events: a `status` event every `interval` seconds (worker
     heartbeat, last confirmed candle, last cycle, cycle latency, data freshness,
     Ollama health), and a `cycle` event whenever a new candle has been processed.
     Fetch-based clients send the API key as a header (EventSource cannot)."""
     interval = max(0.5, min(interval, 30.0))
+    slot = _acquire_stream_slot(principal.name)
+    max_age = get_settings().api_sse_max_age_seconds
+    started = time.monotonic()
 
     async def gen():
-        last_cycle = None
-        sent = 0
-        while not await request.is_disconnected():
-            async with AsyncSessionLocal() as db:
-                status = await compute_system_status(db)
-            cycle = (status.get("worker") or {}).get("last_cycle") or {}
-            if cycle.get("cycle_id") and cycle["cycle_id"] != last_cycle:
-                last_cycle = cycle["cycle_id"]
-                yield f"event: cycle\nid: {last_cycle}\ndata: {json.dumps(cycle)}\n\n"
-            yield f"event: status\ndata: {json.dumps(status, default=str)}\n\n"
-            sent += 1
-            if max_events is not None and sent >= max_events:
-                return
-            await asyncio.sleep(interval)
+        try:
+            last_cycle = None
+            sent = 0
+            while not await request.is_disconnected():
+                # Auth is checked at connect; bound how long one authorization can be used.
+                if time.monotonic() - started > max_age:
+                    yield "event: close\ndata: {\"reason\": \"max_age\"}\n\n"
+                    return
+                async with AsyncSessionLocal() as db:
+                    status = await compute_system_status(db)
+                cycle = (status.get("worker") or {}).get("last_cycle") or {}
+                if cycle.get("cycle_id") and cycle["cycle_id"] != last_cycle:
+                    last_cycle = cycle["cycle_id"]
+                    yield f"event: cycle\nid: {last_cycle}\ndata: {json.dumps(cycle)}\n\n"
+                yield f"event: status\ndata: {json.dumps(status, default=str)}\n\n"
+                sent += 1
+                if max_events is not None and sent >= max_events:
+                    return
+                await asyncio.sleep(interval)
+        finally:
+            slot.release()
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    return StreamingResponse(
+        gen(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        background=BackgroundTask(slot.release),
+    )

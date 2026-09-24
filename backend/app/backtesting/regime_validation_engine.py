@@ -43,16 +43,36 @@ class RegimeStats:
     win_rate: float | None
     max_drawdown_pct: float
     expectancy: float | None
+    # False for a regime in which the strategy made no trade at all: it is reported (not silently absent) so the
+    # coverage of the validation is visible - "untested in HIGH_VOLATILITY" is different from "fine in it".
+    observed: bool = True
 
 
-def compute_regime_breakdown_backtest(result: BacktestResult) -> dict[str, RegimeStats]:
-    """Groups a backtest's trades by the regime active when each one
-    closed (BacktestTrade.exit_regime, stamped by run_backtest)."""
+def _all_regimes() -> list[str]:
+    from app.models.enums import MarketRegime
+
+    return [r.value for r in MarketRegime]
+
+
+def _unobserved() -> RegimeStats:
+    return RegimeStats(trade_count=0, pnl=0.0, roi=None, profit_factor=None, win_rate=None, max_drawdown_pct=0.0,
+                       expectancy=None, observed=False)
+
+
+def compute_regime_breakdown_backtest(results: "BacktestResult | list[BacktestResult]") -> dict[str, RegimeStats]:
+    """Groups backtest trades by the regime they were ENTERED in (BacktestTrade.entry_regime: the market condition
+    that produced the decision), across every supplied slice (train AND validation), and reports EVERY regime -
+    those without a single trade appear as `observed=False` rows."""
+    results = results if isinstance(results, list) else [results]
     buckets: dict[str, list[float]] = {}
-    for trade in result.trades:
-        regime = trade.exit_regime or "UNKNOWN"
-        buckets.setdefault(regime, []).append(trade.net_pnl)
-    return {regime: _regime_stats_from_pnls(pnls, result.starting_equity) for regime, pnls in buckets.items()}
+    for result in results:
+        for trade in result.trades:
+            regime = trade.entry_regime or trade.exit_regime or "UNKNOWN"
+            buckets.setdefault(regime, []).append(trade.net_pnl)
+    base = results[0].starting_equity if results else 0.0
+    out = {r: _unobserved() for r in _all_regimes()}
+    out.update({regime: _regime_stats_from_pnls(pnls, base) for regime, pnls in buckets.items()})
+    return out
 
 
 async def compute_regime_breakdown_live(
@@ -145,7 +165,7 @@ async def run_and_persist_regime_validation(
     db: AsyncSession,
     strategy_version_id: uuid.UUID,
     *,
-    backtest_result: BacktestResult | None = None,
+    backtest_result: "BacktestResult | list[BacktestResult] | None" = None,
     stage: StrategyStage | None = None,
     min_trades_per_regime: int = 10,
     robust_min_positive_regimes_pct: float = 0.7,
@@ -172,11 +192,16 @@ async def run_and_persist_regime_validation(
         strategy_version_id=strategy_version_id,
         per_regime={regime: asdict(stats) for regime, stats in per_regime.items()},
         classification=classification,
-        classification_reasoning=reasoning,
+        classification_reasoning=reasoning + _coverage_note(per_regime),
         computed_at=datetime.now(timezone.utc),
     )
     db.add(report)
     return report
+
+
+def _coverage_note(per_regime: dict[str, RegimeStats]) -> list[str]:
+    missing = sorted(r for r, s in per_regime.items() if not s.observed and r in set(_all_regimes()))
+    return [f"untested regimes (no trades): {', '.join(missing)}"] if missing and len(missing) < len(_all_regimes()) else []
 
 
 def _regime_stats_from_pnls(pnls_in_order: list[float], base_equity: float) -> RegimeStats:

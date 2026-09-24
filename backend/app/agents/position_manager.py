@@ -17,9 +17,13 @@ docs/architecture.md, tested in tests/test_stops_trailing.py):
   3. GAPS: if the bar OPENS beyond an adverse level, the exit fills at the
      OPEN (worse than the level), never at the level. A take-profit limit
      fills at its level (no price improvement is credited on a gap up).
-  4. Trailing stops trail the peak/trough of PRIOR bars only; the current
-     bar's own extreme is added to the peak AFTER the exit check (no same-bar
-     look-ahead), and trailing only arms once price has moved
+  4. Trailing stops trail the peak/trough. With `same_bar_extreme=True` (the
+     research default, settings.trailing_stop_uses_same_bar_extreme) the
+     current bar's own extreme counts: a bar that both extends the peak and
+     trades back through the resulting stop is assumed to have rallied FIRST
+     (the worst case for the trade, consistent with rule 1). With False only
+     PRIOR bars' peak counts (optimistic: a stop can never tighten within the
+     bar that produced the rally). Trailing only arms once price has moved
      `activation_pct` in favour.
   5. Exits are reduce-only orders: stops/liquidations slip more than markets,
      take-profit limits pay no slippage and the maker fee.
@@ -75,9 +79,14 @@ def trailing_is_active(levels: PositionLevels) -> bool:
     return levels.trough_price is not None and levels.trough_price <= levels.entry_price * (1 - levels.trailing_activation_pct / 100)
 
 
-def evaluate_bar(levels: PositionLevels, bar: Bar) -> ProtectiveTrigger | None:
+def evaluate_bar(levels: PositionLevels, bar: Bar, *, same_bar_extreme: bool = False) -> ProtectiveTrigger | None:
     long = levels.side == Side.LONG
     adverse: list[tuple[str, float]] = []
+    if same_bar_extreme:
+        # Conservative path assumption: the bar's favourable extreme happened before its adverse one.
+        levels = PositionLevels(**{**levels.__dict__,
+                                   "peak_price": max(levels.peak_price if levels.peak_price is not None else levels.entry_price, bar.high),
+                                   "trough_price": min(levels.trough_price if levels.trough_price is not None else levels.entry_price, bar.low)})
 
     def hit(level: float) -> bool:
         return bar.low <= level if long else bar.high >= level

@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from app.api.routes import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.security import validate_api_keys_config
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,13 @@ async def lifespan(app: FastAPI):
     configure_logging()
     settings = get_settings()
     logger.info("app.startup", trading_mode=settings.trading_mode.value, agent_count=settings.agent_count)
-    if settings.api_auth_required and not settings.api_keys:
+    try:
+        validate_api_keys_config(settings)
+    except ValueError as exc:
+        # Refuse to start rather than serve 500s (or, worse, run half-configured).
+        logger.error("app.api_keys_invalid", detail=str(exc))
+        raise RuntimeError(f"invalid API_KEYS configuration: {exc}") from exc
+    if settings.api_auth_required and not settings.api_keys.get_secret_value():
         logger.warning("app.api_auth_no_keys_configured", detail="every protected request will be rejected; set API_KEYS")
     if not settings.api_auth_required:
         logger.warning("app.api_auth_disabled", detail="API_AUTH_REQUIRED=false — development only")
@@ -43,6 +50,10 @@ def create_app() -> FastAPI:
         title="Autonomous Evolutionary Crypto Trading Laboratory",
         version="0.1.0",
         lifespan=lifespan,
+        # The API surface is not public information: docs only when explicitly enabled.
+        docs_url="/docs" if settings.expose_api_docs else None,
+        redoc_url="/redoc" if settings.expose_api_docs else None,
+        openapi_url="/openapi.json" if settings.expose_api_docs else None,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -59,6 +70,14 @@ def create_app() -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault("Cache-Control", "no-store")
+        # The dashboard is one self-contained page (inline script/style, same-origin API only).
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        )
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 
     app.include_router(api_router)

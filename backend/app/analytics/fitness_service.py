@@ -23,7 +23,7 @@ from app.analytics.performance_metrics_engine import compute_trade_stats
 from app.analytics.performance_metrics_service import compute_and_persist_agent_performance_metric
 from app.models.adversarial import AdversarialTestReport
 from app.models.agent import Agent
-from app.models.enums import StrategyStage
+from app.models.enums import AgentStatus, StrategyStage
 from app.models.metrics import FitnessScore
 from app.models.regime_validation import RegimeValidationReport
 from app.models.stage_metrics import StageMetrics
@@ -53,6 +53,13 @@ async def _latest_by_version(db: AsyncSession, model, version_ids, extra_filter=
     return latest
 
 
+def _overlaps(trade: Trade, window_ms: tuple[int, int]) -> bool:
+    lo, hi = window_ms
+    opened = int(trade.opened_at.timestamp() * 1000)
+    closed = int(trade.closed_at.timestamp() * 1000)
+    return closed >= lo and opened <= hi
+
+
 def _daily_consistency(trades: list[Trade]) -> float | None:
     by_day: dict = defaultdict(float)
     for t in trades:
@@ -68,11 +75,15 @@ async def compute_and_persist_agent_fitness(
     generation: int,
     weights: FitnessWeights | None = None,
     correlation_by_agent: dict[uuid.UUID, float] | None = None,
+    oos_window_ms: tuple[int, int] | None = None,
 ) -> FitnessSummary:
     """For every Agent in `generation`: persists a PerformanceMetric snapshot,
     builds FitnessInputs (paper results + VALIDATION OOS + walk-forward +
     regime + adversarial + correlation), calls compute_fitness, persists a
-    FitnessScore row and writes the result onto Agent.fitness. Caller commits."""
+    FitnessScore row and writes the result onto Agent.fitness. Caller commits.
+
+    `oos_window_ms` = the sealed OOS holdout's (start, end): any paper trade whose life overlaps it is EXCLUDED, so
+    selection can never be influenced by performance during the protected period."""
     weights = weights or FitnessWeights.from_settings()
     agents = (await db.execute(select(Agent).where(Agent.generation == generation))).scalars().all()
     if not agents:
@@ -86,6 +97,8 @@ async def compute_and_persist_agent_fitness(
     for t in (
         await db.execute(select(Trade).where(Trade.agent_id.in_(agent_ids)).order_by(Trade.closed_at))
     ).scalars().all():
+        if oos_window_ms is not None and _overlaps(t, oos_window_ms):
+            continue
         trades_by_agent[t.agent_id].append(t)
     backtest_rows = await _latest_by_version(db, StageMetrics, version_ids, StageMetrics.stage == StrategyStage.BACKTEST)
     wfo_rows = await _latest_by_version(db, StageMetrics, version_ids, StageMetrics.stage == StrategyStage.WALK_FORWARD)
@@ -124,6 +137,7 @@ async def compute_and_persist_agent_fitness(
             adversarial_robustness=adversarial.robustness_score if adversarial is not None else None,
             starting_balance=agent.starting_balance,
             daily_consistency=_daily_consistency(trades),
+            dead=agent.status == AgentStatus.DEAD,
         )
         result = compute_fitness(inputs, weights)
         db.add(

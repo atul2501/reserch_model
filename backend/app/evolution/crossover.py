@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import random
 
+from app.evolution.rng import derived_rng
+
 from app.schemas.strategy_dna import StrategyDNA
 
 
 def crossover(parent_a: StrategyDNA, parent_b: StrategyDNA, rng: random.Random | None = None) -> StrategyDNA:
-    rng = rng or random.Random()
+    rng = rng or derived_rng(parent_a, parent_b)
     a, b = parent_a.model_dump(), parent_b.model_dump()
 
     child = dict(a if rng.random() < 0.5 else b)  # base structure (family, rules, indicators) from one parent

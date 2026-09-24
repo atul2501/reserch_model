@@ -80,12 +80,19 @@ async def test_database_constraint_is_the_final_arbiter_for_oos_reuse(db_session
     await db_session.rollback()
 
 
-async def test_a_new_dataset_epoch_opens_a_fresh_oos_slice(db_session):
+async def test_only_an_explicit_renewal_opens_a_fresh_oos_slice(db_session):
     c, epoch, version = await _setup(db_session)
     await evaluate_oos_once(db_session, version, epoch, c)
     await db_session.commit()
-    c2 = candles(1500, seed=22, drift=0.01)          # later, different data = different epoch
-    epoch2, _ = await ds.get_or_create_epoch(db_session, c2, symbol="SOL", timeframe="1m")
+    c2 = candles(1500, seed=22, drift=0.01)          # different / later data ...
+    same, created = await ds.get_or_create_epoch(db_session, c2, symbol="SOL", timeframe="1m")
+    assert not created and same.dataset_fingerprint == epoch.dataset_fingerprint     # ... does NOT re-open the holdout
+    with pytest.raises(OosAlreadyConsumedError):
+        await evaluate_oos_once(db_session, version, same, c)
+    await db_session.rollback()
+    await db_session.refresh(version)
+    await db_session.refresh(epoch)
+    epoch2 = await ds.renew_epoch(db_session, c2, symbol="SOL", timeframe="1m", reason="operator refresh")
     again = await evaluate_oos_once(db_session, version, epoch2, c2)
     assert again.dataset_fingerprint == epoch2.dataset_fingerprint != epoch.dataset_fingerprint
 

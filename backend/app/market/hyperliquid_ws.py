@@ -16,6 +16,11 @@ Behaviour
     are counted and dropped, never propagated
   * exact duplicate frames dropped; updates for a bar that is more than one
     interval behind the newest are dropped as out-of-order (REST reconciles)
+  * FUTURE-dated frames (open time beyond now + tolerance), impossible close times and stale
+    frames (older than a few intervals) are dropped and must never advance ordering state, so
+    one bogus far-future frame cannot make every later real frame look "out of order"
+  * dedup/ordering state is recorded only AFTER the frame was delivered successfully, so an
+    identical retry after a failed DB write is not swallowed
   * graceful `stop()`
 """
 from __future__ import annotations
@@ -76,6 +81,11 @@ class WsStats:
     out_of_order: int = 0
     pings_sent: int = 0
     stale_reconnects: int = 0
+    future_frames: int = 0
+    stale_frames: int = 0
+    delivery_failures: int = 0
+    pongs_received: int = 0
+    last_pong_monotonic: float | None = None
     last_message_monotonic: float | None = None
     last_error: str | None = None
     newest_open_time: int | None = None
@@ -96,6 +106,9 @@ class HyperliquidWebSocket:
         stale_after: float = 90.0,
         backoff_min: float = 1.0,
         backoff_max: float = 30.0,
+        future_tolerance_ms: int = 5_000,
+        stale_frame_intervals: int = 3,
+        clock_ms: Callable[[], int] | None = None,
     ) -> None:
         self._url, self._coin, self._interval = url, coin, interval
         self._on_candles = on_candles
@@ -106,6 +119,9 @@ class HyperliquidWebSocket:
         self._connect = connect
         self._ping_interval, self._stale_after = ping_interval, stale_after
         self._backoff_min, self._backoff_max = backoff_min, backoff_max
+        self._future_tolerance_ms = future_tolerance_ms
+        self._stale_frame_ms = stale_frame_intervals * interval_ms
+        self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
         self._stop = asyncio.Event()
         self.stats = WsStats()
 
@@ -168,10 +184,20 @@ class HyperliquidWebSocket:
             logger.info("ws.subscribed", coin=self._coin, interval=self._interval)
             self.stats.last_message_monotonic = time.monotonic()
             pinger = asyncio.create_task(self._heartbeat(ws))
+            recv: asyncio.Future | None = None
             try:
                 while not self._stop.is_set():
+                    recv = asyncio.ensure_future(asyncio.wait_for(ws.recv(), timeout=self._stale_after))
+                    await asyncio.wait({recv, pinger}, return_when=asyncio.FIRST_COMPLETED)
+                    if pinger.done():
+                        # A dead heartbeat means the connection is unhealthy: reconnect, never limp on.
+                        recv.cancel()
+                        await asyncio.gather(recv, return_exceptions=True)
+                        exc = pinger.exception() if not pinger.cancelled() else None
+                        metrics.inc("ws_heartbeat_failures")
+                        raise ConnectionError(f"heartbeat failed: {exc!r}")
                     try:
-                        raw = await asyncio.wait_for(ws.recv(), timeout=self._stale_after)
+                        raw = recv.result()
                     except asyncio.TimeoutError:
                         self.stats.stale_reconnects += 1
                         metrics.inc("ws_stale_reconnects")
@@ -179,11 +205,16 @@ class HyperliquidWebSocket:
                         return
                     await self._handle(raw)
             finally:
-                pinger.cancel()
-                try:
-                    await pinger
-                except (asyncio.CancelledError, Exception):
-                    pass
+                # A cancelled session (stop()/reconnect) must not leak the in-flight recv or the pinger.
+                for task in (recv, pinger):
+                    if task is not None and not task.done():
+                        task.cancel()
+                for task in (recv, pinger):
+                    if task is not None:
+                        try:
+                            await task
+                        except (asyncio.CancelledError, Exception):
+                            pass
 
     async def _heartbeat(self, ws) -> None:
         while True:
@@ -203,13 +234,19 @@ class HyperliquidWebSocket:
             self._invalid("not_object")
             return
         channel = msg.get("channel")
-        if channel in ("pong", "subscriptionResponse"):
+        if channel == "pong":
+            self.stats.pongs_received += 1
+            self.stats.last_pong_monotonic = time.monotonic()
+            return
+        if channel == "subscriptionResponse":
             return
         if channel != "candle":
             return
         data = msg.get("data")
         items = data if isinstance(data, list) else [data]
         deliver: list[dict] = []
+        pending: list[tuple[int, tuple]] = []      # (open_time, fingerprint) recorded only after delivery
+        now_ms = self._clock_ms()
         for item in items:
             try:
                 candle = WsCandle.model_validate(item)
@@ -219,11 +256,21 @@ class HyperliquidWebSocket:
             if candle.s != self._coin or candle.i != self._interval:
                 self._invalid("wrong_market")
                 continue
-            if candle.T < candle.t or candle.h < candle.l:
+            if candle.T < candle.t or candle.h < candle.l or candle.T - candle.t > self._interval_ms:
                 self._invalid("inconsistent_ohlc")
                 continue
+            if candle.t > now_ms + self._future_tolerance_ms:
+                # A bar that has not opened yet cannot exist. Dropped WITHOUT touching newest_open_time.
+                self.stats.future_frames += 1
+                metrics.inc("ws_future_frames")
+                logger.error("ws.future_dated_frame_dropped", open_time=candle.t, now_ms=now_ms)
+                continue
+            if candle.t < now_ms - self._stale_frame_ms:
+                self.stats.stale_frames += 1     # far behind the wall clock: history is REST's job
+                metrics.inc("ws_stale_frames")
+                continue
             fp = candle.fingerprint()
-            if self.stats.recent.get(candle.t) == fp:
+            if self.stats.recent.get(candle.t) == fp or (candle.t, fp) in pending:
                 self.stats.duplicates += 1
                 metrics.inc("ws_duplicates")
                 continue
@@ -232,19 +279,24 @@ class HyperliquidWebSocket:
                 self.stats.out_of_order += 1
                 metrics.inc("ws_out_of_order")
                 continue
-            self.stats.recent[candle.t] = fp
-            if newest is None or candle.t > newest:
-                self.stats.newest_open_time = candle.t
-            if len(self.stats.recent) > 16:
-                for old in sorted(self.stats.recent)[:-8]:
-                    self.stats.recent.pop(old, None)
+            pending.append((candle.t, fp))
             deliver.append(candle.to_raw())
         if deliver:
-            self.stats.candles_delivered += len(deliver)
             try:
                 await self._on_candles(deliver)
             except Exception as exc:  # a DB hiccup must not kill the stream
+                self.stats.delivery_failures += 1
+                metrics.inc("ws_delivery_failures")
                 logger.error("ws.on_candles_failed", error=str(exc))
+                return  # nothing recorded: an identical retry frame is processed, not swallowed as a duplicate
+            self.stats.candles_delivered += len(deliver)
+            for open_time, fp in pending:
+                self.stats.recent[open_time] = fp
+                if self.stats.newest_open_time is None or open_time > self.stats.newest_open_time:
+                    self.stats.newest_open_time = open_time
+            if len(self.stats.recent) > 16:
+                for old in sorted(self.stats.recent)[:-8]:
+                    self.stats.recent.pop(old, None)
 
     def _invalid(self, reason: str) -> None:
         self.stats.invalid += 1

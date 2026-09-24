@@ -73,6 +73,8 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     stage: Mapped[StrategyStage] = mapped_column(
         SAEnum(StrategyStage, name="strategy_stage_enum"), default=StrategyStage.RESEARCH, nullable=False
     )
+    # When this version was promoted to CHAMPION (NULL otherwise) - part of the champion evidence trail.
+    promoted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     champion_status: Mapped[ChampionStatus | None] = mapped_column(
         SAEnum(ChampionStatus, name="champion_status_enum"), nullable=True
     )

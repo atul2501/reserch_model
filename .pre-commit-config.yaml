@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: secret-scan
+        name: secret scan (tracked files)
+        entry: bash -c 'cd backend && python -m scripts.secret_scan'
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -8,11 +8,23 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/home/ec2-user/reserch_model/backend
 Environment="PYTHONUNBUFFERED=1"
-# Secrets live OUTSIDE the repo (root-owned, mode 0600) — never in git.
-EnvironmentFile=-/etc/trading-lab/env
+# Secrets live OUTSIDE the repo (root-owned, mode 0600). No leading '-': a missing file must FAIL the start,
+# otherwise the service would silently boot on SQLite defaults.
+EnvironmentFile=/etc/trading-lab/env
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/home/ec2-user/reserch_model/backend/data /home/ec2-user/reserch_model/backend/logs
 ExecStart=/home/ec2-user/.venv/bin/python -m scripts.run_cycle
 Restart=always
 RestartSec=5

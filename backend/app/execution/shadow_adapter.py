@@ -114,11 +114,15 @@ class ShadowExecutionAdapter(ExecutionEngine):
             rejection_reason=reason,
         )
 
+    def _seen_ids(self) -> set[str]:
+        return self._seen
+
     async def submit_order(self, request: ExecutionRequest) -> ExecutionResult:
         # NEVER an exchange write: only the public book is read; the fill is hypothetical.
         if request.client_order_id in self._seen:
             return self._fail(request, "duplicate_client_order_id")
         self._seen.add(request.client_order_id)
+        self._track(request.agent_id, request.client_order_id)
 
         buying = (request.side == Side.LONG) != request.reduce_only     # entering long / covering short buys
         try:

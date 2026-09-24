@@ -111,7 +111,7 @@ def test_cooldown_and_daily_trade_limits_are_enforced():
     losers = [t for t in cooled.trades if t.net_pnl < 0]
     for a, b in zip(cooled.trades, cooled.trades[1:]):
         if a.net_pnl < 0:
-            assert b.entry_index - a.exit_index >= 30 - 1
+            assert b.entry_index - a.exit_index >= 30 + 1   # signal at X+30, filled one bar later
 
 
 def test_equity_curve_is_marked_to_market_so_drawdown_includes_open_losses():

@@ -21,11 +21,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from app.market.feature_engine import MIN_CANDLES_REQUIRED, InsufficientDataError, compute_features
+from app.market.feature_engine import FEATURE_WINDOW, MIN_CANDLES_REQUIRED, InsufficientDataError, compute_features
 from app.schemas.market_context import MarketContext
 from app.strategies.indicators import IndicatorSpec, compute_indicator_series
 
-FEATURE_WINDOW = 250  # trailing candles fed to the feature engine at each bar (same as live)
 
 _CONTEXT_CACHE: dict[str, tuple[list, list]] = {}
 _CONTEXT_CACHE_MAX = 24
@@ -101,8 +100,12 @@ def prepare_backtest_data(
 
 
 def extend_with_specs(data: BacktestData, specs) -> BacktestData:
-    """Adds any indicator series not yet present (idempotent)."""
+    """Adds any indicator series not yet present (idempotent; a spec whose series all exist is not recomputed)."""
+    from app.strategies.indicators import feature_keys_for
+
     for spec in set(specs):
+        if all(k in data.dyn for k in feature_keys_for(spec)):
+            continue
         for key, series in compute_indicator_series(data.candles, spec).items():
             data.dyn.setdefault(key, series.to_numpy(dtype="float64"))
     return data

@@ -163,3 +163,157 @@ async def test_wait_for_confirmed_candle_gives_up_at_deadline(db_session, monkey
     monkeypatch.setattr(svc._settings, "candle_poll_interval_seconds", 0.01)
     await svc.sync_recent_candles(db_session, lookback_candles=300)
     assert await svc.wait_for_confirmed_candle(db_session, target, deadline_seconds=0.05) is False
+
+
+# --- bind-parameter limit, confirmed-bar immutability, paged recovery, pre-execution finality ------------------
+
+
+def _raws(n: int, start: int = 0) -> list[dict]:
+    return [make_raw_candle(i) for i in range(start, start + n)]
+
+
+ASYNCPG_MAX_BINDS = 32_767   # the production driver's hard per-statement limit (SQLite's default is 32_766)
+
+
+def _spy_bind_counts(db_session, monkeypatch) -> list[int]:
+    """Records the bind-parameter count of every INSERT sent through the session, whatever the backend."""
+    from sqlalchemy.dialects import postgresql
+
+    real = db_session.execute
+    counts: list[int] = []
+
+    async def spy(stmt, *a, **kw):
+        if getattr(stmt, "is_insert", False):
+            counts.append(len(stmt.compile(dialect=postgresql.dialect()).params))
+        return await real(stmt, *a, **kw)
+
+    monkeypatch.setattr(db_session, "execute", spy)
+    return counts
+
+
+async def test_upsert_never_exceeds_the_bind_parameter_limit_of_a_single_statement(db_session, monkeypatch):
+    counts = _spy_bind_counts(db_session, monkeypatch)
+    svc = _service(FakeHyperliquid(n_candles=1), clock_after_bar(5_100))
+    written = await svc.upsert_candles(db_session, _raws(5_000))
+    assert written == 5_000
+    assert len(counts) > 1 and max(counts) <= ASYNCPG_MAX_BINDS       # 5000 rows x ~17 binds would be 85k in ONE statement
+    assert (await db_session.execute(select(func.count()).select_from(MarketCandle))).scalar_one() == 5_000
+
+
+async def test_backfill_history_pages_and_chunks_a_multi_day_range(db_session):
+    fake = FakeHyperliquid(n_candles=6_000)
+    svc = _service(fake, clock_after_bar(6_000))
+    total = await svc.backfill_history(db_session, T0, T0 + 6_000 * INTERVAL, page_bars=4_000)
+    assert total >= 6_000                      # adjacent inclusive pages may re-send one boundary bar (idempotent)
+    assert (await db_session.execute(select(func.count()).select_from(MarketCandle))).scalar_one() == 6_000
+
+
+async def test_large_gap_recovers_in_pages_and_resumes(db_session, monkeypatch):
+    counts = _spy_bind_counts(db_session, monkeypatch)
+    """A 2000-bar hole (> one 1000-bar recovery page AND > the ~1900-row bind-limit ceiling of a single INSERT)
+    must be backfilled page by page, validated for continuity, persisted, and trading must resume."""
+    from app.core.config import get_settings
+
+    fake = FakeHyperliquid(n_candles=3_400)
+    svc = _service(fake, clock_after_bar(3_400))
+    monkeypatch.setattr(get_settings(), "gap_check_window_bars", 1_200)   # sees 1000 recent + 200 pre-hole bars
+    await svc.upsert_candles(db_session, [make_raw_candle(i) for i in range(3_400) if not (400 <= i < 2_400)])
+    await db_session.commit()
+    from app.core.system_flags import set_flag
+    await set_flag(db_session, DATA_GAP_HALT, True, reason="test", set_by="test")   # a halt raised earlier by the outage
+    await db_session.commit()
+    fake.calls.clear()
+
+    report = await svc.recover_gaps(db_session)
+
+    assert len(report.missing_before) == 2_000
+    assert report.recovered and not report.halted and report.backfilled >= 2_000
+    assert len([c for c in fake.calls if c[0] == "candles"]) >= 2          # paged, not one giant request
+    assert await svc.detect_gaps(db_session) == []                          # continuity validated after persisting
+    assert DATA_GAP_HALT not in await active_flags(db_session)              # ... and trading resumes
+    assert (await db_session.execute(select(func.count()).select_from(MarketCandle))).scalar_one() == 3_400
+    assert max(counts) <= ASYNCPG_MAX_BINDS
+
+
+async def test_gap_backfill_failure_rolls_back_and_halts(db_session):
+    fake = FakeHyperliquid(n_candles=300)
+    svc = _service(fake, clock_after_bar(299))
+    await svc.sync_recent_candles(db_session, lookback_candles=300)
+    count = lambda: db_session.execute(select(func.count()).select_from(MarketCandle))  # noqa: E731
+    total = (await count()).scalar_one()
+    ot = T0 + 150 * INTERVAL
+    row = (await db_session.execute(select(MarketCandle).where(MarketCandle.open_time == ot))).scalar_one()
+    await db_session.delete(row)
+    await db_session.commit()
+    fake.fail_candles = True
+    report = await svc.recover_gaps(db_session)
+    assert report.halted and DATA_GAP_HALT in await active_flags(db_session)
+    # the session is usable afterwards (no aborted transaction left behind) and nothing was half-written
+    assert (await count()).scalar_one() == total - 1
+
+
+async def test_confirmed_bar_is_immutable_against_a_late_partial_frame(db_session):
+    from app.core import metrics
+
+    metrics.reset()
+    fake = FakeHyperliquid(n_candles=300)
+    svc = _service(fake, clock_after_bar(299))
+    await svc.sync_recent_candles(db_session, lookback_candles=300)
+    ot = T0 + 299 * INTERVAL
+    before = (await db_session.execute(select(MarketCandle).where(MarketCandle.open_time == ot))).scalar_one()
+    snapshot = (before.open, before.high, before.low, before.close, before.volume)
+    assert before.is_final
+
+    late = dict(fake.candles[299])                       # a late, PARTIAL (non-final) frame for the same bar
+    late.update(o="1", h="2", l="0.5", c="1.5", v="3")
+    await svc.upsert_candles(db_session, [late], now_ms=ot + 10_000)   # clock says the bar is still open
+    await db_session.refresh(before)
+    assert (before.open, before.high, before.low, before.close, before.volume) == snapshot
+    assert before.is_final is True                        # never reverts to open
+    assert metrics.counter_value("candle_revision_ignored", incoming_final="false") == 1
+
+    revised = dict(late)                                  # even a "final" REST re-fetch with different values is ignored
+    await svc.upsert_candles(db_session, [revised], now_ms=clock_after_bar(299))
+    await db_session.refresh(before)
+    assert before.close == snapshot[3]
+    assert metrics.counter_value("candle_revision_ignored", incoming_final="true") == 1
+
+
+async def test_open_bar_is_still_updated_until_it_is_confirmed(db_session):
+    fake = FakeHyperliquid(n_candles=300)
+    now = T0 + 299 * INTERVAL + 20_000
+    svc = _service(fake, now)
+    await svc.sync_recent_candles(db_session, lookback_candles=300)
+    ot = T0 + 299 * INTERVAL
+    upd = dict(fake.candles[299])
+    upd.update(c="123.45")
+    await svc.upsert_candles(db_session, [upd], now_ms=now)
+    row = (await db_session.execute(select(MarketCandle).where(MarketCandle.open_time == ot))).scalar_one()
+    assert row.close == 123.45 and row.is_final is False
+
+
+async def test_funding_context_can_still_attach_to_a_confirmed_bar(db_session):
+    fake = FakeHyperliquid(n_candles=300)
+    svc = _service(fake, clock_after_bar(299))
+    await svc.upsert_candles(db_session, [fake.candles[299]])          # confirmed without funding context
+    await svc.upsert_candles(db_session, [fake.candles[299]], funding_context={"funding": "0.0001", "openInterest": "42"})
+    row = (await db_session.execute(select(MarketCandle).where(MarketCandle.open_time == T0 + 299 * INTERVAL))).scalar_one()
+    assert row.funding_rate == pytest.approx(0.0001) and row.open_interest == 42.0 and row.is_final
+
+
+async def test_verify_candle_final_gate(db_session):
+    from app.market.market_data_service import CandleNotFinalError
+
+    fake = FakeHyperliquid(n_candles=300)
+    now = T0 + 299 * INTERVAL + 20_000                                   # bar 299 still open, 298 confirmed
+    svc = _service(fake, now)
+    await svc.sync_recent_candles(db_session, lookback_candles=300)
+    good = T0 + 298 * INTERVAL
+    row = (await db_session.execute(select(MarketCandle).where(MarketCandle.open_time == good))).scalar_one()
+    await svc.verify_candle_final(db_session, good, expected_close=row.close)          # ok
+    with pytest.raises(CandleNotFinalError):
+        await svc.verify_candle_final(db_session, T0 + 299 * INTERVAL)                 # still forming
+    with pytest.raises(CandleNotFinalError):
+        await svc.verify_candle_final(db_session, T0 + 5_000 * INTERVAL)               # absent / future
+    with pytest.raises(CandleNotFinalError):
+        await svc.verify_candle_final(db_session, good, expected_close=row.close + 1)  # changed under our feet

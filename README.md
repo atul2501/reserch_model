@@ -92,8 +92,13 @@ and a 500-agent performance test.
 * Live trading is **not implemented** and must stay blocked; the launch checklist in
   [docs/security.md](docs/security.md) is entirely open.
 * Order-flow strategies use a bar-based imbalance *proxy* (no tape / L2 history is stored).
-* Paper fills use the signal-bar close; the backtester fills at the next open (a documented, measured gap).
+* Paper and backtest both fill at the next bar's open (parity is tested); SHADOW fills against the live book.
+  The backtest applies no latency drift / random rejects / partial fills (adversarial scenarios add them).
 * Shadow uses one shared book snapshot per cycle; it does not deplete liquidity between agents.
-* Council results exist only on candles where the council ran (`NOT_RUN` otherwise, by design).
-* After an outage longer than `MAX_CATCHUP_BARS` the skipped bars are recorded, not replayed.
+* The council runs on its cadence; on candles where it is not due it is explicitly *not required* (`NOT_RUN`).
+  When it is required, any failure (quorum, judge, timeout, malformed, wrong candle) blocks new entries.
+* After an outage longer than `MAX_CATCHUP_BARS` skipped bars are not *decided* on, but open positions are still
+  protected on every one of them (stop/take-profit/trailing/funding replay).
+* The sealed OOS holdout ages: research uses only data before it until an operator renews it.
+* Agent fitness still aggregates paper and shadow trades per agent (positions/orders are venue-tagged, agents are not).
 * `backend/.env` was committed in the past: **rotate all keys** and purge history (see security doc).

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import random
 
+from app.evolution.rng import derived_rng
+
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.indicators import UnknownIndicatorError, feature_keys_for, resolve_spec
 
@@ -12,7 +14,7 @@ MUTATION_RATE = 0.3  # probability any given mutable field is touched
 
 
 def mutate(dna: StrategyDNA, rng: random.Random | None = None) -> StrategyDNA:
-    rng = rng or random.Random()
+    rng = rng or derived_rng(dna)
     data = dna.model_dump()
 
     if rng.random() < MUTATION_RATE:

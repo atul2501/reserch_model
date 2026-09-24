@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Integer, Uuid, Index
+from sqlalchemy import BigInteger, Float, ForeignKey, Integer, Uuid, Index
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,5 +57,13 @@ class StageMetrics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     missed_trade_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     missed_trade_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     avg_signal_to_fill_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Observation window this snapshot covers. Stages are only comparable per unit of time: a 14-day backtest and one
+    # day of paper are not the same experiment. `observed_days` is the normaliser (a walk-forward row stores the MEAN
+    # window length, since its return is the mean per-window return; a live stage stores the mean agent lifetime).
+    observed_days: Mapped[float | None] = mapped_column(Float, nullable=True)
+    period_start_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    period_end_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    bar_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     computed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

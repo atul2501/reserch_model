@@ -9,30 +9,39 @@ from __future__ import annotations
 from app.schemas.strategy_dna import StrategyDNA
 
 
-def dna_distance(a: StrategyDNA, b: StrategyDNA) -> float:
-    """A simple, interpretable [0, 1] distance: 0 = identical family and
-    near-identical parameters, 1 = maximally different. Not a learned
-    embedding — deliberately auditable."""
-    if a.strategy_family != b.strategy_family:
-        return 1.0
+_SCALES = (20.0, 1.0, 6.0, 8.0, 1.0, 200.0, 20.0)
 
-    fields = [
-        (a.risk_profile.max_leverage, b.risk_profile.max_leverage, 20.0),
-        (a.risk_profile.max_position_fraction, b.risk_profile.max_position_fraction, 1.0),
-        (a.stop_loss.value, b.stop_loss.value, 6.0),
-        (a.take_profit.value, b.take_profit.value, 8.0),
-        (a.position_sizing.fraction_of_equity, b.position_sizing.fraction_of_equity, 1.0),
-        (a.max_trades_per_day, b.max_trades_per_day, 200.0),
-        (a.leverage_limit, b.leverage_limit, 20.0),
-    ]
-    diffs = [abs(x - y) / scale for x, y, scale in fields]
-    # Behavioural structure, not just scalar risk parameters: which indicators
-    # (with which periods) a strategy reads, and how it chooses direction.
-    specs_a, specs_b = _spec_set(a), _spec_set(b)
+
+def dna_signature(dna: StrategyDNA) -> tuple:
+    """Everything `dna_distance` needs, resolved ONCE per DNA. Resolving indicator specs is the expensive part; the
+    O(n^2) population scans below used to redo it for every pair (~125k times for 500 agents) on the event loop."""
+    return (
+        dna.strategy_family,
+        (
+            dna.risk_profile.max_leverage, dna.risk_profile.max_position_fraction, dna.stop_loss.value,
+            dna.take_profit.value, dna.position_sizing.fraction_of_equity, dna.max_trades_per_day, dna.leverage_limit,
+        ),
+        frozenset(_spec_set(dna)),
+        dna.direction_mode,
+    )
+
+
+def signature_distance(sa: tuple, sb: tuple) -> float:
+    if sa[0] != sb[0]:
+        return 1.0
+    diffs = [abs(x - y) / scale for x, y, scale in zip(sa[1], sb[1], _SCALES)]
+    specs_a, specs_b = sa[2], sb[2]
     union = specs_a | specs_b
     diffs.append(1.0 - (len(specs_a & specs_b) / len(union)) if union else 0.0)
-    diffs.append(0.0 if a.direction_mode == b.direction_mode else 1.0)
+    diffs.append(0.0 if sa[3] == sb[3] else 1.0)
     return sum(diffs) / len(diffs)
+
+
+def dna_distance(a: StrategyDNA, b: StrategyDNA) -> float:
+    """A simple, interpretable [0, 1] distance: 0 = identical family and near-identical parameters, 1 = maximally
+    different. Not a learned embedding - deliberately auditable. Behavioural structure (which indicators with which
+    periods, how direction is chosen) counts, not just scalar risk parameters."""
+    return signature_distance(dna_signature(a), dna_signature(b))
 
 
 def _spec_set(dna: StrategyDNA) -> set:
@@ -40,18 +49,30 @@ def _spec_set(dna: StrategyDNA) -> set:
     return dna_indicator_specs(dna)
 
 
-def population_diversity_score(dnas: list[StrategyDNA]) -> float:
-    """Average pairwise distance across the population. Low values (e.g.
-    < 0.15) indicate the population has homogenized and diversity pressure
-    (more mutation, novel-family injection) should be applied."""
+def population_diversity_score(dnas: list[StrategyDNA], signatures: list[tuple] | None = None) -> float:
+    """Average pairwise distance across the population. Low values (e.g. < 0.15) indicate the population has
+    homogenized and diversity pressure (more mutation, novel-family injection) should be applied."""
     if len(dnas) < 2:
         return 1.0
+    sigs = signatures if signatures is not None else [dna_signature(d) for d in dnas]
     total, count = 0.0, 0
-    for i in range(len(dnas)):
-        for j in range(i + 1, len(dnas)):
-            total += dna_distance(dnas[i], dnas[j])
+    for i in range(len(sigs)):
+        for j in range(i + 1, len(sigs)):
+            total += signature_distance(sigs[i], sigs[j])
             count += 1
     return total / count if count else 1.0
+
+
+def most_similar_pair(dnas: list[StrategyDNA], signatures: list[tuple] | None = None) -> tuple[int, int]:
+    """Indices of the least-diverse pair (O(n^2) over precomputed signatures)."""
+    sigs = signatures if signatures is not None else [dna_signature(d) for d in dnas]
+    best_i, best_j, best_distance = 0, 1, float("inf")
+    for i in range(len(sigs)):
+        for j in range(i + 1, len(sigs)):
+            d = signature_distance(sigs[i], sigs[j])
+            if d < best_distance:
+                best_i, best_j, best_distance = i, j, d
+    return best_i, best_j
 
 
 def family_distribution(dnas: list[StrategyDNA]) -> dict[str, int]:

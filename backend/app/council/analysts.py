@@ -7,12 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-import httpx
-
 from app.core.logging import get_logger
 from app.schemas.council import ANALYST_NAMES, AnalystResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient, OllamaError
+from app.services.ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -34,6 +32,7 @@ class AnalystRunResult:
     request_id: str
     latency_ms: int
     model: str
+    normalization: dict | None = None      # boundary-normalisation audit (truncations, dropped keys); None = untouched
 
 ANALYST_FOCUS = {
     "trend": "Assess directional trend strength using EMA/SMA alignment and slope. Ignore short-term noise.",
@@ -59,6 +58,7 @@ futures candle. Respond with ONLY a JSON object matching this schema:
   "key_factors": ["<factor1>", "..."],
   "invalidators": ["<what would prove this wrong>", "..."]
 }}
+key_factors and invalidators: AT MOST 10 items each, ordered MOST IMPORTANT FIRST.
 Do not include any text outside the JSON object. Be honest about uncertainty —
 low confidence and NEUTRAL are valid, useful answers."""
 
@@ -96,13 +96,16 @@ async def run_analyst(
             system_prompt=system_prompt, user_prompt=user_prompt, response_model=AnalystResponse,
             deadline_seconds=deadline_seconds,
         )
+        if response.analyst != analyst:
+            raise ValueError(f"schema validation: response is for analyst {response.analyst!r}, expected {analyst!r}")
         completed_at = datetime.now(timezone.utc)
         return AnalystRunResult(
             analyst=analyst, response=response, error=None,
             started_at=started_at, completed_at=completed_at,
             request_id=stats.request_id, latency_ms=stats.latency_ms, model=stats.model,
+            normalization=getattr(stats, "normalization", None),
         )
-    except (OllamaError, httpx.HTTPError) as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure (incl. malformed envelopes) is one abstaining analyst
         completed_at = datetime.now(timezone.utc)
         logger.error("council.analyst_failed", analyst=analyst, error=str(exc))
         return AnalystRunResult(

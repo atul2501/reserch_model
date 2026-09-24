@@ -33,7 +33,7 @@ def get_execution_engine(settings: Settings | None = None) -> ExecutionEngine:
                 "No new trades will be placed until every gate passes."
             )
         return HyperliquidLiveExecutionAdapter(
-            settings.hyperliquid_account_address, settings.hyperliquid_private_key
+            settings.hyperliquid_account_address, settings.hyperliquid_private_key.get_secret_value()
         )
 
     raise ValueError(f"unknown trading mode: {settings.trading_mode}")

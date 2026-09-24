@@ -71,6 +71,18 @@ def compute_trade_stats(net_pnls: list[float], holding_seconds: list[int]) -> Tr
     )
 
 
+# A strategy with wins and NO losing trade has an infinite profit factor. It is reported (and scored) at this cap so
+# "no losses yet" is neither treated as neutral (1.0) nor allowed to dominate a ranking with an unbounded number.
+PROFIT_FACTOR_CAP = 3.0
+
+
+def capped_profit_factor(gross_win: float, gross_loss: float) -> float | None:
+    """gross_win / gross_loss; the no-loss case is capped, and no evidence at all (no wins, no losses) is None."""
+    if gross_loss > 0:
+        return gross_win / gross_loss
+    return PROFIT_FACTOR_CAP if gross_win > 0 else None
+
+
 def _max_streaks(net_pnls: list[float]) -> tuple[int, int]:
     """Longest consecutive-win and consecutive-loss streaks, in trade order.
     Flat trades (net_pnl == 0) break both streaks."""

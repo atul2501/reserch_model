@@ -117,11 +117,6 @@ def _all_rulesets(dna: StrategyDNA):
     return (dna.entry_rules, dna.exit_rules, dna.short_entry_rules, dna.short_exit_rules)
 
 
-def referenced_features(dna: StrategyDNA) -> set[str]:
-    return (_condition_features(dna.entry_rules) | _condition_features(dna.exit_rules)
-            | _condition_features(dna.short_entry_rules) | _condition_features(dna.short_exit_rules))
-
-
 def available_feature_keys(dna: StrategyDNA) -> set[str]:
     keys = set(static_feature_names())
     for spec in dna_indicator_specs(dna):

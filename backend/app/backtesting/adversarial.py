@@ -6,6 +6,8 @@ than only ever backtesting it under benign historical data.
 from __future__ import annotations
 
 import random
+
+from app.evolution.rng import derived_rng
 import statistics
 import zlib
 from dataclasses import dataclass, field
@@ -113,7 +115,7 @@ def perturb_dna_variants(dna: StrategyDNA, n: int, rng: random.Random | None = N
     robustness testing — every listed field is touched on every variant
     (unlike mutation.py's mutate(), which only touches each field with
     probability MUTATION_RATE)."""
-    rng = rng or random.Random()
+    rng = rng or derived_rng(dna)
     variants = []
     for _ in range(n):
         data = dna.model_dump()
@@ -143,9 +145,58 @@ class ScenarioResult:
     result: BacktestResult
 
 
+@dataclass(frozen=True)
+class AdversarialConfig:
+    """Every scenario parameter. `from_settings()` is the production source; the defaults equal the historical constants."""
+
+    volatility_spike_magnitude: float = 3.0
+    gap_pct: float = -0.08
+    stale_bars: int = 20
+    extreme_move_pct: float = 0.25
+    volume_spike_magnitude: float = 5.0
+    liquidity_reduction: float = 0.05
+    missing_candle_fraction: float = 0.02
+    duplicate_candle_fraction: float = 0.02
+    execution_delay_bars: int = 3
+    partial_fill_fraction: float = 0.5
+    reject_probability: float = 0.3
+    max_acceptable_drawdown: float = 0.40
+    min_acceptable_worst_case_return: float = -0.20
+
+    @classmethod
+    def from_settings(cls, s=None) -> "AdversarialConfig":
+        from app.core.config import get_settings
+        s = s or get_settings()
+        return cls(
+            volatility_spike_magnitude=s.adversarial_volatility_spike_magnitude, gap_pct=s.adversarial_gap_pct,
+            stale_bars=s.adversarial_stale_bars, extreme_move_pct=s.adversarial_extreme_move_pct,
+            volume_spike_magnitude=s.adversarial_volume_spike_magnitude,
+            liquidity_reduction=s.adversarial_liquidity_reduction,
+            missing_candle_fraction=s.adversarial_missing_candle_fraction,
+            duplicate_candle_fraction=s.adversarial_duplicate_candle_fraction,
+            execution_delay_bars=s.adversarial_execution_delay_bars, partial_fill_fraction=s.adversarial_partial_fill_fraction,
+            reject_probability=s.adversarial_reject_probability,
+            max_acceptable_drawdown=s.adversarial_max_acceptable_drawdown,
+            min_acceptable_worst_case_return=s.adversarial_min_acceptable_worst_case_return,
+        )
+
+    def as_dict(self) -> dict:
+        return dict(self.__dict__)
+
+
+def _pct(x: float) -> str:
+    return f"{round(abs(x) * 100, 6):g}"
+
+
 @dataclass
 class AdversarialReport:
     scenario_results: list[ScenarioResult] = field(default_factory=list)
+    # Provenance: everything needed to reproduce this exact run.
+    seed: int = 0
+    scenario_config: dict = field(default_factory=dict)
+    max_drawdown_limit: float = 0.40
+    min_return_limit: float = -0.20
+    total_trades: int = 0
     # Scenario combinations that raised an unexpected error. These are FAILURES
     # of the strategy under stress (recorded and failing the suite), never
     # silently dropped from the worst-case statistics.
@@ -156,10 +207,9 @@ class AdversarialReport:
     failure_reasons: list[str] = field(default_factory=list)
 
 
-# A strategy must not exceed either bound in ANY single stress scenario, not
-# just on average. champion.py's max_drawdown=0.25 is a normal-condition
-# promotion gate; these are looser since every scenario here is deliberately
-# worse than normal conditions.
+# Fallback limits when a report carries none (hand-built reports in tests). Production runs take BOTH limits from
+# settings (`adversarial_max_acceptable_drawdown` / `adversarial_min_acceptable_worst_case_return`) and store them on
+# the report, so the pass/fail decision and the robustness normalisers can never disagree.
 MAX_ACCEPTABLE_DRAWDOWN = 0.40
 MIN_ACCEPTABLE_WORST_CASE_RETURN = -0.20
 
@@ -183,6 +233,9 @@ def run_adversarial_suite(
     max_acceptable_drawdown: float | None = None,
     min_acceptable_worst_case_return: float | None = None,
     cost_multipliers: list[tuple[float, float]] | None = None,
+    seed: int = 0,
+    config: AdversarialConfig | None = None,
+    funding: list[tuple[int, float]] | None = None,
 ) -> AdversarialReport:
     """Runs run_backtest across {stress scenario x fee/slippage multiplier x
     DNA variant} and aggregates worst-case metrics. Skips (rather than
@@ -195,26 +248,35 @@ def run_adversarial_suite(
     the same checks live/paper trading would apply. `bypass_risk_engine` is
     a test-only escape hatch for comparing against pre-risk-gating
     behavior; production call sites must never set it."""
-    rng = rng or random.Random()
+    cfg = config or AdversarialConfig()
+    # REPRODUCIBLE: with no explicit rng the DNA perturbations come from `seed`; every candle transform derives its
+    # own seed from it and the per-scenario reject stream is keyed on (scenario, variant) - so (seed, config, dataset,
+    # DNA) fully determines the report.
+    rng = rng or random.Random(seed)
     variants = [dna] + perturb_dna_variants(dna, n_dna_variants, rng)
-    max_dd_limit = max_acceptable_drawdown if max_acceptable_drawdown is not None else MAX_ACCEPTABLE_DRAWDOWN
-    min_ret_limit = min_acceptable_worst_case_return if min_acceptable_worst_case_return is not None else MIN_ACCEPTABLE_WORST_CASE_RETURN
+    max_dd_limit = max_acceptable_drawdown if max_acceptable_drawdown is not None else cfg.max_acceptable_drawdown
+    min_ret_limit = min_acceptable_worst_case_return if min_acceptable_worst_case_return is not None else cfg.min_acceptable_worst_case_return
 
     mid = len(candles) // 2
     # (name, frame, execution kwargs)
     scenarios: list[tuple[str, pd.DataFrame, dict]] = [
         ("baseline", candles, {}),
-        ("volatility_spike", inject_volatility_spike(candles, magnitude=3.0, at_index=mid), {}),
-        ("gap_down_8pct", inject_gap(candles, gap_pct=-0.08, at_index=mid), {}),
-        ("stale_period_20", inject_stale_period(candles, length=20, at_index=mid), {}),
-        ("extreme_move_down_25pct", inject_extreme_move(candles, direction="down", magnitude=0.25, at_index=mid), {}),
-        ("abnormal_volume_spike_5x", inject_abnormal_volume(candles, magnitude=5.0, at_index=mid, length=20), {}),
-        ("liquidity_reduction", inject_liquidity_reduction(candles, magnitude=0.05, at_index=mid, length=20), {}),
-        ("missing_candles_2pct", drop_random_candles(candles, 0.02, seed=1), {}),
-        ("duplicate_candles_2pct", duplicate_random_candles(candles, 0.02, seed=2), {}),
-        ("delayed_execution_3bars", candles, {"execution_delay_bars": 3}),
-        ("partial_fills_50pct", candles, {"fill_fraction": 0.5}),
-        ("rejected_or_unknown_orders_30pct", candles, {"entry_reject_probability": 0.3}),
+        ("volatility_spike", inject_volatility_spike(candles, magnitude=cfg.volatility_spike_magnitude, at_index=mid), {}),
+        (f"gap_{'down' if cfg.gap_pct < 0 else 'up'}_{_pct(cfg.gap_pct)}pct", inject_gap(candles, gap_pct=cfg.gap_pct, at_index=mid), {}),
+        (f"stale_period_{cfg.stale_bars}", inject_stale_period(candles, length=cfg.stale_bars, at_index=mid), {}),
+        (f"extreme_move_down_{_pct(cfg.extreme_move_pct)}pct",
+         inject_extreme_move(candles, direction="down", magnitude=cfg.extreme_move_pct, at_index=mid), {}),
+        (f"abnormal_volume_spike_{cfg.volume_spike_magnitude:g}x",
+         inject_abnormal_volume(candles, magnitude=cfg.volume_spike_magnitude, at_index=mid, length=20), {}),
+        ("liquidity_reduction", inject_liquidity_reduction(candles, magnitude=cfg.liquidity_reduction, at_index=mid, length=20), {}),
+        (f"missing_candles_{_pct(cfg.missing_candle_fraction)}pct",
+         drop_random_candles(candles, cfg.missing_candle_fraction, seed=seed + 1), {}),
+        (f"duplicate_candles_{_pct(cfg.duplicate_candle_fraction)}pct",
+         duplicate_random_candles(candles, cfg.duplicate_candle_fraction, seed=seed + 2), {}),
+        (f"delayed_execution_{cfg.execution_delay_bars}bars", candles, {"execution_delay_bars": cfg.execution_delay_bars}),
+        (f"partial_fills_{_pct(cfg.partial_fill_fraction)}pct", candles, {"fill_fraction": cfg.partial_fill_fraction}),
+        (f"rejected_or_unknown_orders_{_pct(cfg.reject_probability)}pct", candles,
+         {"entry_reject_probability": cfg.reject_probability}),
     ]
     fee_slippage_multipliers = list(cost_multipliers) if cost_multipliers else [(1.0, 1.0), (2.0, 3.0)]
 
@@ -226,7 +288,7 @@ def run_adversarial_suite(
             # Features are computed ONCE per scenario frame and shared by every
             # cost multiplier x DNA-variant run (variants only perturb
             # stops/sizing, never the declared indicators).
-            shared = prepare_backtest_data(stressed_candles, symbol=symbol, timeframe=timeframe, specs=specs)
+            shared = prepare_backtest_data(stressed_candles, symbol=symbol, timeframe=timeframe, specs=specs, funding=funding)
         except InsufficientDataError:
             continue  # the stress transform left too few bars for warm-up: not evaluable
         for fee_mult, slip_mult in fee_slippage_multipliers:
@@ -245,8 +307,8 @@ def run_adversarial_suite(
                         global_max_position_size=global_max_position_size,
                         global_max_drawdown=global_max_drawdown,
                         global_max_daily_loss=global_max_daily_loss,
-                        data=shared,
-                        rng=random.Random(zlib.crc32(f"{scenario_name}:{idx}".encode())),  # stable across processes
+                        data=shared, funding=funding,
+                        rng=random.Random(zlib.crc32(f"{seed}:{scenario_name}:{idx}".encode())),  # stable across processes
                         **exec_kwargs,
                     )
                 except InsufficientDataError:
@@ -264,8 +326,12 @@ def run_adversarial_suite(
         failure_reasons.append(f"worst_case_max_drawdown {worst_dd:.2%} > {max_dd_limit:.0%}")
     if worst_return < min_ret_limit:
         failure_reasons.append(f"worst_case_net_return {worst_return:.2%} < {min_ret_limit:.0%}")
+    total_trades = sum(len(r.result.trades) for r in results)
     if not results:
         failure_reasons.append("no_scenario_produced_a_result")
+    elif total_trades == 0:
+        # A strategy that never trades has no drawdown - and no evidence of robustness either. It must not "pass".
+        failure_reasons.append("strategy_never_traded_in_any_scenario")
     if errors:
         failure_reasons.append(f"{len(errors)} scenario run(s) raised errors: {errors[0]}")
 
@@ -276,6 +342,12 @@ def run_adversarial_suite(
         worst_case_net_return_pct=worst_return,
         passed=not failure_reasons,
         failure_reasons=failure_reasons,
+        seed=seed, scenario_config={**cfg.as_dict(), "max_acceptable_drawdown": max_dd_limit,
+                                    "min_acceptable_worst_case_return": min_ret_limit,
+                                    "scenarios": [name for name, _, _ in scenarios], "cost_multipliers": fee_slippage_multipliers,
+                                    "n_dna_variants": n_dna_variants, "funding_events": len(funding or []),
+                                    "risk_engine_enforced": not bypass_risk_engine},
+        max_drawdown_limit=max_dd_limit, min_return_limit=min_ret_limit, total_trades=total_trades,
     )
 
 
@@ -297,11 +369,13 @@ def compute_robustness_score(report: AdversarialReport) -> float:
     an empty report (no scenario produced a result at all)."""
     if not report.scenario_results:
         return 0.0
+    if report.scenario_config and report.total_trades == 0:
+        return 0.0   # a real suite run in which nothing ever traded: no evidence of robustness
 
-    drawdown_component = _clip01(1.0 - report.worst_case_max_drawdown_pct / MAX_ACCEPTABLE_DRAWDOWN)
-    return_component = _clip01(
-        (report.worst_case_net_return_pct - MIN_ACCEPTABLE_WORST_CASE_RETURN) / abs(MIN_ACCEPTABLE_WORST_CASE_RETURN)
-    )
+    dd_limit = report.max_drawdown_limit or MAX_ACCEPTABLE_DRAWDOWN
+    ret_limit = report.min_return_limit if report.min_return_limit else MIN_ACCEPTABLE_WORST_CASE_RETURN
+    drawdown_component = _clip01(1.0 - report.worst_case_max_drawdown_pct / dd_limit)
+    return_component = _clip01((report.worst_case_net_return_pct - ret_limit) / abs(ret_limit))
 
     groups: dict[tuple[str, float, float], list[float]] = {}
     for r in report.scenario_results:
@@ -319,3 +393,4 @@ def compute_robustness_score(report: AdversarialReport) -> float:
 
 def _clip01(value: float) -> float:
     return max(0.0, min(1.0, value))
+

@@ -80,6 +80,8 @@ do_setup() {
     echo "==> No backend/.env found, copying from .env.example (fill in OLLAMA_* before real use)"
     cp "$ROOT_DIR/.env.example" .env
   fi
+  # Secrets must never be world/group readable.
+  chmod 600 .env
 
   mkdir -p "$BACKEND_DIR/data"   # every database file lives here
   echo "==> Running migrations"

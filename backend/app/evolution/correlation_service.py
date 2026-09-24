@@ -10,6 +10,7 @@ DB I/O at that scale is not viable.
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -19,8 +20,10 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.evolution.correlation import entry_condition_similarity, exit_condition_similarity, feature_similarity
-from app.evolution.diversity import dna_distance, family_distribution, population_diversity_score
+from app.evolution.correlation import (
+    _jaccard, feature_set, ruleset_signature, ruleset_signature_similarity,
+)
+from app.evolution.diversity import dna_signature, family_distribution, population_diversity_score, signature_distance
 from app.models.agent import Agent
 from app.models.correlation import AgentCorrelation, CorrelationConvergenceSnapshot, StrategyFamilyCorrelation
 from app.models.strategy import StrategyVersion
@@ -113,42 +116,69 @@ async def compute_generation_correlation_report(
         db, agent_ids=agent_ids, bucket=bucket, lookback_days=lookback_days
     )
 
+    # The pairwise build is CPU-bound (~125k pairs for 500 agents): per-agent structures are computed ONCE, matrix
+    # lookups are O(1) numpy indexing, and the whole thing runs off the event loop (lease heartbeats keep beating).
+    return await asyncio.to_thread(
+        _build_report, generation, agent_ids, dna_by_agent_id, family_by_agent_id,
+        (direction_corr, return_corr, timing_corr, overlap_jaccard), max_strategy_correlation, top_n_pairs,
+    )
+
+
+class _Matrix:
+    """O(1) pair lookups into a (possibly missing) correlation DataFrame."""
+
+    def __init__(self, matrix: pd.DataFrame | None, agent_ids: list[uuid.UUID]) -> None:
+        self._values = None
+        if matrix is not None:
+            self._values = matrix.reindex(index=agent_ids, columns=agent_ids).to_numpy(dtype=float)
+
+    def get(self, i: int, j: int) -> float | None:
+        if self._values is None:
+            return None
+        v = self._values[i, j]
+        return None if np.isnan(v) else float(v)
+
+
+def _build_report(
+    generation: int, agent_ids: list[uuid.UUID], dna_by_agent_id: dict, family_by_agent_id: dict, matrices: tuple,
+    max_strategy_correlation: float, top_n_pairs: int,
+) -> GenerationCorrelationReport:
+    direction_m, return_m, timing_m, overlap_m = (_Matrix(m, agent_ids) for m in matrices)
+    dnas = [dna_by_agent_id[a] for a in agent_ids]
+    sigs = [dna_signature(d) for d in dnas]
+    feats = [feature_set(d) for d in dnas]
+    entries = [ruleset_signature(d.entry_rules) for d in dnas]
+    exits = [ruleset_signature(d.exit_rules) for d in dnas]
+
     pairs: list[PairCorrelation] = []
     corr_sum: dict[uuid.UUID, float] = {aid: 0.0 for aid in agent_ids}
     for i in range(len(agent_ids)):
         for j in range(i + 1, len(agent_ids)):
             id_a, id_b = agent_ids[i], agent_ids[j]
-            dna_a, dna_b = dna_by_agent_id[id_a], dna_by_agent_id[id_b]
-            dna_sim = 1.0 - dna_distance(dna_a, dna_b)
             values = {
-                "dna_similarity": dna_sim,
-                "feature_similarity": feature_similarity(dna_a, dna_b),
-                "entry_condition_similarity": entry_condition_similarity(dna_a, dna_b),
-                "exit_condition_similarity": exit_condition_similarity(dna_a, dna_b),
-                "trade_direction_correlation": _lookup(direction_corr, id_a, id_b),
-                "return_correlation": _lookup(return_corr, id_a, id_b),
-                "position_overlap": _lookup(overlap_jaccard, id_a, id_b),
-                "trade_timing_similarity": _lookup(timing_corr, id_a, id_b),
+                "dna_similarity": 1.0 - signature_distance(sigs[i], sigs[j]),
+                "feature_similarity": _jaccard(feats[i], feats[j]),
+                "entry_condition_similarity": ruleset_signature_similarity(entries[i], entries[j]),
+                "exit_condition_similarity": ruleset_signature_similarity(exits[i], exits[j]),
+                "trade_direction_correlation": direction_m.get(i, j),
+                "return_correlation": return_m.get(i, j),
+                "position_overlap": overlap_m.get(i, j),
+                "trade_timing_similarity": timing_m.get(i, j),
             }
+            composite = _composite(values)
             pairs.append(
                 PairCorrelation(
-                    agent_id_a=id_a,
-                    agent_id_b=id_b,
-                    family_a=family_by_agent_id[id_a],
-                    family_b=family_by_agent_id[id_b],
-                    dna_similarity=values["dna_similarity"],
-                    feature_similarity=values["feature_similarity"],
+                    agent_id_a=id_a, agent_id_b=id_b, family_a=family_by_agent_id[id_a], family_b=family_by_agent_id[id_b],
+                    dna_similarity=values["dna_similarity"], feature_similarity=values["feature_similarity"],
                     entry_condition_similarity=values["entry_condition_similarity"],
                     exit_condition_similarity=values["exit_condition_similarity"],
                     trade_direction_correlation=values["trade_direction_correlation"],
-                    return_correlation=values["return_correlation"],
-                    position_overlap=values["position_overlap"],
-                    trade_timing_similarity=values["trade_timing_similarity"],
-                    composite_correlation=_composite(values),
+                    return_correlation=values["return_correlation"], position_overlap=values["position_overlap"],
+                    trade_timing_similarity=values["trade_timing_similarity"], composite_correlation=composite,
                 )
             )
-            corr_sum[id_a] += pairs[-1].composite_correlation
-            corr_sum[id_b] += pairs[-1].composite_correlation
+            corr_sum[id_a] += composite
+            corr_sum[id_b] += composite
 
     mean_correlation = sum(p.composite_correlation for p in pairs) / len(pairs) if pairs else 0.0
     above_threshold_agent_ids: set[uuid.UUID] = set()
@@ -169,10 +199,10 @@ async def compute_generation_correlation_report(
     return GenerationCorrelationReport(
         generation=generation,
         pairs=pairs[:top_n_pairs],
-        population_diversity_score=population_diversity_score(list(dna_by_agent_id.values())),
+        population_diversity_score=population_diversity_score(dnas, sigs),
         mean_pairwise_correlation=mean_correlation,
         pct_agents_above_max_correlation=pct_above,
-        family_distribution=family_distribution(list(dna_by_agent_id.values())),
+        family_distribution=family_distribution(dnas),
         family_pair_correlations=family_pair_correlations,
         agent_mean_correlation={aid: total / (len(agent_ids) - 1) for aid, total in corr_sum.items()},
     )

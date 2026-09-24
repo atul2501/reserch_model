@@ -27,6 +27,11 @@ from app.schemas.market_context import (
 )
 
 MIN_CANDLES_REQUIRED = 210  # enough for a 200-period SMA/EMA plus warmup
+# The trailing window of confirmed candles fed to `compute_features` for ONE decision. The live worker, the backtest
+# (`app.backtesting.data`) and walk-forward all use this single constant: EMA seeding, rank-based volatility
+# percentiles and the window VWAP depend on the window length, so a different length in any path would make the
+# same DNA see different features on the same candles.
+FEATURE_WINDOW = 300
 
 _TIMEFRAME_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000}
 
@@ -275,3 +280,27 @@ def detect_regime(
         return RegimeState(regime=MarketRegime.RANGE, confidence=0.7)
 
     return RegimeState(regime=MarketRegime.UNCERTAIN, confidence=0.4)
+
+
+def minimal_context(row, *, symbol: str, timeframe: str) -> MarketContext:
+    """A NEUTRAL-feature context for one CONFIRMED stored candle (open/high/low/close/time only).
+
+    Used by the protective pass for bars the worker could not run a full decision on (failed attempt, poison
+    candle, skipped catch-up bar): stops, take-profit, trailing, funding and liquidation only need the bar's OHLC.
+    The regime is recorded as UNCERTAIN and no strategy signal is ever evaluated from it."""
+    close = float(row["close"])
+    open_time = int(row["open_time"])
+    return MarketContext(
+        symbol=symbol, timeframe=timeframe, candle_open_time=open_time, close_price=close,
+        candle_open=float(row["open"]), candle_high=float(row["high"]), candle_low=float(row["low"]),
+        candle_close_time=open_time + _TIMEFRAME_MS.get(timeframe, 60_000) - 1,
+        trend=TrendFeatures(ema_fast=close, ema_slow=close, sma_fast=close, sma_slow=close, ema_slope=0.0, trend_strength=0.0),
+        momentum=MomentumFeatures(rsi_14=50.0, macd=0.0, macd_signal=0.0, macd_hist=0.0, roc_10=0.0),
+        volatility=VolatilityFeatures(atr_14=0.0, realized_vol=0.0, volatility_percentile=0.5, bb_upper=close,
+                                      bb_middle=close, bb_lower=close, bb_width=0.0),
+        structure=StructureFeatures(),
+        volume=VolumeFeatures(volume_sma_20=0.0, volume_ratio=1.0, volume_spike=False, vwap=close),
+        price_action=PriceActionFeatures(body=0.0, wick_ratio=0.0, candle_range=0.0, gap=0.0, is_momentum_candle=False),
+        regime=RegimeState(regime="UNCERTAIN", confidence=0.0),
+        is_final=True,
+    )

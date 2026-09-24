@@ -250,3 +250,159 @@ async def test_concurrency_is_bounded():
 async def test_all_ollama_errors_share_a_base_class_so_callers_fail_closed():
     for exc in (OllamaAuthError, OllamaRateLimitError, OllamaTimeoutError, OllamaServerError, OllamaUnavailableError, OllamaResponseError):
         assert issubclass(exc, OllamaError)
+
+
+# --- full status matrix (spec phase 11): nothing may escape as a raw exception ---------------------------
+
+
+async def test_200_with_non_json_body_is_a_typed_response_error_not_a_crash():
+    c = make_client(lambda req: httpx.Response(200, text="<html>502 proxy error page</html>"))
+    with pytest.raises(OllamaResponseError):
+        await call(c)
+    assert metrics.counter_value("ollama_requests", outcome="malformed_envelope") == 1
+    assert c.key_health_snapshot()[0]["status"] == "healthy"   # the key itself is fine
+
+
+@pytest.mark.parametrize("body", [[1, 2], {"message": None}, {"message": {"content": None}}, {"message": {"content": "  "}}, {}])
+async def test_200_with_malformed_envelope_is_a_typed_response_error(body):
+    c = make_client(lambda req: httpx.Response(200, json=body))
+    with pytest.raises(OllamaResponseError):
+        await call(c)
+
+
+async def test_400_is_not_retried_and_is_a_typed_error():
+    calls = []
+
+    def h(req):
+        calls.append(1)
+        return httpx.Response(400, text="bad request")
+
+    c = make_client(h)
+    with pytest.raises(OllamaError):
+        await call(c)
+    assert len(calls) == 1
+
+
+async def test_408_is_retried_like_a_timeout_and_can_succeed():
+    seq = iter([httpx.Response(408), httpx.Response(200, json=OK)])
+    c = make_client(lambda req: next(seq))
+    value, stats = await call(c)
+    assert value.value == "ok" and stats.retries == 1
+
+
+@pytest.mark.parametrize("code", [500, 502, 503])
+async def test_5xx_is_retried_then_raises_a_typed_server_error(code):
+    calls = []
+
+    def h(req):
+        calls.append(1)
+        return httpx.Response(code)
+
+    c = make_client(h, retries=3)
+    with pytest.raises(OllamaServerError):
+        await call(c)
+    assert len(calls) == 3
+
+
+async def test_connection_reset_is_wrapped_retried_and_never_escapes_raw():
+    from app.services.ollama_client import OllamaConnectionError
+
+    calls = []
+
+    def h(req):
+        calls.append(1)
+        raise httpx.ReadError("connection reset by peer")
+
+    c = make_client(h, retries=3)
+    with pytest.raises(OllamaConnectionError) as exc:
+        await call(c)
+    assert not isinstance(exc.value, httpx.HTTPError) and len(calls) == 3
+    assert metrics.counter_value("ollama_requests", outcome="transport_error") == 3
+
+
+async def test_connection_reset_then_recovery():
+    seq = iter([httpx.ConnectError("refused"), httpx.Response(200, json=OK)])
+
+    def h(req):
+        item = next(seq)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    value, _ = await call(make_client(h))
+    assert value.value == "ok"
+
+
+async def test_429_retry_after_http_date_is_honoured_and_clamped():
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+
+    when = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=45), usegmt=True)
+    resp = httpx.Response(429, headers={"retry-after": when})
+    assert 30 <= OllamaClient._retry_after_seconds(resp, 1) <= 46
+    far = format_datetime(datetime.now(timezone.utc) + timedelta(hours=5), usegmt=True)
+    assert OllamaClient._retry_after_seconds(httpx.Response(429, headers={"retry-after": far}), 1) == 120.0
+    assert OllamaClient._retry_after_seconds(httpx.Response(429, headers={"retry-after": "garbage"}), 2) == 40.0
+
+
+# --- controlled key refresh ------------------------------------------------------------------------------
+
+
+def test_refresh_keeps_health_of_unchanged_bad_keys_and_starts_new_keys_healthy(monkeypatch):
+    from pydantic import SecretStr
+    from app.core.config import Settings
+
+    c = make_client(lambda r: httpx.Response(200, json=OK), keys=("bad-key", "good-key"))
+    c._mark_failure(0, permanent=True)
+    monkeypatch.setattr(Settings, "ollama_api_key_list", property(lambda self: ["bad-key", "good-key", "rotated-in"]))
+    out = c.refresh_keys()
+    assert out == {"keys": 3, "kept": 2, "new_or_reset": 1}
+    statuses = [k["status"] for k in c.key_health_snapshot()]
+    assert statuses == ["unhealthy", "healthy", "healthy"]      # the known-bad key is NOT re-enabled
+    assert c.refresh_keys(force=True)["new_or_reset"] == 3       # forced reload re-tests everything
+    assert [k["status"] for k in c.key_health_snapshot()] == ["healthy"] * 3
+
+
+def test_replacing_a_disabled_key_makes_the_client_available_again_without_restart(monkeypatch):
+    from app.core.config import Settings
+
+    c = make_client(lambda r: httpx.Response(200, json=OK), keys=("only-key",))
+    c._mark_failure(0, permanent=True)
+    assert not c.is_available() and c.has_permanently_failed()
+    monkeypatch.setattr(Settings, "ollama_api_key_list", property(lambda self: ["replacement-key"]))
+    c.refresh_keys()
+    assert c.is_available() and not c.has_permanently_failed()
+
+
+def test_key_refresher_periodic_and_forced(monkeypatch):
+    from app.worker.key_refresh import KeyRefresher
+
+    class Fake:
+        def __init__(self):
+            self.calls = []
+
+        def refresh_keys(self, *, force=False):
+            self.calls.append(force)
+            return {"keys": 1}
+
+    now = [0.0]
+    fake = Fake()
+    r = KeyRefresher(fake, interval_seconds=300, clock=lambda: now[0])
+    assert r.tick() is None                      # too early
+    now[0] = 301
+    assert r.tick() == {"keys": 1} and fake.calls == [False]
+    assert r.tick() is None
+    r.request_forced_refresh()
+    assert r.tick() == {"keys": 1} and fake.calls == [False, True]
+
+
+def test_key_refresher_never_raises_into_the_trading_loop():
+    from app.worker.key_refresh import KeyRefresher
+
+    class Boom:
+        def refresh_keys(self, *, force=False):
+            raise RuntimeError("env file unreadable")
+
+    r = KeyRefresher(Boom(), interval_seconds=0)
+    r.request_forced_refresh()
+    assert r.tick() is None

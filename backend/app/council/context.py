@@ -32,12 +32,16 @@ class CouncilContext:
     trade_allowed: bool = True
     candle_open_time: int | None = None
     decision_id: object | None = None
+    # Explicit per-cycle requirement. NOT_RUN only means "council approved" when it was NOT required;
+    # a required council that did not run (or ran for another candle) blocks new entries.
+    required: bool = False
 
     def for_candle(self, candle_open_time: int) -> "CouncilContext":
-        """The context to use for `candle_open_time`. A result produced for a
-        different candle is discarded (NOT_RUN), never carried forward."""
+        """The context to use for `candle_open_time`. A result produced for a different candle is
+        NEVER applied: it is replaced by a fail-closed INCOMPLETE (no new entries), because a
+        stale/misbound council decision is a council failure, not "no council"."""
         if self.candle_open_time is not None and self.candle_open_time != candle_open_time:
-            return CouncilContext(status=NOT_RUN, trade_allowed=True)
+            return CouncilContext(status=INCOMPLETE, trade_allowed=False, required=True)
         return self
 
 
@@ -74,8 +78,10 @@ def combine(agent_signal: Bias, council: CouncilContext | None) -> CombinedDecis
         return out(Bias.NEUTRAL, 1.0, "no_agent_signal")
     if c.status == INCOMPLETE or not c.trade_allowed:
         return out(Bias.NEUTRAL, 0.0, "council_incomplete_no_new_trades")
+    if c.status == NOT_RUN and c.required:
+        return out(Bias.NEUTRAL, 0.0, "council_required_but_not_run")
     if c.status == NOT_RUN or c.bias is None:
-        return out(agent_signal, 1.0, "council_not_run")
+        return out(agent_signal, 1.0, "council_not_required")
 
     conf = max(0.0, min(1.0, c.confidence or 0.0))
     if c.bias == Bias.NEUTRAL:

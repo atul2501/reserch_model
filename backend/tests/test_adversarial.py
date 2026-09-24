@@ -141,14 +141,16 @@ def test_perturb_dna_variants_produces_distinct_valid_variants():
     assert len(values) > 1  # jittering actually varies the parameter
 
 
-def test_adversarial_suite_passes_for_a_strategy_that_never_trades():
+def test_a_strategy_that_never_trades_does_not_pass_the_adversarial_suite():
+    """No trades means no drawdown - and no evidence of robustness. Inactivity must never look perfectly robust."""
     candles = _trending_candles(600)
     report = run_adversarial_suite(
         _never_trades_dna(), candles, symbol="SOL", timeframe="1m", starting_equity=100.0,
         base_fee_rate=0.00045, base_slippage_bps=2, n_dna_variants=2, rng=random.Random(7),
     )
-    assert report.passed is True
-    assert report.worst_case_net_return_pct == pytest.approx(0.0)
+    assert report.passed is False and "strategy_never_traded_in_any_scenario" in report.failure_reasons
+    assert report.total_trades == 0 and report.worst_case_net_return_pct == pytest.approx(0.0)
+    assert compute_robustness_score(report) == 0.0
 
 
 def test_adversarial_suite_fails_for_an_overleveraged_strategy_when_risk_engine_bypassed():

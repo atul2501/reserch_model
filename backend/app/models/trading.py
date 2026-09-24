@@ -71,6 +71,13 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     reduce_only: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     order_kind: Mapped[str] = mapped_column(String(16), default="market", nullable=False)
 
+    # Next-bar-open execution (paper): an entry decided on the CLOSE of bar N is persisted as a PENDING order and
+    # filled at the OPEN of bar N+1 - exactly the backtest's model, with no signal-bar look-ahead. `intent` carries
+    # what the fill needs from the signal bar (ATR, swing levels, regime, sizing method); an order that was not
+    # filled on bar N+1 is CANCELLED, never filled late.
+    signal_candle_open_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    intent: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
 
 class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "positions"
@@ -114,6 +121,21 @@ class Position(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     unrealized_pnl: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     is_open: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # Which execution venue opened this position (PAPER / SHADOW / LIVE). Switching TRADING_MODE with positions open on
+    # another venue would mix books, so new entries are refused until they close (see run_decision_cycle).
+    venue: Mapped[ExecutionVenue] = mapped_column(
+        SAEnum(ExecutionVenue, name="execution_venue_enum"), default=ExecutionVenue.PAPER, nullable=False,
+        server_default=ExecutionVenue.PAPER.value,
+    )
+
+    # A signal exit decided on the close of bar N executes at the open of bar N+1 (paper next-open model).
+    pending_exit_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pending_exit_signal_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Newest bar whose OHLC this position has been managed against. Makes protective processing idempotent per
+    # bar (a retried cycle or a protective replay never evaluates - or extends the trailing extreme with - a bar twice).
+    last_processed_open_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Consecutive failed attempts to close this position (drives the deterministic force-settle fallback).
+    exit_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
 
     opened_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
@@ -148,6 +170,7 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     funding: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     slippage_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     net_pnl: Mapped[float] = mapped_column(Float, nullable=False)
+    bad_debt: Mapped[float] = mapped_column(Float, default=0.0, nullable=False, server_default="0")
 
     opened_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     closed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

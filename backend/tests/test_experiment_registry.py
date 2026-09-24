@@ -40,10 +40,12 @@ async def test_epoch_is_frozen_chronologically_and_idempotent(db_session):
     assert (n_train, n_val) == (600, 200)
 
 
-async def test_different_data_gets_a_different_epoch(db_session):
-    e1, _ = await ds.get_or_create_epoch(db_session, frame(seed=1), symbol="SOL", timeframe="1m")
-    e2, _ = await ds.get_or_create_epoch(db_session, frame(seed=2), symbol="SOL", timeframe="1m")
-    assert e1.epoch_id != e2.epoch_id and e1.dataset_fingerprint != e2.dataset_fingerprint
+async def test_different_data_does_not_move_the_sealed_epoch_only_an_explicit_renewal_does(db_session):
+    e1, created1 = await ds.get_or_create_epoch(db_session, frame(seed=1), symbol="SOL", timeframe="1m")
+    e2, created2 = await ds.get_or_create_epoch(db_session, frame(seed=2), symbol="SOL", timeframe="1m")
+    assert created1 and not created2 and e1.epoch_id == e2.epoch_id           # the holdout does not follow the data
+    e3 = await ds.renew_epoch(db_session, frame(seed=2), symbol="SOL", timeframe="1m", reason="quarterly refresh")
+    assert e3.epoch_id != e1.epoch_id and e3.dataset_fingerprint != e1.dataset_fingerprint
 
 
 async def test_experiment_records_all_required_provenance(db_session):
@@ -62,7 +64,11 @@ async def test_experiment_records_all_required_provenance(db_session):
 
 def test_code_and_schema_versions_are_resolved():
     assert code_version() not in ("", None)
-    assert schema_version() == "c6f3a1b8d5e2"    # alembic head shipped with this code
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+    assert schema_version() == head    # the alembic head shipped with this code (never a hard-coded revision)
 
 
 async def test_confirmed_only_loader_never_returns_open_bars(db_session):

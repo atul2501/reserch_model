@@ -167,3 +167,37 @@ async def test_full_shadow_cycle_creates_hypothetical_orders_positions_and_shado
     trades = (await db_session.execute(select(Trade))).scalars().all()
     assert len(trades) == 2 and {t.stage for t in trades} == {StrategyStage.SHADOW}      # hypothetical PnL, SHADOW stage
     assert all(t.exit_price == pytest.approx(99.95) for t in trades)          # closing a long sells into the REAL bid
+
+
+# --- venue tagging: paper and shadow books never mix (spec phase 21) -------------------------------------------------------
+
+
+async def test_positions_carry_the_venue_that_opened_them_and_a_mode_switch_blocks_new_entries(db_session, monkeypatch):
+    from sqlalchemy import select
+    from app.core.config import get_settings
+    from app.execution.paper_adapter import PaperExecutionAdapter
+    from app.models.decision import Decision
+    from app.models.enums import ExecutionVenue
+    from app.models.trading import Position
+    from tests.helpers_agents import cycle, make_agents, make_context, make_dna
+
+    monkeypatch.setattr(get_settings(), "paper_fill_timing", "signal_close")
+    from app.schemas.strategy_dna import Condition, RuleSet
+
+    late = make_dna(entry_rules=RuleSet(conditions=[Condition(feature="rsi_14", operator="gt", value=90)]))   # flat until rsi > 90
+    a1, a2 = await make_agents(db_session, [make_dna(), late])
+    paper = PaperExecutionAdapter()
+    await cycle(db_session, paper, make_context(1, 100.0, rsi=65.0))
+    positions = (await db_session.execute(select(Position))).scalars().all()
+    assert positions and all(p.venue == ExecutionVenue.PAPER for p in positions)
+
+    # the operator switches to SHADOW while the paper positions are still open
+    class FakeShadow(PaperExecutionAdapter):
+        venue = ExecutionVenue.SHADOW
+
+    n_before = len(positions)
+    await cycle(db_session, FakeShadow(), make_context(2, 100.0, rsi=95.0))       # the flat agent now signals an entry
+    assert len((await db_session.execute(select(Position))).scalars().all()) == n_before      # no NEW shadow entry ...
+    rows = (await db_session.execute(select(Decision).where(Decision.market_candle_open_time == make_context(2, 1).candle_open_time))).scalars().all()
+    assert rows and all(any(r.startswith("trading_halted:venue_mismatch:PAPER") for r in d.risk_reasoning["reasons"]) for d in rows)
+    assert all(p.is_open for p in (await db_session.execute(select(Position))).scalars().all())   # ... open ones untouched by it

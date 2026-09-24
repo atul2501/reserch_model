@@ -12,7 +12,6 @@ rather than crash.
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 import uuid
 from dataclasses import dataclass
@@ -31,6 +30,7 @@ from tenacity import (
 from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.schemas.normalization import ResponseNormalizationError, normalize_payload, parse_model_json
 
 logger = get_logger(__name__)
 
@@ -57,6 +57,11 @@ class OllamaAuthError(OllamaError):
     exists specifically to rotate onto the next key in the pool instead."""
 
 
+class OllamaConnectionError(OllamaError):
+    """Transport-level failure (connection reset/refused, TLS, DNS): transient, retried with backoff.
+    Wrapped so callers never see a raw httpx exception escape the client."""
+
+
 class OllamaServerError(OllamaError):
     """5xx from the Ollama API: transient, retried with backoff."""
 
@@ -81,6 +86,7 @@ class OllamaCallStats:
     completion_tokens: int | None
     model: str
     retries: int
+    normalization: dict | None = None   # audit of boundary repairs (None when the response needed none)
 
 
 @dataclass
@@ -165,14 +171,33 @@ class OllamaClient:
     def has_permanently_failed(self) -> bool:
         return bool(self._api_keys) and all(h.disabled for h in self._key_health)
 
-    def refresh_keys(self) -> None:
-        """Explicit operator action: re-read credentials from settings and
-        clear all health state (the only way a 401/403 key is used again)."""
+    def refresh_keys(self, *, force: bool = False) -> dict[str, int]:
+        """Re-read credentials from settings WITHOUT a restart.
+
+        A key whose value is unchanged keeps its health (a key that returned 401 stays disabled, so
+        a periodic refresh never hammers a known-bad credential); a NEW or replaced key starts healthy.
+        `force=True` clears all health state (operator wants every key re-tried). Keys are compared by
+        digest and never logged."""
+        import hashlib
         from app.core.config import Settings
-        self._api_keys = Settings().ollama_api_key_list  # fresh read; never mutates the shared settings cache
-        self._key_health = [OllamaKeyHealth() for _ in self._api_keys]
-        self._key_cursor = 0
-        logger.info("ollama.keys_refreshed", key_count=len(self._api_keys))
+
+        def digest(k: str) -> str:
+            return hashlib.sha256(k.encode()).hexdigest()
+
+        old = {digest(k): h for k, h in zip(self._api_keys, self._key_health)}
+        new_keys = Settings().ollama_api_key_list  # fresh read; never mutates the shared settings cache
+        kept = added = 0
+        health: list[OllamaKeyHealth] = []
+        for k in new_keys:
+            previous = None if force else old.get(digest(k))
+            if previous is not None:
+                kept += 1
+            else:
+                added += 1
+            health.append(previous or OllamaKeyHealth())
+        self._api_keys, self._key_health, self._key_cursor = new_keys, health, 0
+        logger.info("ollama.keys_refreshed", key_count=len(new_keys), kept=kept, new_or_reset=added, forced=force)
+        return {"keys": len(new_keys), "kept": kept, "new_or_reset": added}
 
     def _mark_success(self, key_index: int | None) -> None:
         if key_index is not None:
@@ -198,7 +223,7 @@ class OllamaClient:
             return any(not health.disabled and health.cooldown_until <= time.monotonic() for health in self._key_health)
         if isinstance(exc, OllamaUnavailableError):
             return False
-        return isinstance(exc, (OllamaTimeoutError, OllamaServerError, httpx.TransportError))
+        return isinstance(exc, (OllamaTimeoutError, OllamaServerError, OllamaConnectionError, httpx.TransportError))
 
     @staticmethod
     def _retry_after_seconds(resp: httpx.Response, failure_count: int) -> float:
@@ -209,6 +234,16 @@ class OllamaClient:
             try:
                 return max(1.0, min(120.0, float(header)))
             except ValueError:
+                pass
+            try:  # RFC 9110 also allows an HTTP-date
+                from email.utils import parsedate_to_datetime
+                from datetime import datetime, timezone
+
+                when = parsedate_to_datetime(header)
+                if when.tzinfo is None:
+                    when = when.replace(tzinfo=timezone.utc)
+                return max(1.0, min(120.0, (when - datetime.now(timezone.utc)).total_seconds()))
+            except (TypeError, ValueError):
                 pass
         return min(120.0, 20.0 * (2 ** max(0, failure_count - 1)))
 
@@ -267,6 +302,14 @@ class OllamaClient:
                     metrics.inc("ollama_requests", outcome="timeout")
                     self._mark_failure(key_index)
                     raise OllamaTimeoutError(str(exc)) from exc
+                except httpx.TransportError as exc:  # connection reset/refused, TLS, DNS, protocol errors
+                    metrics.inc("ollama_requests", outcome="transport_error")
+                    self._mark_failure(key_index)
+                    raise OllamaConnectionError(f"{type(exc).__name__}: {exc}") from exc
+                if resp.status_code == 408:  # request timeout: transient, retryable like a client-side timeout
+                    metrics.inc("ollama_requests", outcome="408")
+                    self._mark_failure(key_index)
+                    raise OllamaTimeoutError("ollama returned 408")
                 if resp.status_code == 429:
                     failures = (self._key_health[key_index].failure_count + 1) if key_index is not None else 1
                     self._mark_failure(key_index, cooldown=self._retry_after_seconds(resp, failures))
@@ -291,8 +334,14 @@ class OllamaClient:
                     raise OllamaAuthError(f"ollama returned {resp.status_code} for key_index={key_index}")
                 resp.raise_for_status()
                 self._mark_success(key_index)
+                try:
+                    body = resp.json()
+                except ValueError as exc:  # 200 with an HTML/plain-text/empty body (proxy error page, truncation)
+                    metrics.inc("ollama_requests", outcome="malformed_envelope")
+                    logger.error("ollama.non_json_response", status=resp.status_code, body_prefix=resp.text[:80])
+                    raise OllamaResponseError("ollama returned a non-JSON response body") from exc
                 metrics.inc("ollama_requests", outcome="ok")
-                return resp.json()
+                return body
 
         @retry(
             reraise=True,
@@ -305,7 +354,7 @@ class OllamaClient:
             nonlocal retries_used
             try:
                 return await _attempt()
-            except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, OllamaServerError, httpx.TransportError):
+            except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, OllamaServerError, OllamaConnectionError, httpx.TransportError):
                 retries_used += 1
                 raise
 
@@ -320,7 +369,8 @@ class OllamaClient:
         except httpx.HTTPStatusError as exc:
             logger.error("ollama.http_error", request_id=request_id, status=exc.response.status_code)
             raise OllamaError(f"ollama http error: {exc}") from exc
-        except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, OllamaServerError, OllamaUnavailableError) as exc:
+        except (OllamaTimeoutError, OllamaRateLimitError, OllamaAuthError, OllamaServerError, OllamaConnectionError,
+                OllamaUnavailableError, OllamaResponseError) as exc:
             logger.error(
                 "ollama.call_failed", request_id=request_id, error=str(exc), retries_used=retries_used,
             )
@@ -329,20 +379,46 @@ class OllamaClient:
         latency_ms = int((time.monotonic() - start) * 1000)
         metrics.observe("ollama_latency_ms", latency_ms)
 
-        content = raw.get("message", {}).get("content", "")
+        message = raw.get("message") if isinstance(raw, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, str) or not content.strip():
+            metrics.inc("ollama_requests", outcome="malformed_envelope")
+            logger.error("ollama.malformed_envelope", request_id=request_id)
+            raise OllamaResponseError("ollama response has no message content")
+        # Boundary: safe parse -> deterministic normalisation (opt-in schemas only) -> STRICT Pydantic validation.
+        # A response that cannot be safely normalised is an invalid response, never a partial one.
+        report = None
         try:
-            parsed_json = json.loads(content)
-        except json.JSONDecodeError as exc:
-            metrics.inc("ollama_requests", outcome="malformed_json")
-            logger.error("ollama.invalid_json", request_id=request_id, content_prefix=content[:120])
-            raise OllamaResponseError(f"model did not return valid JSON: {exc}") from exc
+            parsed_json, parse_method = parse_model_json(content)
+            if hasattr(response_model, "ordered_lists"):
+                parsed_json, report = normalize_payload(response_model, parsed_json)
+                report.parse_method = parse_method
+        except ResponseNormalizationError as exc:
+            outcome = "malformed_json" if exc.reason == "malformed_json" else "schema_invalid"
+            metrics.inc("ollama_requests", outcome=outcome)
+            logger.error("ollama.response_rejected", request_id=request_id, model_schema=response_model.__name__,
+                         reason=exc.reason, content_prefix=content[:120] if outcome == "malformed_json" else None)
+            what = "model did not return valid JSON" if outcome == "malformed_json" else "model response failed schema validation"
+            raise OllamaResponseError(f"{what}: {exc.reason}") from exc
 
         try:
             validated = response_model.model_validate(parsed_json)
         except ValidationError as exc:
             metrics.inc("ollama_requests", outcome="schema_invalid")
-            logger.error("ollama.schema_validation_failed", request_id=request_id, error_count=len(exc.errors()))
-            raise OllamaResponseError(f"model response failed schema validation: {exc}") from exc
+            logger.error("ollama.schema_validation_failed", request_id=request_id, model_schema=response_model.__name__,
+                         error_count=len(exc.errors()), fields=sorted({str(e["loc"][0]) for e in exc.errors() if e["loc"]}))
+            raise OllamaResponseError(f"model response failed schema validation: {str(exc)[:300]}") from exc
+
+        normalization = report.as_dict() if report is not None and report.changed else None
+        if normalization is not None:
+            for t in report.truncations:
+                metrics.inc("ollama_schema_normalized", field=t["field"])
+                logger.warning("ollama.schema_normalized", request_id=request_id, model_schema=response_model.__name__,
+                               schema_truncated=True, field=t["field"], original_count=t["original_count"],
+                               accepted_count=t["accepted_count"], policy=t["policy"])
+            if not report.truncations:
+                logger.info("ollama.schema_repaired", request_id=request_id, model_schema=response_model.__name__,
+                            **{k: v for k, v in normalization.items() if k != "schema_truncated"})
 
         stats = OllamaCallStats(
             request_id=request_id,
@@ -351,6 +427,7 @@ class OllamaClient:
             completion_tokens=raw.get("eval_count"),
             model=self._model,
             retries=retries_used,
+            normalization=normalization,
         )
         self.last_stats = stats
         logger.info(

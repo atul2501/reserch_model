@@ -10,11 +10,14 @@ from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+# Mirrors len(app.schemas.council.ANALYST_NAMES); importing that here would be circular
+# (models -> database -> settings). tests/test_council_failclosed.py pins the two together.
+COUNCIL_ANALYST_COUNT = 8
 
 
 def resolve_sqlite_url(url: str) -> str:
@@ -50,12 +53,14 @@ class Settings(BaseSettings):
 
     # --- Trading mode ---------------------------------------------------
     trading_mode: TradingMode = TradingMode.PAPER
+    # Provenance: overrides the git commit recorded on every experiment (containers without a .git directory).
+    code_version: str = ""
 
     # --- Hyperliquid ------------------------------------------------------
     hyperliquid_api_url: str = "https://api.hyperliquid.xyz"
     hyperliquid_ws_url: str = "wss://api.hyperliquid.xyz/ws"
     hyperliquid_account_address: str = ""
-    hyperliquid_private_key: str = ""
+    hyperliquid_private_key: SecretStr = SecretStr("")
     market_symbol: str = "SOL"
     market_timeframe: str = "1m"
     # A candle is only "final" once its close time is at least this far in the
@@ -78,21 +83,25 @@ class Settings(BaseSettings):
     market_ws_enabled: bool = True
     ws_ping_interval_seconds: float = 30.0
     ws_stale_after_seconds: float = 90.0
+    # A frame whose bar opens further than this in the future is dropped (never becomes 'latest').
+    ws_future_tolerance_ms: int = 5_000
     funding_history_lookback_hours: int = 48
 
     # --- Ollama -------------------------------------------------------------
     ollama_base_url: str = ""
-    ollama_api_key: str = ""
+    ollama_api_key: SecretStr = SecretStr("")
     # Optional: multiple keys (e.g. several free-tier accounts), comma-separated.
     # OllamaClient round-robins across these — every retry attempt picks the
     # next key, so a 429 on one key is transparently retried on the next
     # instead of just backing off on the same rate-limited key. Falls back
     # to the single `ollama_api_key` above when unset.
-    ollama_api_keys: str = ""
+    ollama_api_keys: SecretStr = SecretStr("")
     ollama_model: str = ""
     ollama_timeout_seconds: int = 120
     ollama_max_retries: int = 3
     ollama_concurrency: int = 10
+    # How often the worker re-reads OLLAMA_API_KEY(S) (0 disables); SIGHUP forces an immediate full reload.
+    ollama_key_refresh_seconds: int = 300
 
     # Housekeeping: no-op decision rows (legacy) older than this many days are pruned by
     # `python -m scripts.prune_decisions`. Rows linked to an order/trade are NEVER pruned.
@@ -126,11 +135,16 @@ class Settings(BaseSettings):
     database_url_sync: str = "sqlite:///./data/trading_lab.db"
     # Production: DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trading_lab
     # (SQLite stays the default for local development and the test-suite.)
-    database_pool_size: int = 20
-    database_max_overflow: int = 10
+    # Sized against PostgreSQL's max_connections (default 100) for THREE processes (api, worker, research):
+    # 3 x (pool_size + max_overflow) must stay well below it. See the startup check in `_check_pool_budget`.
+    database_pool_size: int = 10
+    database_max_overflow: int = 5
+    database_server_max_connections: int = 100   # what your PostgreSQL is configured with (`SHOW max_connections`)
     database_pool_timeout_seconds: int = 30
     database_pool_recycle_seconds: int = 1800
     database_statement_timeout_ms: int = 30_000
+    database_lock_timeout_ms: int = 10_000              # a statement waits at most this long for a row/table lock
+    database_idle_in_transaction_timeout_ms: int = 120_000   # a forgotten open transaction is killed (it would hold locks)
 
     # --- Paper execution simulation ---------------------------------------
     paper_fee_rate: float = 0.00045            # taker
@@ -145,12 +159,29 @@ class Settings(BaseSettings):
     # Simulated latency is REPORTED (and can drift the price) without sleeping;
     # 500 sequential real sleeps would blow the 1-minute cycle budget.
     paper_simulate_latency_sleep: bool = False
-    paper_latency_drift_bps_per_sec: float = 0.0
-    paper_partial_fill_probability: float = 0.0
+    # Random adverse/favourable price drift per second of (simulated) latency between decision and fill.
+    paper_latency_drift_bps_per_sec: float = 2.0
+    paper_partial_fill_probability: float = 0.02
     paper_partial_fill_min_fraction: float = 0.5
-    paper_reject_probability: float = 0.0
+    # Entries can be rejected by the exchange (exits never are: an agent must always be able to close).
+    paper_reject_probability: float = 0.005
     # Hyperliquid's real minimum order value is $10; 0 disables the check.
-    paper_min_order_notional: float = 0.0
+    paper_min_order_notional: float = 10.0
+    # When a paper/backtest entry FILLS relative to the bar that produced the signal:
+    #   next_open    - an entry/exit decided on the CLOSE of bar N is a persisted PENDING order filled at the OPEN
+    #                  of bar N+1 (the backtest's model: no signal-bar look-ahead). The research default.
+    #   signal_close - fill at the signal bar's own close (kept for engines that model live submission, e.g. tests).
+    # SHADOW always fills immediately against the live order book (that is what it exists to measure).
+    paper_fill_timing: str = "next_open"
+    # Trailing stops count the CURRENT bar's own extreme (worst-case path: rally first, then fall). False = prior bars only
+    # (optimistic). Shared by paper, shadow and the backtest so they can never disagree.
+    trailing_stop_uses_same_bar_extreme: bool = True
+    # An agent that is flat and whose equity fell below this can never open another order (the minimum notional
+    # and lot size make it untradeable): it is retired as DEAD instead of lingering as a zombie ACTIVE agent.
+    agent_min_viable_equity: float = 1.0
+    # A position whose exit order keeps failing (e.g. no book liquidity in SHADOW) is settled deterministically at
+    # the modelled price after this many consecutive failed attempts, so an agent can never be stuck in a position.
+    exit_force_settle_after_attempts: int = 3
     paper_quantity_step: float = 0.01          # lot size (SOL: 2 size decimals)
     paper_random_seed: int = 1337
     # Margin model (cross margin, one position per agent).
@@ -190,11 +221,19 @@ class Settings(BaseSettings):
     # Hard wall-clock budget for a whole council cycle (must be < candle interval).
     council_deadline_seconds: float = 45.0
     council_analyst_timeout_seconds: float = 30.0
+    # Failsafe margin for the OUTER guard around the whole council step
+    # (deadline + grace must also stay below the candle interval).
+    council_outer_grace_seconds: float = 5.0
     evolution_interval_hours: int = 24
     # --- Research pipeline (scheduled evolution; only runs when enough data exists) ---
     research_window_candles: int = 20_160      # ~14 days of 1m bars per research epoch
     research_min_candles: int = 3_000          # below this the pipeline SKIPS (never guesses)
     research_train_fraction: float = 0.6
+    # A strategy LINEAGE (a family of mutated/crossed descendants) may be evaluated against a sealed OOS holdout at most
+    # this many times; more is adaptive tuning against the final test. Renewing the epoch (operator action) resets it.
+    research_oos_max_evaluations_per_lineage: int = 3
+    # Only a WARNING threshold: the sealed holdout ages as the market moves on; the operator decides when to renew it.
+    research_epoch_max_age_days: float = 30.0
     research_validation_fraction: float = 0.2  # remaining 20% is the protected final OOS slice
     research_min_generation_age_hours: float = 12.0
     research_min_closed_trades: int = 30       # need real paper history before selecting on it
@@ -219,12 +258,8 @@ class Settings(BaseSettings):
     fitness_w_expectancy: float = 0.5
     fitness_w_regime: float = 1.0
     fitness_w_adversarial: float = 1.0
-
-    # --- Professional classification ----------------------------------------
-    pro_min_trades: int = 200
-    pro_min_profit_factor: float = 1.5
-    pro_max_drawdown: float = 0.20
-    pro_min_oos_score: float = 0.70
+    fitness_w_inactivity: float = 0.25    # penalty x (1 - trade-count confidence): idleness is not a strategy
+    fitness_w_death: float = 1.0          # extra penalty for an agent that died
 
     # --- Regime validation ----------------------------------------------------
     regime_validation_min_trades_per_regime: int = 10
@@ -233,7 +268,6 @@ class Settings(BaseSettings):
 
     # --- Strategy correlation ---------------------------------------------------
     max_strategy_correlation: float = 0.80
-    max_return_correlation: float = 0.80
     min_strategy_diversity: float = 0.60
     correlation_lookback_days: int = 30
     correlation_time_bucket: str = "1h"
@@ -244,6 +278,10 @@ class Settings(BaseSettings):
     # Soft flag/report annotation only — champion/challenger evaluates the raw
     # per-metric numbers itself rather than a single pass/fail threshold here.
     reality_gap_max_acceptable_degradation_pct: float = 0.35
+    # Two stages are only COMPARABLE (usable as promotion evidence) when both cover at least this much observed time and
+    # this many trades: a multi-day backtest vs one day of paper is not reliable evidence of anything.
+    reality_gap_min_observation_days: float = 2.0
+    reality_gap_min_trades: int = 20
 
     # --- Champion/Challenger ------------------------------------------------
     champion_min_trade_count: int = 100
@@ -253,6 +291,9 @@ class Settings(BaseSettings):
     champion_min_profit_factor: float = 1.3
     champion_min_fitness_improvement: float = 0.05
     champion_min_stage_days: int = 14
+    # Champions and challengers under observation are carried into the next generation unchanged (same strategy version,
+    # fresh capital) - up to this many slots - so their track record can accumulate to a promotion decision.
+    champion_elite_slots: int = 10
     champion_min_observation_days: int = 14
     champion_min_adversarial_robustness: float = 0.5
     champion_min_paper_trade_count: int = 30
@@ -263,8 +304,19 @@ class Settings(BaseSettings):
     adversarial_n_dna_variants: int = 5
     adversarial_fee_stress_multiplier: float = 2.0
     adversarial_slippage_stress_multiplier: float = 3.0
-    adversarial_partial_fill_min_pct: float = 0.3
-    adversarial_execution_delay_jitter_ms: int = 500
+    # Scenario parameters (every stress scenario is configuration, not a buried constant). They are persisted with each
+    # report (`scenario_config`) so a run can be reproduced exactly.
+    adversarial_volatility_spike_magnitude: float = 3.0       # one candle's range x this
+    adversarial_gap_pct: float = -0.08                        # permanent gap (negative = down)
+    adversarial_stale_bars: int = 20                          # flat, zero-volume feed outage
+    adversarial_extreme_move_pct: float = 0.25                # permanent flash-crash size (down)
+    adversarial_volume_spike_magnitude: float = 5.0
+    adversarial_liquidity_reduction: float = 0.05             # volume collapses to this fraction
+    adversarial_missing_candle_fraction: float = 0.02
+    adversarial_duplicate_candle_fraction: float = 0.02
+    adversarial_execution_delay_bars: int = 3
+    adversarial_partial_fill_fraction: float = 0.5
+    adversarial_reject_probability: float = 0.3
 
     # --- Live trading safety gates -------------------------------------------
     # Shadow mode: real order-book data, hypothetical fills, NO orders ever sent.
@@ -293,7 +345,18 @@ class Settings(BaseSettings):
     # protected request is rejected. Format: name:role:sha256hex[,...]
     # (see `python -m scripts.hash_api_key`). Roles: viewer|researcher|operator|admin.
     api_auth_required: bool = True
-    api_keys: str = ""
+    api_keys: SecretStr = SecretStr("")
+    # Brute-force / abuse protection (in-process; behind a reverse proxy the client
+    # address is the proxy's, so also rate-limit at the proxy).
+    api_auth_max_failures: int = 10           # failed auths per client within the window => lockout
+    api_auth_failure_window_seconds: int = 300
+    api_auth_lockout_seconds: int = 300
+    api_rate_limit_per_minute: int = 600      # authenticated requests per principal per minute; 0 disables
+    api_max_sse_streams: int = 20             # concurrent /api/stream connections (all principals)
+    api_max_sse_streams_per_principal: int = 5
+    api_sse_max_age_seconds: int = 3600       # server closes a stream after this long; clients reconnect
+    # OpenAPI/Swagger reveal the full API surface; off unless explicitly enabled.
+    expose_api_docs: bool = False
 
     @model_validator(mode="after")
     def _anchor_sqlite_paths(self) -> "Settings":
@@ -302,6 +365,46 @@ class Settings(BaseSettings):
         self.database_url = resolve_sqlite_url(self.database_url)
         self.database_url_sync = resolve_sqlite_url(self.database_url_sync)
         return self
+
+    @model_validator(mode="after")
+    def _council_settings_are_coherent(self) -> "Settings":
+        """A council that cannot possibly reach quorum, or that may outlive its own candle,
+        is a misconfiguration that would silently turn trading off (or apply stale calls)."""
+        if not 1 <= self.council_min_successful_analysts <= COUNCIL_ANALYST_COUNT:
+            raise ValueError(f"council_min_successful_analysts must be within 1..{COUNCIL_ANALYST_COUNT}")
+        if self.council_deadline_seconds <= 0 or self.council_analyst_timeout_seconds <= 0:
+            raise ValueError("council deadlines must be positive")
+        unit = {"s": 1, "m": 60, "h": 3600}.get(self.market_timeframe[-1:], None)
+        digits = self.market_timeframe[:-1]
+        if self.council_enabled and unit and digits.isdigit():
+            interval = int(digits) * unit
+            if self.council_deadline_seconds + self.council_outer_grace_seconds >= interval:
+                raise ValueError(
+                    "council_deadline_seconds + council_outer_grace_seconds must be below the candle interval "
+                    f"({interval}s): a late council decision must never be applied to a newer candle"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _check_pool_budget(self) -> "Settings":
+        """Three processes share the database. If their pools alone could exceed the server's connection limit, a busy
+        moment turns into 'too many clients' errors (and the lease heartbeat is what dies first)."""
+        if self.database_url.startswith("postgresql"):
+            worst_case = 3 * (self.database_pool_size + self.database_max_overflow)
+            if worst_case > 0.9 * self.database_server_max_connections:
+                raise ValueError(
+                    f"database pools can open up to {worst_case} connections across api+worker+research, which exceeds 90% of "
+                    f"DATABASE_SERVER_MAX_CONNECTIONS={self.database_server_max_connections}; lower DATABASE_POOL_SIZE / "
+                    "DATABASE_MAX_OVERFLOW or raise max_connections"
+                )
+        return self
+
+    @field_validator("paper_fill_timing")
+    @classmethod
+    def _known_fill_timing(cls, v: str) -> str:
+        if v not in ("next_open", "signal_close"):
+            raise ValueError("paper_fill_timing must be 'next_open' or 'signal_close'")
+        return v
 
     @field_validator("agent_count")
     @classmethod
@@ -316,9 +419,10 @@ class Settings(BaseSettings):
 
     @property
     def ollama_api_key_list(self) -> list[str]:
-        keys = [k.strip() for k in self.ollama_api_keys.split(",") if k.strip()]
-        if not keys and self.ollama_api_key:
-            keys = [self.ollama_api_key]
+        keys = [k.strip() for k in self.ollama_api_keys.get_secret_value().split(",") if k.strip()]
+        single = self.ollama_api_key.get_secret_value().strip()
+        if not keys and single:
+            keys = [single]
         return keys
 
     def is_live(self) -> bool:
@@ -339,7 +443,7 @@ class Settings(BaseSettings):
             and self.live_account_confirmed
             and self.load_agent_snapshot
             and self.hyperliquid_account_address
-            and self.hyperliquid_private_key
+            and self.hyperliquid_private_key.get_secret_value()
         )
 
 

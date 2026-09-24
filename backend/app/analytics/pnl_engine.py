@@ -50,15 +50,6 @@ def compute_unrealized_pnl(*, side: Side, quantity: float, entry_price: float, c
     return (current_price - entry_price) * quantity * direction
 
 
-def compute_liquidation_price_isolated(*, side: Side, entry_price: float, leverage: float, maintenance_margin_fraction: float = 0.005) -> float:
-    """Approximate isolated-margin liquidation price. This is a simplified
-    model for paper trading; live trading must query Hyperliquid's actual
-    margin/liquidation calculation rather than rely on this approximation."""
-    direction = 1 if side == Side.LONG else -1
-    margin_fraction = (1 / leverage) - maintenance_margin_fraction
-    return entry_price * (1 - direction * margin_fraction)
-
-
 def compute_liquidation_price(
     *, side: Side, entry_price: float, quantity: float, balance: float, maintenance_margin_rate: float
 ) -> float | None:

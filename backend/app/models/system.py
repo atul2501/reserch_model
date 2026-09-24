@@ -2,7 +2,7 @@
 Ollama/Hyperliquid/DB failures) — spec sections 41/47."""
 from __future__ import annotations
 
-from sqlalchemy import JSON, BigInteger, Boolean, Float, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, Float, String, Text, false
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,6 +53,9 @@ class WorkerCycle(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     attempts: Mapped[int] = mapped_column(default=1, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     council_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    # Explicit per-cycle requirement: True when the council was due (and enabled) for this candle,
+    # in which case NOT_RUN / INCOMPLETE / a candle mismatch all mean "no new entries".
+    council_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=false())
     agents_processed: Mapped[int | None] = mapped_column(nullable=True)
     trading_halt_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
 

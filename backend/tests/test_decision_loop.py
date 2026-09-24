@@ -27,6 +27,8 @@ from app.schemas.market_context import (
 )
 from app.schemas.strategy_dna import Condition, PositionSizing, RiskProfile, RuleSet, StrategyDNA
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 def _context(open_time: int, close: float, rsi: float, trend_strength: float) -> MarketContext:
     return MarketContext(
@@ -34,6 +36,7 @@ def _context(open_time: int, close: float, rsi: float, trend_strength: float) ->
         timeframe="1m",
         candle_open_time=open_time,
         close_price=close,
+        is_final=True,
         trend=TrendFeatures(ema_fast=close, ema_slow=close - 1, sma_fast=close, sma_slow=close, ema_slope=0.1, trend_strength=trend_strength),
         momentum=MomentumFeatures(rsi_14=rsi, macd=0.1, macd_signal=0.05, macd_hist=0.05, roc_10=1.0),
         volatility=VolatilityFeatures(atr_14=0.5, realized_vol=0.02, volatility_percentile=0.5, bb_upper=close + 2, bb_middle=close, bb_lower=close - 2, bb_width=0.02),

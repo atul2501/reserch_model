@@ -20,6 +20,8 @@ from app.research.snapshots import create_agent_snapshot
 from tests.helpers_agents import cycle, make_agents, make_context, make_dna
 from tests.test_backtest_parity import ema_cross_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 BACKEND = Path(__file__).resolve().parents[1]
 
 

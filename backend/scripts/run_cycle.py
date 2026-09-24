@@ -19,6 +19,8 @@ import argparse
 import asyncio
 import signal
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import configure_logging, get_logger
@@ -30,9 +32,10 @@ from app.market.market_data_service import MarketDataService
 from app.services.ollama_client import OllamaClient
 from app.core import metrics
 from app.core.runtime_status import WORKER, publish_status
-from app.worker.cycle import run_pending_cycles
+from app.worker.cycle import record_cycle_metrics, run_pending_cycles
 from app.worker.status import build_worker_payload
-from app.worker.lease import LeaseKeeper
+from app.worker.key_refresh import KeyRefresher
+from app.worker.lease import LeaseKeeper, LeaseLost
 from app.worker.scheduler import last_confirmed_open_time, seconds_until_next_confirmation
 
 logger = get_logger(__name__)
@@ -75,6 +78,7 @@ async def main(run_once: bool = False) -> None:
             settings.hyperliquid_ws_url, settings.market_symbol, settings.market_timeframe,
             WsCandleIngestor(AsyncSessionLocal, market_service), interval_ms=interval_ms,
             ping_interval=settings.ws_ping_interval_seconds, stale_after=settings.ws_stale_after_seconds,
+            future_tolerance_ms=settings.ws_future_tolerance_ms,
         )
         ws_task = asyncio.create_task(ws.run(), name="hyperliquid-ws")
 
@@ -85,27 +89,38 @@ async def main(run_once: bool = False) -> None:
             loop.add_signal_handler(sig, stop.set)
         except NotImplementedError:  # pragma: no cover (non-POSIX)
             pass
+    key_refresher = KeyRefresher(ollama_client, settings.ollama_key_refresh_seconds)
+    try:  # `kill -HUP <worker pid>` after rotating a key: reload credentials, re-try every key
+        loop.add_signal_handler(signal.SIGHUP, key_refresher.request_forced_refresh)
+    except (NotImplementedError, AttributeError, ValueError):  # pragma: no cover (non-POSIX)
+        pass
 
     try:
         while not stop.is_set():
             target = last_confirmed_open_time(HyperliquidClient.now_ms(), interval_ms, grace_ms)
             outcomes = []
+            key_refresher.tick()
             try:
                 async with AsyncSessionLocal() as db:
                     outcomes = await run_pending_cycles(
                         db, market_service, ollama_client, execution_engine=execution_engine,
-                        lease_lost=lambda: lease.is_lost, target_open_time=target,
+                        lease_lost=lambda: lease.is_lost, fence=lease, target_open_time=target,
                     )
+                record_cycle_metrics(outcomes)
                 for o in outcomes:
-                    metrics.inc("worker_cycles", status=o.status)
-                    if o.latency_seconds is not None:
-                        metrics.observe("cycle_latency_seconds", o.latency_seconds)
                     logger.info(
                         "cycle.done", cycle_id=o.cycle_id, status=o.status, agents=o.agents_processed,
                         council=o.council_status, halt=o.halt_reason, latency=o.latency_seconds,
                     )
-            except Exception:
+            except LeaseLost:
+                logger.critical("worker.fenced_off_stopping_all_trading")
+            except Exception as exc:
+                if isinstance(exc, SQLAlchemyError):
+                    metrics.record_db_error("worker_loop")
                 logger.exception("cycle.unhandled_error")
+            if lease.is_lost:
+                logger.critical("worker.lease_lost_exiting")
+                break
             try:  # publish runtime state for the API/dashboard (never allowed to break the loop)
                 async with AsyncSessionLocal() as db:
                     await publish_status(db, WORKER, build_worker_payload(ollama_client, ws, execution_engine, outcomes))

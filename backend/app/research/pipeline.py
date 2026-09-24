@@ -36,6 +36,8 @@ from app.backtesting.stage_metrics_service import compute_live_stage_metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.evolution.adversarial_service import run_and_persist_adversarial_suite
+from app.evolution.breeding import NoValidCandidatesError
+from app.evolution.rng import derive_seed
 from app.evolution.breeding import select_and_breed_next_generation
 from app.evolution.champion_challenger_service import advance_pipeline_stage
 from app.evolution.correlation_service import (
@@ -162,10 +164,25 @@ async def run_research_cycle(
     if have < s.research_min_candles:
         return await _record_skip(db, f"insufficient_market_data ({have} < {s.research_min_candles} candles)", generation.number)
 
-    candles = await ds.load_confirmed_candles(db, symbol, timeframe, limit=s.research_window_candles)
-    epoch, _created = await ds.get_or_create_epoch(db, candles, symbol=symbol, timeframe=timeframe)
+    # FROZEN HOLDOUT: the active sealed epoch fixes the OOS range, its fingerprint and the train/validation boundaries.
+    # New candles never move it; only an explicit operator renewal (scripts.run_research --new-oos-epoch) replaces it.
+    epoch = await ds.get_active_epoch(db, symbol, timeframe)
+    if epoch is None:
+        recent = await ds.load_confirmed_candles(db, symbol, timeframe, limit=s.research_window_candles)
+        epoch = await ds.seal_epoch(db, recent, symbol=symbol, timeframe=timeframe, reason="initial")
+        logger.warning("research.oos_epoch_sealed", epoch_id=epoch.epoch_id, oos_start_ms=epoch.oos_start_ms,
+                       oos_end_ms=epoch.oos_end_ms)
+    try:
+        candles = await ds.load_epoch_candles(db, epoch)
+    except ds.EpochIntegrityError as exc:
+        await db.rollback()
+        return await _record_skip(db, f"epoch_integrity_error ({exc})", generation.number)
+    epoch_age_days = (now.timestamp() * 1000 - epoch.oos_end_ms) / 86_400_000
+    if epoch_age_days > s.research_epoch_max_age_days:
+        logger.warning("research.oos_epoch_is_old_consider_renewing", epoch_id=epoch.epoch_id, age_days=round(epoch_age_days, 1))
     exp = await register_experiment(
-        db, kind="evolution", seed=s.research_seed, epoch=epoch, generation=generation.number,
+        db, kind="evolution", seed=derive_seed(s.research_seed, epoch.epoch_id, generation.number), epoch=epoch,
+        generation=generation.number,
         parameters={"window_candles": len(candles), "survivor_fraction": s.research_survivor_fraction,
                     "adversarial_top_k": s.research_adversarial_top_k, "forced": force},
     )
@@ -208,14 +225,14 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
     evaluated = 0
     for vid, dna in dnas.items():
         try:
-            ev = await asyncio.to_thread(evaluate_in_sample, vid, dna, frame, data, epoch, funding=funding)
+            ev = await asyncio.to_thread(evaluate_in_sample, vid, dna, frame, data, epoch)
         except InsufficientDataError:
             continue
         db.add(ev.backtest_metrics)
         if ev.wfo_metrics is not None:
             db.add(ev.wfo_metrics)
         await run_and_persist_regime_validation(
-            db, vid, backtest_result=ev.train,
+            db, vid, backtest_result=[ev.train, ev.validation],   # train AND validation, bucketed by ENTRY regime
             min_trades_per_regime=s.regime_validation_min_trades_per_regime,
             robust_min_positive_regimes_pct=s.regime_validation_robust_min_positive_regimes_pct,
             specialist_min_pnl_share=s.regime_validation_specialist_min_pnl_share,
@@ -241,7 +258,8 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
         await db.commit()
 
     # ---- 3. preliminary fitness -> adversarial on the top-K -> final fitness ----- #
-    await compute_and_persist_agent_fitness(db, generation=gen_no, correlation_by_agent=correlation_by_agent)
+    await compute_and_persist_agent_fitness(db, generation=gen_no, correlation_by_agent=correlation_by_agent,
+                                            oos_window_ms=(epoch.oos_start_ms, epoch.oos_end_ms))
     await db.commit()
     ranked = sorted((a for a in agents if a.status == AgentStatus.ACTIVE), key=lambda a: a.fitness or -1e9, reverse=True)
     top_versions = list(dict.fromkeys(a.strategy_version_id for a in ranked))[: s.research_adversarial_top_k]
@@ -249,13 +267,14 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
     adv_done = 0
     for vid in top_versions:
         try:
-            report = await _adversarial(db, s, vid, adv_frame, epoch)
+            report = await _adversarial(db, s, vid, adv_frame, epoch, exp.experiment_id, funding)
             adv_done += 1 if report else 0
         except InsufficientDataError:
             continue
     await db.commit()
     counts["adversarial_suites"] = adv_done
-    await compute_and_persist_agent_fitness(db, generation=gen_no, correlation_by_agent=correlation_by_agent)
+    await compute_and_persist_agent_fitness(db, generation=gen_no, correlation_by_agent=correlation_by_agent,
+                                            oos_window_ms=(epoch.oos_start_ms, epoch.oos_end_ms))
     await db.commit()
 
     # ---- 4. nominate the top-K for promotion: PAPER metrics, final OOS (once), pipeline ---- #
@@ -302,9 +321,11 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
             mutation_rate_multiplier=pressure.mutation_rate_multiplier if pressure else 1.0,
             max_family_survivor_fraction=s.max_family_survivor_fraction, candidate_validator=validator,
             max_validation_attempts=s.research_max_child_attempts, experiment_id=exp.experiment_id,
+            elite_slots=s.champion_elite_slots,
         )
         new_ids = result.strategy_version_ids
-        counts.update(children=len(new_ids), validation_rejected=result.validation_rejected_count,
+        counts.update(children=len(new_ids) - len(result.elite_version_ids), elites_carried=len(result.elite_version_ids),
+                      validation_rejected=result.validation_rejected_count, dropped_candidates=result.dropped_candidates,
                       injected_fresh=result.injected_fresh_count, diversity_score=round(result.diversity_score, 4))
     else:  # extinction: restart from fresh, validated founders (never revive the dead)
         new_ids = await _spawn_founders(db, s, gen_no + 1, rng, exp.experiment_id, validator)
@@ -324,20 +345,49 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
                           generation_from=gen_no, generation_to=new_gen.number, counts=counts)
 
 
-async def _adversarial(db, s, version_id, frame, epoch):
+async def _adversarial(db, s, version_id, frame, epoch, experiment_id=None, funding=None):
     return await run_and_persist_adversarial_suite(
         db, version_id, frame, symbol=epoch.symbol, timeframe=epoch.timeframe, starting_equity=s.agent_starting_balance,
         base_fee_rate=s.paper_fee_rate, base_slippage_bps=s.paper_slippage_bps, n_dna_variants=s.adversarial_n_dna_variants,
         global_max_leverage=s.max_leverage, global_max_position_size=s.max_position_size,
         global_max_drawdown=s.max_drawdown, global_max_daily_loss=s.max_daily_loss,
+        experiment_id=experiment_id, funding=funding,
     )
 
 
+FOUNDER_ATTEMPTS_PER_SLOT = 5   # candidate founders generated per population slot before giving up on the slot
+
+
 async def _spawn_founders(db, s, generation_number, rng, experiment_id, validator) -> list:
+    """Extinction restart: fresh founders, each through the SAME gate as bred children (schema + in-sample validator).
+    A founder that fails is replaced (bounded attempts) and never inserted; if none pass, nothing is born."""
+    from app.evolution.breeding import check_candidate_schema
     from app.models.strategy import Strategy
+
+    def gate(dna: StrategyDNA) -> bool:
+        if check_candidate_schema(dna):
+            return False
+        return True if validator is None else bool(validator(dna)[0])
+
+    def make_valid() -> list[StrategyDNA]:
+        accepted: list[StrategyDNA] = []
+        budget = s.agent_count * FOUNDER_ATTEMPTS_PER_SLOT
+        while len(accepted) < s.agent_count and budget > 0:
+            batch = generate_population_dna(min(s.agent_count, budget), seed=rng.randint(0, 2**31 - 1))
+            for dna in batch:
+                budget -= 1
+                if gate(dna):
+                    accepted.append(dna)
+                    if len(accepted) >= s.agent_count:
+                        break
+        return accepted
+
+    accepted = await asyncio.to_thread(make_valid)   # a backtest per founder: never on the event loop
+    if not accepted:
+        raise NoValidCandidatesError("no extinction-restart founder passed the validation gate")
     ids: list = []
-    for dna in generate_population_dna(s.agent_count, seed=rng.randint(0, 2**31 - 1)):
-        strat = Strategy(code=f"STRAT-{dna.strategy_family.value.upper()}-GEN{generation_number:02d}-{len(ids):05d}-{rng.randint(0, 9999):04d}",
+    for dna in accepted:
+        strat = Strategy(code=f"STRAT-{dna.strategy_family.value.upper()}-GEN{generation_number:02d}-{len(ids):05d}-{rng.getrandbits(16):04x}",
                          family=dna.strategy_family, name="founder")
         db.add(strat)
         await db.flush()

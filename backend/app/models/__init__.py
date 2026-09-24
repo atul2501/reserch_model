@@ -55,3 +55,11 @@ __all__ = [
     "Position",
     "Trade",
 ]
+
+
+# Database-level invariants (CHECK constraints + the one-pending-entry-per-agent index). Attached once every model is
+# imported so `Base.metadata.create_all` (tests, fresh installs) enforces exactly what the migration installs.
+from app.core.database import Base as _Base  # noqa: E402
+from app.models.constraints import attach_constraints as _attach_constraints  # noqa: E402
+
+_attach_constraints(_Base.metadata)

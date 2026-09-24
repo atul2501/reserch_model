@@ -33,7 +33,9 @@ async def compute_agent_performance_metric(
     roi = (agent.equity - agent.starting_balance) / agent.starting_balance if agent.starting_balance else 0.0
     net_pnl = agent.equity - agent.starting_balance
     gross_pnl = sum(t.gross_pnl for t in trades)
-    survival_seconds = ((as_of or datetime.now(timezone.utc)) - agent.created_at).total_seconds()
+    # An agent lives until it DIES: survival is time-to-death, not time-to-now (a dead agent must not keep accruing).
+    end = agent.death_timestamp or as_of or datetime.now(timezone.utc)
+    survival_seconds = (end - agent.created_at).total_seconds()
 
     return PerformanceMetric(
         agent_id=agent.id,
@@ -72,14 +74,3 @@ async def compute_and_persist_agent_performance_metric(
     metric = await compute_agent_performance_metric(db, agent, as_of=as_of, trades=trades)
     db.add(metric)
     return metric
-
-
-async def latest_performance_metric(db: AsyncSession, agent_id: uuid.UUID) -> PerformanceMetric | None:
-    return (
-        await db.execute(
-            select(PerformanceMetric)
-            .where(PerformanceMetric.agent_id == agent_id)
-            .order_by(PerformanceMetric.as_of.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()

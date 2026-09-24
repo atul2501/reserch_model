@@ -7,10 +7,12 @@ validation (the caller then retries or treats the analyst as abstained).
 from __future__ import annotations
 
 import uuid
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
 from app.models.enums import Bias
+from app.schemas.normalization import BoundedResponse
 
 ANALYST_NAMES = (
     "trend",
@@ -24,7 +26,13 @@ ANALYST_NAMES = (
 )
 
 
-class AnalystResponse(BaseModel):
+class AnalystResponse(BoundedResponse):
+    """`key_factors` and `invalidators` are ORDERED MOST-IMPORTANT-FIRST (the prompt says so); that documented
+    ordering is what allows the boundary normaliser to keep the first 10 of an over-long list (see
+    app.schemas.normalization). The max_length=10 constraints themselves stay strict."""
+
+    ordered_lists: ClassVar[frozenset[str]] = frozenset({"key_factors", "invalidators"})
+
     analyst: str = Field(pattern="^(" + "|".join(ANALYST_NAMES) + ")$")
     bias: Bias
     confidence: float = Field(ge=0.0, le=1.0)
@@ -35,7 +43,9 @@ class AnalystResponse(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class JudgeResponse(BaseModel):
+class JudgeResponse(BoundedResponse):
+    ordered_lists: ClassVar[frozenset[str]] = frozenset({"key_risks", "invalidators"})
+
     decision: Bias
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(min_length=1, max_length=2048)
@@ -74,6 +84,8 @@ class ConsensusResult(BaseModel):
     # --- Audit timing (council_start/analyst-level timing live on the
     # persisted CouncilAnalysis rows; these are the cycle-level summary) --
     council_decision_id: uuid.UUID | None = None  # set once the CouncilDecision row is flushed
+    candle_open_time: int | None = None  # the candle this consensus was produced for (never reused for another)
+    council_completed_at: float | None = None  # unix epoch seconds
     council_start: float | None = None  # unix epoch seconds
     consensus_time: float | None = None  # seconds from council_start to consensus computed
     total_council_latency: float | None = None  # seconds from council_start to full persistence

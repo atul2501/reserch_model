@@ -15,6 +15,8 @@ from app.models.trading import Order, Position, Trade
 from app.schemas.strategy_dna import PositionSizing, RiskProfile, StopLossConfig, TakeProfitConfig
 from tests.helpers_agents import cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 MMR = 0.025
 
 

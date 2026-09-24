@@ -195,3 +195,41 @@ async def test_lease_lost_before_decisions_aborts_without_writing_decisions(db_s
     )
     assert outcomes[0].status == "FAILED"
     assert (await db_session.execute(select(Decision))).scalars().all() == []
+
+
+async def test_decision_loop_refuses_a_context_that_was_not_verified_final(db_session, no_council):
+    from app.agents.decision_loop import run_decision_cycle
+    from app.market.market_data_service import CandleNotFinalError
+    from tests.helpers_agents import make_context
+
+    ctx = make_context(1, 100.0).model_copy(update={"is_final": False})
+    with pytest.raises(CandleNotFinalError):
+        await run_decision_cycle(
+            db_session, PaperExecutionAdapter(), ctx, None, generation=1, council_decision_id=None,
+            global_max_leverage=5, global_max_position_size=0.5, global_max_drawdown=0.3,
+            global_max_daily_loss=0.1, market_data_age_seconds=1.0,
+        )
+
+
+async def test_candle_that_stops_being_final_before_the_decision_phase_aborts_without_any_writes(db_session, no_council, monkeypatch):
+    """The council can take ~45s; the bar is re-verified right before decisions and a failure aborts the cycle."""
+    from app.market.market_data_service import CandleNotFinalError, MarketDataService as MDS
+    from app.models.trading import Order
+
+    _, market = await _setup(db_session)
+    real = MDS.verify_candle_final
+    calls = {"n": 0}
+
+    async def flaky(self, db, open_time, **kw):
+        calls["n"] += 1
+        if calls["n"] == 2:                          # first gate (load) passes, second gate (pre-decision) fails
+            raise CandleNotFinalError("bar revised while the council was running")
+        return await real(self, db, open_time, **kw)
+
+    monkeypatch.setattr(MDS, "verify_candle_final", flaky)
+    outcomes = await cycle_mod.run_pending_cycles(db_session, market, None, execution_engine=PaperExecutionAdapter())
+    assert outcomes[0].status == "FAILED" and calls["n"] == 2
+    row = (await _cycles(db_session))[T0 + 399 * INTERVAL]
+    assert row.status == "FAILED" and "CandleNotFinalError" in row.error
+    assert (await db_session.execute(select(Decision))).scalars().all() == []
+    assert (await db_session.execute(select(Order))).scalars().all() == []

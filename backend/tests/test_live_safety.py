@@ -57,3 +57,11 @@ def test_env_example_defaults_keep_live_disabled():
     from pathlib import Path
     text = (Path(__file__).resolve().parents[2] / ".env.example").read_text()
     assert "TRADING_MODE=paper" in text and "LIVE_TRADING_ENABLED=false" in text and "LIVE_ACCOUNT_CONFIRMED=false" in text
+
+
+def test_empty_secret_private_key_does_not_pass_the_live_gate():
+    # SecretStr("") is a truthy object; the gate must inspect the secret value.
+    cfg = dict(ALL)
+    cfg["hyperliquid_private_key"] = ""
+    assert Settings(**cfg).live_safety_ok() is False
+    assert "secret" not in repr(Settings(**ALL))

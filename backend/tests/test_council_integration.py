@@ -49,7 +49,9 @@ def test_council_result_is_bound_to_its_candle_and_never_reused():
     c = ctx(Bias.LONG, 0.9, candle=100)
     assert c.for_candle(100) is c
     stale = c.for_candle(101)
-    assert stale.status == NOT_RUN and stale.bias is None and stale.trade_allowed
+    # A verdict bound to another candle is a council FAILURE (fail closed), never "not run / approved".
+    assert stale.status == INCOMPLETE and stale.bias is None and not stale.trade_allowed
+    assert combine(Bias.LONG, stale).final_signal == Bias.NEUTRAL
 
 
 def test_audit_payload_has_the_four_required_fields():
@@ -100,4 +102,5 @@ async def test_council_context_for_another_candle_is_not_applied(db_session):
     c1 = make_context(1, 100.0)
     c2 = make_context(2, 100.0)
     built = _council_context(c1, None, True, Bias.SHORT, 0.95, COMPLETE)
-    assert built.for_candle(c2.candle_open_time).status == NOT_RUN
+    stale = built.for_candle(c2.candle_open_time)
+    assert stale.status == INCOMPLETE and not stale.trade_allowed and stale.bias is None

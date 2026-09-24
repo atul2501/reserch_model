@@ -38,9 +38,9 @@ class InSampleEvaluation:
 
 def evaluate_in_sample(
     version_id, dna: StrategyDNA, frame: pd.DataFrame, data: BacktestData, epoch: ResearchEpoch,
-    *, funding: list[tuple[int, float]] | None = None,
 ) -> InSampleEvaluation:
-    """`frame`/`data` MUST be the train+validation frame (see dataset.slice_train_validation)."""
+    """`frame`/`data` MUST be the train+validation frame (see dataset.slice_train_validation). Funding comes with
+    `data` (BacktestData.funding); train, validation AND walk-forward all use it."""
     s = get_settings()
     if int(frame["open_time"].iloc[-1]) > epoch.validation_end_ms:
         raise ValueError("in-sample evaluation received candles beyond the validation boundary (OOS leak)")
@@ -69,7 +69,10 @@ def evaluate_in_sample(
             wfo = run_walk_forward(
                 frame, dna, symbol=epoch.symbol, timeframe=epoch.timeframe, train_window=train_window,
                 test_window=test_window, step=test_window, starting_equity=s.agent_starting_balance,
-                fee_rate=s.paper_fee_rate, slippage_bps=s.paper_slippage_bps,
+                fee_rate=s.paper_fee_rate, slippage_bps=s.paper_slippage_bps, enforce_risk_engine=True,
+                global_max_leverage=s.max_leverage, global_max_position_size=s.max_position_size,
+                global_max_drawdown=s.max_drawdown, global_max_daily_loss=s.max_daily_loss,
+                data=data, funding=data.funding or None,      # the population's shared features, incl. funding
             )
             wfo_row = persist_walk_forward_metrics(version_id, wfo)
         except InsufficientDataError:

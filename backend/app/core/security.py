@@ -15,6 +15,8 @@ from __future__ import annotations
 import enum
 import hashlib
 import hmac
+import time
+from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request, status
@@ -67,17 +69,88 @@ def parse_api_keys(raw: str) -> list[tuple[str, Role, str]]:
     return entries
 
 
+def validate_api_keys_config(settings: Settings) -> None:
+    """Startup check: a malformed API_KEYS must stop the process with a clear
+    error instead of turning every request into an HTTP 500 later."""
+    if settings.api_auth_required:
+        parse_api_keys(settings.api_keys.get_secret_value())
+
+
 def authenticate(presented_key: str | None, settings: Settings) -> Principal | None:
     if not presented_key:
         return None
     digest = hash_api_key(presented_key)
     match: Principal | None = None
+    try:
+        entries = parse_api_keys(settings.api_keys.get_secret_value())
+    except ValueError:
+        # Fail CLOSED (401), never 500: a broken configuration authenticates nobody.
+        logger.error("api.keys_config_invalid", detail="API_KEYS is malformed; rejecting all keys")
+        return None
     # Compare against every configured key (constant-time each) so timing does
     # not reveal which entry matched or how many exist.
-    for name, role, expected in parse_api_keys(settings.api_keys):
+    for name, role, expected in entries:
         if hmac.compare_digest(digest, expected):
             match = Principal(name=name, role=role)
     return match
+
+
+class AbuseGuard:
+    """In-process brute-force lockout (per client address) and request-rate cap (per principal)."""
+
+    def __init__(self) -> None:
+        self._failures: dict[str, deque[float]] = defaultdict(deque)
+        self._locked_until: dict[str, float] = {}
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
+
+    def reset(self) -> None:
+        self._failures.clear()
+        self._locked_until.clear()
+        self._requests.clear()
+
+    def locked_seconds(self, client: str, now: float | None = None) -> int:
+        now = time.monotonic() if now is None else now
+        until = self._locked_until.get(client, 0.0)
+        if until <= now:
+            self._locked_until.pop(client, None)
+            return 0
+        return int(until - now) + 1
+
+    def record_failure(self, client: str, settings: Settings, now: float | None = None) -> bool:
+        """Returns True when this failure triggers a lockout."""
+        now = time.monotonic() if now is None else now
+        window = self._failures[client]
+        window.append(now)
+        while window and window[0] < now - settings.api_auth_failure_window_seconds:
+            window.popleft()
+        if len(window) >= settings.api_auth_max_failures:
+            self._locked_until[client] = now + settings.api_auth_lockout_seconds
+            window.clear()
+            return True
+        return False
+
+    def record_success(self, client: str) -> None:
+        self._failures.pop(client, None)
+
+    def over_rate_limit(self, principal: str, settings: Settings, now: float | None = None) -> bool:
+        limit = settings.api_rate_limit_per_minute
+        if limit <= 0:
+            return False
+        now = time.monotonic() if now is None else now
+        window = self._requests[principal]
+        while window and window[0] < now - 60:
+            window.popleft()
+        if len(window) >= limit:
+            return True
+        window.append(now)
+        return False
+
+
+abuse_guard = AbuseGuard()
+
+
+def _client_id(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 def _extract_key(request: Request) -> str | None:
@@ -98,12 +171,32 @@ def require_role(minimum: Role):
         settings = get_settings()
         if not settings.api_auth_required:
             return ANONYMOUS_ADMIN
+        client = _client_id(request)
+        locked = abuse_guard.locked_seconds(client)
+        if locked:
+            logger.warning("api.auth_locked_out", client=client, path=request.url.path, retry_after=locked)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="too many failed authentication attempts",
+                headers={"Retry-After": str(locked)},
+            )
         principal = authenticate(_extract_key(request), settings)
         if principal is None:
+            locked_now = abuse_guard.record_failure(client, settings)
+            logger.warning(
+                "api.unauthorized", client=client, path=request.url.path, method=request.method,
+                key_presented=bool(_extract_key(request)), lockout_triggered=locked_now,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+        abuse_guard.record_success(client)
+        if abuse_guard.over_rate_limit(principal.name, settings):
+            logger.warning("api.rate_limited", principal=principal.name, path=request.url.path)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="rate limit exceeded", headers={"Retry-After": "60"}
             )
         if principal.role < minimum:
             logger.warning(

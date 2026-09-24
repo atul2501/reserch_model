@@ -9,7 +9,10 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
-from app.evolution.promotion_service import MIN_STAGE_DAYS, evaluate_and_promote
+from app.core.config import get_settings
+from app.evolution.promotion_service import evaluate_and_promote
+
+MIN_STAGE_DAYS = get_settings().champion_min_stage_days      # the gate is the CONFIGURED value, not a constant
 from tests.helpers_agents import add_promotion_evidence
 from app.models.agent import Agent
 from app.models.enums import ChampionStatus, EvolutionEventType, StrategyFamily, StrategyStage
@@ -76,8 +79,7 @@ def _passing_metrics(strategy_version_id, computed_at) -> StageMetrics:
         trade_count=150,
         oos_score=0.8,
         walk_forward_consistency=0.8,
-        computed_at=computed_at,
-    )
+        computed_at=computed_at, observed_days=14.0)
 
 
 @pytest.mark.asyncio
@@ -149,8 +151,7 @@ async def test_promotes_and_retires_previous_champion_when_all_gates_pass(db_ses
         StageMetrics(
             strategy_version_id=champion.id, stage=StrategyStage.PAPER,
             net_return_pct=0.05, max_drawdown_pct=0.10, win_rate=0.5, profit_factor=1.1,
-            trade_count=120, oos_score=0.66, walk_forward_consistency=0.61, computed_at=now,
-        )
+            trade_count=120, oos_score=0.66, walk_forward_consistency=0.61, computed_at=now, observed_days=14.0)
     )
     db_session.add(_agent_with_fitness(champion.id, fitness=0.10, identifier="GEN01-AG0001"))
 
@@ -160,6 +161,9 @@ async def test_promotes_and_retires_previous_champion_when_all_gates_pass(db_ses
     db_session.add(_passing_metrics(challenger.id, computed_at=now))
     db_session.add(_agent_with_fitness(challenger.id, fitness=0.40, identifier="GEN02-AG0001"))
     await add_promotion_evidence(db_session, challenger.id)
+    # The promotion gate needs the FINAL OOS evidence itself (a validation score is no substitute).
+    db_session.add(StageMetrics(strategy_version_id=challenger.id, stage=StrategyStage.OUT_OF_SAMPLE, net_return_pct=0.1,
+                                max_drawdown_pct=0.05, trade_count=40, oos_score=0.8, computed_at=now))
     await db_session.commit()
 
     decision = await evaluate_and_promote(db_session, challenger.id, stage=StrategyStage.PAPER)

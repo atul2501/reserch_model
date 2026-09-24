@@ -1,6 +1,6 @@
 [Unit]
 Description=Trading Lab API (FastAPI/uvicorn)
-After=network.target
+After=network.target postgresql.service
 
 [Service]
 Type=simple
@@ -8,11 +8,23 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/home/ec2-user/reserch_model/backend
 Environment="PYTHONUNBUFFERED=1"
-# Secrets live OUTSIDE the repo (root-owned, mode 0600) — never in git.
-EnvironmentFile=-/etc/trading-lab/env
+# API needs DATABASE_URL + API_KEYS only. It does NOT get HYPERLIQUID_PRIVATE_KEY or OLLAMA_API_KEY(S):
+# keep those in /etc/trading-lab/env (worker/research only). Root-owned, mode 0600.
+EnvironmentFile=/etc/trading-lab/api.env
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/home/ec2-user/reserch_model/backend/data /home/ec2-user/reserch_model/backend/logs
 ExecStart=/home/ec2-user/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5

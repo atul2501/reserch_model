@@ -3,6 +3,7 @@ into chronologically-split epochs (TRAIN / VALIDATION / FINAL-OOS)."""
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -66,32 +67,121 @@ async def load_funding(db: AsyncSession, symbol: str, start_ms: int, end_ms: int
     return [(int(t), float(r)) for t, r in rows]
 
 
+class EpochIntegrityError(RuntimeError):
+    """The candles now stored for a sealed epoch no longer match what was sealed (missing or revised bars)."""
+
+
+class NoActiveEpochError(RuntimeError):
+    pass
+
+
+def _oos_fingerprint(oos_slice: pd.DataFrame, bounds: tuple[int, int, int, int]) -> str:
+    """Fingerprint of the sealed holdout: the OOS candles PLUS the chronological boundaries. Independent of anything
+    that happens to the market after the seal, so it is stable for the epoch's whole life."""
+    h = hashlib.sha256()
+    h.update(np.ascontiguousarray(oos_slice[_COLS].to_numpy(dtype="<f8")).tobytes())
+    h.update(("|".join(str(b) for b in bounds)).encode())
+    return h.hexdigest()
+
+
+async def get_active_epoch(db: AsyncSession, symbol: str, timeframe: str) -> ResearchEpoch | None:
+    return (
+        await db.execute(
+            select(ResearchEpoch).where(
+                ResearchEpoch.symbol == symbol, ResearchEpoch.timeframe == timeframe, ResearchEpoch.active.is_(True)
+            ).order_by(ResearchEpoch.created_at.desc()).limit(1)
+        )
+    ).scalars().first()
+
+
+def _build_epoch(candles: pd.DataFrame, *, symbol: str, timeframe: str, train_fraction: float, validation_fraction: float,
+                 reason: str, supersedes: str | None) -> ResearchEpoch:
+    n = len(candles)
+    oos_n = max(1, round(n * (1.0 - train_fraction - validation_fraction)))
+    pre = candles.iloc[: n - oos_n]
+    oos = candles.iloc[n - oos_n:]
+    if len(pre) < 2 or len(oos) < 1:
+        raise ValueError("not enough candles to seal a train/validation/OOS epoch")
+    train_n = int(len(pre) * train_fraction / (train_fraction + validation_fraction))
+    train_end_ms = int(pre["open_time"].iloc[max(0, train_n - 1)])
+    validation_end_ms = int(pre["open_time"].iloc[-1])
+    oos_start_ms, oos_end_ms = int(oos["open_time"].iloc[0]), int(oos["open_time"].iloc[-1])
+    start_ms = int(candles["open_time"].iloc[0])
+    bounds = (start_ms, train_end_ms, validation_end_ms, oos_end_ms)
+    fp = _oos_fingerprint(oos, bounds)
+    return ResearchEpoch(
+        epoch_id=f"EPOCH-{fp[:12]}", symbol=symbol, timeframe=timeframe, start_ms=start_ms, end_ms=oos_end_ms,
+        n_candles=n, dataset_fingerprint=fp, train_end_ms=train_end_ms, validation_end_ms=validation_end_ms,
+        oos_locked=True, oos_start_ms=oos_start_ms, oos_end_ms=oos_end_ms, oos_fingerprint=fp, active=True,
+        sealed_at=datetime.now(timezone.utc), renewal_reason=reason, supersedes_epoch_id=supersedes,
+    )
+
+
+async def seal_epoch(
+    db: AsyncSession, candles: pd.DataFrame, *, symbol: str, timeframe: str, reason: str = "initial",
+    train_fraction: float | None = None, validation_fraction: float | None = None, supersedes: str | None = None,
+) -> ResearchEpoch:
+    """Freezes `candles` as an epoch: TRAIN and VALIDATION strictly before a fixed, sealed OOS range. The OOS range,
+    its fingerprint and the boundaries never change afterwards (DB triggers + ORM guard), no matter how many candles
+    arrive later."""
+    s = get_settings()
+    epoch = _build_epoch(
+        candles, symbol=symbol, timeframe=timeframe,
+        train_fraction=train_fraction if train_fraction is not None else s.research_train_fraction,
+        validation_fraction=validation_fraction if validation_fraction is not None else s.research_validation_fraction,
+        reason=reason, supersedes=supersedes,
+    )
+    existing = (await db.execute(select(ResearchEpoch).where(ResearchEpoch.dataset_fingerprint == epoch.dataset_fingerprint))).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    db.add(epoch)
+    await db.flush()
+    return epoch
+
+
 async def get_or_create_epoch(
     db: AsyncSession, candles: pd.DataFrame, *, symbol: str, timeframe: str,
     train_fraction: float | None = None, validation_fraction: float | None = None,
 ) -> tuple[ResearchEpoch, bool]:
-    """Freezes `candles` as a research epoch. The same data always maps to the
-    same epoch (unique fingerprint), so its OOS slice can be consumed only once
-    per strategy version no matter how often the pipeline is re-run."""
-    s = get_settings()
-    train_fraction = train_fraction if train_fraction is not None else s.research_train_fraction
-    validation_fraction = validation_fraction if validation_fraction is not None else s.research_validation_fraction
-    fp = fingerprint_frame(candles)
-    existing = (await db.execute(select(ResearchEpoch).where(ResearchEpoch.dataset_fingerprint == fp))).scalar_one_or_none()
-    if existing is not None:
-        return existing, False
-    split = chronological_split(candles, train_fraction=train_fraction, validation_fraction=validation_fraction)
-    epoch = ResearchEpoch(
-        epoch_id=f"EPOCH-{fp[:12]}", symbol=symbol, timeframe=timeframe,
-        start_ms=int(candles["open_time"].iloc[0]), end_ms=int(candles["open_time"].iloc[-1]), n_candles=len(candles),
-        dataset_fingerprint=fp,
-        train_end_ms=int(split.train["open_time"].iloc[-1]),
-        validation_end_ms=int(split.validation["open_time"].iloc[-1]),
-        oos_locked=True,
-    )
-    db.add(epoch)
-    await db.flush()
+    """The ACTIVE sealed epoch if there is one (whatever `candles` the caller happens to hold now - the holdout does not
+    move as data arrives); otherwise seal one from `candles`. Returns (epoch, created)."""
+    active = await get_active_epoch(db, symbol, timeframe)
+    if active is not None:
+        return active, False
+    epoch = await seal_epoch(db, candles, symbol=symbol, timeframe=timeframe, reason="initial",
+                             train_fraction=train_fraction, validation_fraction=validation_fraction)
     return epoch, True
+
+
+async def renew_epoch(
+    db: AsyncSession, candles: pd.DataFrame, *, symbol: str, timeframe: str, reason: str,
+) -> ResearchEpoch:
+    """The ONLY way a holdout is replaced: an explicit, reasoned operator action. The old epoch is superseded (kept
+    forever, still queryable, its OOS evaluations untouched); the new one is sealed from `candles`."""
+    if not reason or not reason.strip():
+        raise ValueError("renewing the OOS epoch requires a reason (it is recorded permanently)")
+    old = await get_active_epoch(db, symbol, timeframe)
+    epoch = await seal_epoch(db, candles, symbol=symbol, timeframe=timeframe, reason=reason.strip()[:256],
+                             supersedes=old.epoch_id if old is not None else None)
+    if old is not None and old.id != epoch.id:
+        old.active = False
+        old.superseded_at = datetime.now(timezone.utc)
+        await db.flush()
+    return epoch
+
+
+async def load_epoch_candles(db: AsyncSession, epoch: ResearchEpoch) -> pd.DataFrame:
+    """The epoch's frame, loaded by its FIXED bounds [start_ms, oos_end_ms] - so it is identical on every cycle and
+    unaffected by new candles - and verified against the sealed fingerprint. Raises EpochIntegrityError if bars are
+    missing or were revised: a holdout that changed under our feet must never be evaluated silently."""
+    frame = await load_confirmed_candles(db, epoch.symbol, epoch.timeframe, start_ms=epoch.start_ms, end_ms=epoch.oos_end_ms)
+    if len(frame) != epoch.n_candles:
+        raise EpochIntegrityError(f"{epoch.epoch_id}: {len(frame)} confirmed candles found, {epoch.n_candles} were sealed")
+    oos = frame[frame["open_time"] >= epoch.oos_start_ms]
+    bounds = (epoch.start_ms, epoch.train_end_ms, epoch.validation_end_ms, epoch.oos_end_ms)
+    if _oos_fingerprint(oos, bounds) != epoch.oos_fingerprint:
+        raise EpochIntegrityError(f"{epoch.epoch_id}: the sealed OOS candles no longer match their fingerprint")
+    return frame
 
 
 def slice_train_validation(candles: pd.DataFrame, epoch: ResearchEpoch) -> pd.DataFrame:

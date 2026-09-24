@@ -8,8 +8,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from app.backtesting.data import prepare_backtest_data
+from app.backtesting.data import BacktestData, prepare_backtest_data
 from app.backtesting.engine import BacktestResult, run_backtest
+from app.core.config import get_settings
 from app.market.feature_engine import MIN_CANDLES_REQUIRED
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.engine import dna_indicator_specs
@@ -75,7 +76,24 @@ def run_walk_forward(
     starting_equity: float,
     fee_rate: float,
     slippage_bps: float,
+    enforce_risk_engine: bool = True,
+    global_max_leverage: float | None = None,
+    global_max_position_size: float | None = None,
+    global_max_drawdown: float | None = None,
+    global_max_daily_loss: float | None = None,
+    funding: list[tuple[int, float]] | None = None,
+    data: BacktestData | None = None,
 ) -> WalkForwardReport:
+    """Every window runs under the SAME assumptions as the live research engine and the in-sample runs: the real Risk
+    Engine and its global caps (defaults come from settings, never silently disabled), exchange funding, fees,
+    slippage, margin, stops, cooldown and sizing. `data` lets the caller share the population's prepared features."""
+    s = get_settings()
+    caps = dict(
+        global_max_leverage=s.max_leverage if global_max_leverage is None else global_max_leverage,
+        global_max_position_size=s.max_position_size if global_max_position_size is None else global_max_position_size,
+        global_max_drawdown=s.max_drawdown if global_max_drawdown is None else global_max_drawdown,
+        global_max_daily_loss=s.max_daily_loss if global_max_daily_loss is None else global_max_daily_loss,
+    )
     windows: list[WalkForwardWindow] = []
     n = len(candles)
     window_index = 0
@@ -84,9 +102,10 @@ def run_walk_forward(
     # Features (static + this DNA's indicators) are computed ONCE for the whole
     # dataset and every window re-uses them — walk-forward is then a cheap set
     # of index slices rather than N full feature recomputations.
-    data = prepare_backtest_data(
-        candles, symbol=symbol, timeframe=timeframe, specs=dna_indicator_specs(dna)
-    ) if n >= MIN_CANDLES_REQUIRED + 5 else None
+    if data is None and n >= MIN_CANDLES_REQUIRED + 5:
+        data = prepare_backtest_data(
+            candles, symbol=symbol, timeframe=timeframe, specs=dna_indicator_specs(dna), funding=funding
+        )
 
     while start + train_window + test_window <= n:
         test_start = start + train_window
@@ -97,8 +116,8 @@ def run_walk_forward(
         # DNA is fixed, this is a rolling out-of-time test, not re-optimisation.)
         result = run_backtest(
             candles, dna, symbol=symbol, timeframe=timeframe, starting_equity=starting_equity,
-            fee_rate=fee_rate, slippage_bps=slippage_bps, data=data,
-            start_index=test_start, end_index=test_end,
+            fee_rate=fee_rate, slippage_bps=slippage_bps, data=data, funding=funding,
+            enforce_risk_engine=enforce_risk_engine, start_index=test_start, end_index=test_end, **caps,
         )
         windows.append(
             WalkForwardWindow(

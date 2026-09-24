@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass, field
 
 import pandas as pd
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +34,21 @@ from app.models.market import FundingRate, MarketCandle
 
 logger = get_logger(__name__)
 
-STALE_DATA_THRESHOLD_SECONDS = 180  # legacy default; runtime value comes from settings
+# SQLite (32766) and asyncpg (32767) cap bind parameters per statement. A candle row binds ~17
+# values, so one multi-row INSERT tops out near 1900 rows: never send more than this per statement.
+UPSERT_CHUNK_ROWS = 1000
+IN_CLAUSE_CHUNK = 500
+# Gap recovery / backfill request size (bars per REST page; the exchange itself caps a snapshot at 5000).
+RECOVERY_PAGE_BARS = 1000
+
+
+class CandleNotFinalError(RuntimeError):
+    """A candle about to drive a decision is not (or is no longer) the confirmed bar we computed on."""
+
+
+def _chunks(items: list, size: int):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
 
 _CANDLE_COLUMNS = ["open_time", "open", "high", "low", "close", "volume", "funding_rate", "open_interest"]
 
@@ -98,8 +112,13 @@ class MarketDataService:
         start_ms = end_ms - interval_ms * lookback_candles
 
         t_fetch = time.monotonic()
-        raw = await self._client.get_candles(self._symbol, self._timeframe, start_ms, end_ms)
-        metrics.observe("market_data_latency_seconds", time.monotonic() - t_fetch)
+        try:
+            raw = await self._client.get_candles(self._symbol, self._timeframe, start_ms, end_ms)
+        except Exception:
+            metrics.inc("market_data_errors", operation="sync_recent_candles")
+            raise
+        finally:
+            metrics.observe("market_data_latency_seconds", time.monotonic() - t_fetch)
         if not raw:
             logger.warning("market_data.empty_response", symbol=self._symbol)
             metrics.inc("market_data_empty_responses")
@@ -156,48 +175,76 @@ class MarketDataService:
                 }
             )
 
-        await self._log_revised_final_candles(db, rows)
-
-        insert = _dialect_insert(db)
-        stmt = insert(MarketCandle).values(rows)
-        update_cols = {
-            col: getattr(stmt.excluded, col)
-            for col in ("close_time", "open", "high", "low", "close", "volume", "trade_count", "is_final")
-        }
-        # Never blank out (or rewrite) previously stored funding/OI context.
-        update_cols["funding_rate"] = func.coalesce(stmt.excluded.funding_rate, MarketCandle.funding_rate)
-        update_cols["open_interest"] = func.coalesce(stmt.excluded.open_interest, MarketCandle.open_interest)
-        # A confirmed bar never reverts to "open" (guards out-of-order pushes).
-        update_cols["is_final"] = MarketCandle.is_final | stmt.excluded.is_final
-        stmt = stmt.on_conflict_do_update(index_elements=["symbol", "timeframe", "open_time"], set_=update_cols)
-        await db.execute(stmt)
-        await db.commit()
+        try:
+            await self._log_revised_final_candles(db, rows)
+            insert = _dialect_insert(db)
+            for chunk in _chunks(rows, UPSERT_CHUNK_ROWS):
+                stmt = insert(MarketCandle).values(chunk)
+                excluded = stmt.excluded
+                # A CONFIRMED bar is immutable: a late/partial WebSocket frame or a REST re-fetch must never
+                # rewrite the OHLCV a decision may already have been computed on. Only funding/OI context
+                # (informational, coalesced) may still attach to a final row.
+                update_cols = {
+                    col: case((MarketCandle.is_final.is_(True), getattr(MarketCandle, col)), else_=getattr(excluded, col))
+                    for col in ("close_time", "open", "high", "low", "close", "volume", "trade_count")
+                }
+                update_cols["funding_rate"] = func.coalesce(excluded.funding_rate, MarketCandle.funding_rate)
+                update_cols["open_interest"] = func.coalesce(excluded.open_interest, MarketCandle.open_interest)
+                # A confirmed bar never reverts to "open" (guards out-of-order pushes).
+                update_cols["is_final"] = MarketCandle.is_final | excluded.is_final
+                stmt = stmt.on_conflict_do_update(index_elements=["symbol", "timeframe", "open_time"], set_=update_cols)
+                await db.execute(stmt)
+            await db.commit()
+        except Exception:
+            await db.rollback()  # never leave the session in an aborted transaction (PostgreSQL)
+            raise
         return len(rows)
 
     async def _log_revised_final_candles(self, db: AsyncSession, rows: list[dict]) -> None:
-        """A confirmed bar whose OHLCV later changes means a decision may have
-        been computed on data that was not yet final. Rare by construction
-        (grace period) — but it must be visible, not silent."""
-        finals = [r for r in rows if r["is_final"]]
-        if not finals:
-            return
-        existing = (
-            await db.execute(
-                select(MarketCandle).where(
-                    MarketCandle.symbol == self._symbol,
-                    MarketCandle.timeframe == self._timeframe,
-                    MarketCandle.is_final.is_(True),
-                    MarketCandle.open_time.in_([r["open_time"] for r in finals]),
+        """An incoming frame (final OR a late partial one) that disagrees with an already-CONFIRMED bar is
+        never applied (confirmed bars are immutable) - but it must be visible, not silent."""
+        by_time: dict[int, MarketCandle] = {}
+        for chunk in _chunks([r["open_time"] for r in rows], IN_CLAUSE_CHUNK):
+            existing = (
+                await db.execute(
+                    select(MarketCandle).where(
+                        MarketCandle.symbol == self._symbol,
+                        MarketCandle.timeframe == self._timeframe,
+                        MarketCandle.is_final.is_(True),
+                        MarketCandle.open_time.in_(chunk),
+                    )
                 )
-            )
-        ).scalars().all()
-        by_time = {c.open_time: c for c in existing}
-        for r in finals:
+            ).scalars().all()
+            by_time.update({c.open_time: c for c in existing})
+        for r in rows:
             old = by_time.get(r["open_time"])
             if old is None:
                 continue
             if any(abs(getattr(old, k) - r[k]) > 1e-9 for k in ("open", "high", "low", "close", "volume")):
-                logger.error("market_data.final_candle_revised", open_time=r["open_time"], symbol=self._symbol)
+                metrics.inc("candle_revision_ignored", incoming_final=str(bool(r["is_final"])).lower())
+                logger.error(
+                    "market_data.confirmed_candle_revision_ignored", open_time=r["open_time"], symbol=self._symbol,
+                    incoming_final=bool(r["is_final"]),
+                )
+
+    async def verify_candle_final(self, db: AsyncSession, open_time: int, *, expected_close: float | None = None) -> None:
+        """Last gate before execution: the bar a decision is about to act on must still be the CONFIRMED bar
+        (is_final, present, and not revised since the features were computed). Raises CandleNotFinalError."""
+        row = (
+            await db.execute(
+                select(MarketCandle).where(
+                    MarketCandle.symbol == self._symbol,
+                    MarketCandle.timeframe == self._timeframe,
+                    MarketCandle.open_time == open_time,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None or not row.is_final:
+            raise CandleNotFinalError(f"candle {open_time} is not a confirmed bar")
+        if not self.is_confirmed(row.close_time):
+            raise CandleNotFinalError(f"candle {open_time} closes in the future relative to the market clock")
+        if expected_close is not None and abs(row.close - expected_close) > 1e-9:
+            raise CandleNotFinalError(f"candle {open_time} changed since features were computed")
 
     async def sync_funding_history(self, db: AsyncSession) -> int:
         """Upserts exchange-published funding settlements for accrual."""
@@ -236,8 +283,15 @@ class MarketDataService:
         total = 0
         cursor = start_ms
         while cursor < end_ms:
-            raw = await self._client.get_candles(self._symbol, self._timeframe, cursor, min(end_ms, cursor + step))
-            total += await self.upsert_candles(db, raw)
+            t0 = time.monotonic()
+            try:
+                raw = await self._client.get_candles(self._symbol, self._timeframe, cursor, min(end_ms, cursor + step))
+            except Exception:
+                metrics.inc("market_data_errors", operation="backfill")
+                raise
+            finally:
+                metrics.observe("market_data_backfill_latency_seconds", time.monotonic() - t0)
+            total += await self.upsert_candles(db, raw)   # chunked: never exceeds the bind-parameter limit
             cursor += step
         return total
 
@@ -278,11 +332,13 @@ class MarketDataService:
             start, end = min(report.missing_before), max(report.missing_before) + step
             logger.warning("market_data.gap_detected", missing=len(report.missing_before), first=start, last=end - step)
             try:
-                raw = await self._client.get_candles(self._symbol, self._timeframe, start, end)
-                report.backfilled = await self.upsert_candles(db, raw)
+                # Paged: a long outage must never become one giant request/INSERT.
+                report.backfilled = await self.backfill_history(db, start, end, page_bars=RECOVERY_PAGE_BARS)
             except Exception as exc:
+                await db.rollback()
+                metrics.inc("market_data_errors", operation="gap_backfill")
                 logger.error("market_data.gap_backfill_failed", error=str(exc))
-            report.missing_after = await self.detect_gaps(db)
+            report.missing_after = await self.detect_gaps(db)   # validate continuity after the backfill
         else:
             report.missing_after = []
 

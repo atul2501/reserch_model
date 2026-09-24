@@ -3,7 +3,8 @@ immutable-by-convention record — dataset fingerprint, periods, strategy,
 parameters, code version, schema version, seed."""
 from __future__ import annotations
 
-import os
+import hashlib
+import json
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.backtesting.engine import ENGINE_VERSION
 from app.models.research import Experiment, ResearchEpoch
 
 _BACKEND = Path(__file__).resolve().parents[2]
@@ -21,9 +23,11 @@ _BACKEND = Path(__file__).resolve().parents[2]
 def code_version() -> str:
     """Git commit (short) of the running code; `CODE_VERSION` env overrides
     (containers without a .git directory); else 'unknown'."""
-    env = os.environ.get("CODE_VERSION")
-    if env:
-        return env[:64]
+    from app.core.config import get_settings
+
+    configured = get_settings().code_version
+    if configured:
+        return configured[:64]
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "--short=12", "HEAD"], cwd=_BACKEND, capture_output=True, text=True, timeout=5
@@ -50,6 +54,24 @@ def schema_version() -> str:
         return ScriptDirectory.from_config(cfg).get_current_head() or "unknown"
     except Exception:
         return "unknown"
+
+
+def parameter_hash() -> str:
+    """Hash of every execution/risk/data parameter that shapes a simulation result. Two experiments with the same
+    (code_version, engine_version, parameter_hash, dataset_fingerprint, seed) are the same experiment."""
+    from app.core.config import get_settings
+    from app.market.feature_engine import FEATURE_WINDOW
+
+    s = get_settings()
+    params = {k: getattr(s, k) for k in (
+        "paper_fee_rate", "paper_maker_fee_rate", "paper_slippage_bps", "paper_slippage_impact_bps_per_10k",
+        "paper_stop_slippage_multiplier", "paper_min_order_notional", "paper_quantity_step", "paper_fill_timing",
+        "maintenance_margin_rate", "liquidation_fee_rate", "liquidation_is_fatal", "agent_bankruptcy_equity_fraction",
+        "max_leverage", "max_position_size", "max_exposure_multiple", "max_loss_per_trade_fraction", "max_drawdown",
+        "max_daily_loss", "agent_starting_balance", "research_train_fraction", "research_validation_fraction",
+    )}
+    params["feature_window"] = FEATURE_WINDOW
+    return hashlib.sha256(json.dumps(params, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def new_experiment_id(kind: str) -> str:
@@ -81,6 +103,8 @@ async def register_experiment(
         parameters=parameters,
         code_version=code_version(),
         schema_version=schema_version(),
+        engine_version=ENGINE_VERSION,
+        parameter_hash=parameter_hash(),
         random_seed=seed,
     )
     db.add(exp)

@@ -21,7 +21,6 @@ import asyncio
 import time
 from datetime import datetime, timezone
 
-import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import metrics
@@ -33,7 +32,7 @@ from app.models.council import CouncilAnalysis, CouncilDecision
 from app.models.enums import Bias
 from app.schemas.council import ANALYST_NAMES, AnalystResponse, ConsensusResult, JudgeResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient, OllamaError
+from app.services.ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -48,6 +47,7 @@ call. Respond with ONLY a JSON object:
   "key_risks": ["..."],
   "invalidators": ["..."]
 }
+key_risks and invalidators: AT MOST 10 items each, ordered MOST IMPORTANT FIRST.
 When in doubt, prefer NEUTRAL over a low-confidence directional call."""
 
 
@@ -129,6 +129,8 @@ async def run_council_cycle(
     failed = [r for r in results if r.response is None]
     successful_analysts = len(succeeded)
     failed_analysts = [r.analyst for r in failed]
+    for r in failed:   # per-analyst failure accounting (a dead analyst/credential is visible per name, not only as a quorum miss)
+        metrics.inc("council_analyst_failures", analyst=r.analyst, reason=_failure_bucket(r.error))
     failure_reasons = {r.analyst: (r.error or "unknown_error") for r in failed}
     quorum_met = successful_analysts >= settings.council_min_successful_analysts
 
@@ -179,14 +181,38 @@ async def run_council_cycle(
         )
 
         remaining = deadline - (time.monotonic() - council_start_monotonic)
-        if not consensus.is_strong_consensus and settings.judge_enabled and remaining > 2.0:
-            try:
-                judge_response = await asyncio.wait_for(_run_judge(client, context, valid_responses), timeout=remaining)
-            except asyncio.TimeoutError:
-                logger.error("council.judge_deadline_exceeded", remaining=remaining)
-                judge_response = None
+        if not consensus.is_strong_consensus:
+            judge_response: JudgeResponse | None = None
+            judge_failure: str | None = None
+            if not settings.judge_enabled:
+                pass  # operator choice, not a failure: the council abstains (see below)
+            elif remaining <= 2.0:
+                judge_failure = "judge_skipped_no_time_left"
+            else:
+                try:
+                    judge_response = await asyncio.wait_for(
+                        _run_judge(client, context, valid_responses), timeout=remaining
+                    )
+                except asyncio.TimeoutError:
+                    logger.error("council.judge_deadline_exceeded", remaining=remaining)
+                if judge_response is None:
+                    judge_failure = "judge_failed_or_timed_out"
             if judge_response is not None:
                 consensus = apply_judge(consensus, judge_response)
+            else:
+                # Weak consensus and no judge ruling. The plurality of a 3-3 split is an ARBITRARY
+                # direction (dict order), so it must never leave the council: the council abstains.
+                update: dict = {"final_bias": Bias.NEUTRAL, "final_confidence": 0.0}
+                if judge_failure is not None:
+                    # The judge was required to break the tie and could not: fail CLOSED.
+                    update.update(
+                        council_status="INCOMPLETE", trade_allowed=False,
+                        failure_reasons={**failure_reasons, "judge": judge_failure},
+                    )
+                    metrics.inc("council_judge_failures")
+                    logger.error("council.judge_unavailable_failing_closed", reason=judge_failure,
+                                 candle_open_time=context.candle_open_time)
+                consensus = consensus.model_copy(update=update)
         consensus_time_monotonic = time.monotonic()
 
     decision_row = CouncilDecision(
@@ -205,11 +231,14 @@ async def run_council_cycle(
         expected_analysts=expected_analysts,
         successful_analysts=successful_analysts,
         failed_analysts=failed_analysts,
-        failure_reasons=failure_reasons,
+        failure_reasons=consensus.failure_reasons,
         quorum_met=quorum_met,
         trade_allowed=consensus.trade_allowed,
         council_start=council_start_epoch,
         total_council_latency_seconds=time.monotonic() - council_start_monotonic,
+        council_completed_at=time.time(),
+        consensus_time_seconds=consensus_time_monotonic - council_start_monotonic,
+        failed_count=len(failed_analysts),
     )
     db.add(decision_row)
     await db.flush()
@@ -231,6 +260,11 @@ async def run_council_cycle(
                 latency_ms=r.latency_ms,
                 model=r.model,
                 was_valid=r.response is not None,
+                raw_response=(
+                    {"normalization": r.normalization} if r.normalization
+                    else {} if r.response is not None
+                    else {"validation_failure": (r.error or "unknown_error")[:500]}
+                ),
                 started_at=r.started_at,
                 completed_at=r.completed_at,
             )
@@ -241,6 +275,8 @@ async def run_council_cycle(
     consensus = consensus.model_copy(
         update={
             "council_decision_id": decision_row.id,
+            "candle_open_time": context.candle_open_time,
+            "council_completed_at": decision_row.council_completed_at,
             "council_start": council_start_epoch,
             "consensus_time": consensus_time_monotonic - council_start_monotonic,
             "total_council_latency": total_latency,
@@ -274,9 +310,18 @@ async def _run_judge(client: OllamaClient, context: MarketContext, responses: li
             system_prompt=_JUDGE_SYSTEM_PROMPT, user_prompt=user_prompt, response_model=JudgeResponse
         )
         return judge_response
-    except (OllamaError, httpx.HTTPError) as exc:
+    except Exception as exc:  # noqa: BLE001 - a judge failure of ANY kind must fail closed, never crash the cycle
         logger.error("council.judge_failed", candle_open_time=context.candle_open_time, error=str(exc))
         return None
+
+
+def _failure_bucket(error: str | None) -> str:
+    e = (error or "").lower()
+    for needle, bucket in (("timeout", "timeout"), ("deadline", "deadline"), ("unavailable", "unavailable"), ("401", "auth"),
+                           ("403", "auth"), ("429", "rate_limited"), ("json", "malformed"), ("schema", "malformed"), ("validation", "malformed")):
+        if needle in e:
+            return bucket
+    return "error"
 
 
 def _open_time_to_dt(open_time_ms: int) -> datetime:

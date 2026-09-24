@@ -10,6 +10,9 @@ import websockets
 from app.market.hyperliquid_ws import HyperliquidWebSocket
 
 
+NOW_MS = 600_000   # injected wall clock; frames in these tests are dated at/before it
+
+
 def candle(t, c=100.0, v=10.0, coin="SOL", interval="1m", **kw):
     d = {"t": t, "T": t + 59_999, "s": coin, "i": interval, "o": "100", "c": str(c), "h": "101", "l": "99", "v": str(v), "n": 5}
     d.update(kw)
@@ -67,6 +70,8 @@ def make(url, sink, **kw):
     async def on(raws):
         sink.extend(raws)
     kw.setdefault("backoff_min", 0.05); kw.setdefault("backoff_max", 0.2)
+    kw.setdefault("clock_ms", lambda: NOW_MS)
+    kw.setdefault("stale_frame_intervals", 10**6)   # transport tests use arbitrary old timestamps; the stale test opts in
     return HyperliquidWebSocket(url, "SOL", "1m", on, **kw)
 
 
@@ -215,6 +220,102 @@ async def test_callback_failure_does_not_kill_the_stream():
         await asyncio.sleep(5)
 
     async with FakeServer(script) as srv:
-        client = HyperliquidWebSocket(srv.url, "SOL", "1m", bad, backoff_min=0.05)
+        client = HyperliquidWebSocket(srv.url, "SOL", "1m", bad, backoff_min=0.05, clock_ms=lambda: NOW_MS, stale_frame_intervals=10**6)
         await _run_until(client, lambda: len(seen) == 2)
     assert client.stats.connects == 1
+
+
+# --- future / stale frames, retry-after-failure, heartbeat (spec phase 13) -----------------------------
+
+
+async def test_future_dated_frame_is_dropped_and_never_becomes_the_latest_candle():
+    got = []
+
+    async def script(ws, idx):
+        await ws.send(json.dumps(candle(NOW_MS + 3_600_000)))      # an hour in the future: bogus
+        await ws.send(json.dumps(candle(NOW_MS - 60_000)))          # real frames must still flow afterwards
+        await ws.send(json.dumps(candle(NOW_MS)))
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = make(srv.url, got)
+        await _run_until(client, lambda: len(got) == 2)
+    assert [g["t"] for g in got] == [NOW_MS - 60_000, NOW_MS]
+    assert client.stats.future_frames == 1
+    assert client.stats.newest_open_time == NOW_MS           # NOT the bogus future bar
+    assert client.stats.out_of_order == 0                     # the bogus frame did not poison ordering
+
+
+async def test_impossible_close_time_is_rejected():
+    got = []
+
+    async def script(ws, idx):
+        await ws.send(json.dumps(candle(NOW_MS, T=NOW_MS + 10 * 60_000)))    # a "1m" bar that closes in 10 minutes
+        await ws.send(json.dumps(candle(NOW_MS)))
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = make(srv.url, got)
+        await _run_until(client, lambda: len(got) == 1)
+    assert client.stats.invalid == 1
+
+
+async def test_stale_frames_far_behind_the_wall_clock_are_dropped():
+    got = []
+
+    async def script(ws, idx):
+        await ws.send(json.dumps(candle(NOW_MS - 10 * 60_000)))    # ten intervals old: history is REST's job
+        await ws.send(json.dumps(candle(NOW_MS)))
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = make(srv.url, got, stale_frame_intervals=3)
+        await _run_until(client, lambda: len(got) == 1)
+    assert client.stats.stale_frames == 1
+
+
+async def test_identical_frame_is_redelivered_after_a_failed_delivery():
+    """A DB hiccup must not turn the exchange's retry of the SAME frame into a swallowed 'duplicate'."""
+    attempts = []
+
+    async def flaky(raws):
+        attempts.append(raws)
+        if len(attempts) == 1:
+            raise RuntimeError("db down")
+
+    async def script(ws, idx):
+        await ws.send(json.dumps(candle(NOW_MS)))
+        await asyncio.sleep(0.1)
+        await ws.send(json.dumps(candle(NOW_MS)))      # identical retry
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = HyperliquidWebSocket(srv.url, "SOL", "1m", flaky, backoff_min=0.05, clock_ms=lambda: NOW_MS, stale_frame_intervals=10**6)
+        await _run_until(client, lambda: len(attempts) == 2)
+    assert client.stats.delivery_failures == 1 and client.stats.duplicates == 0 and client.stats.candles_delivered == 1
+
+
+async def test_pongs_are_tracked():
+    got = []
+
+    async def script(ws, idx):
+        await ws.send(json.dumps({"channel": "pong"}))
+        await ws.send(json.dumps({"channel": "pong"}))
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = make(srv.url, got)
+        await _run_until(client, lambda: client.stats.pongs_received == 2)
+    assert client.stats.last_pong_monotonic is not None
+
+
+async def test_heartbeat_failure_forces_a_reconnect_instead_of_limping_on():
+    async def script(ws, idx):
+        if idx == 0:
+            await ws.close()          # server vanishes right after connect; the next ping send must fail
+        await asyncio.sleep(0.6)
+
+    async with FakeServer(script) as srv:
+        client = make(srv.url, [], ping_interval=0.05)
+        await _run_until(client, lambda: client.stats.connects >= 2)
+    assert client.stats.reconnects >= 1

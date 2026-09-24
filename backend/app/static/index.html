@@ -558,7 +558,7 @@ async function refresh() {
   await section("health", async () => {
     const h = await get("/api/system/health");
     document.getElementById("badges").innerHTML =
-      `<span class="badge"><span class="dot ${h.trading_mode === 'live' ? 'red' : 'green'}"></span>${h.trading_mode.toUpperCase()}</span>` +
+      `<span class="badge"><span class="dot ${h.trading_mode === 'live' ? 'red' : 'green'}"></span>${esc(String(h.trading_mode).toUpperCase())}</span>` +
       healthBadge(h.database_ok, "DB") +
       healthBadge(h.hyperliquid_configured, "Hyperliquid") +
       healthBadge(h.ollama_configured, "Ollama") +
@@ -813,9 +813,9 @@ async function refresh() {
         </tr>`).join("") : `<tr><td colspan="4" class="empty">No correlation data for this generation yet</td></tr>`;
       pairsTbody.innerHTML = pairRows.map(r => `
         <tr>
-          <td>${r.agent_id_a.slice(0, 8)}</td>
+          <td>${esc(String(r.agent_id_a).slice(0, 8))}</td>
           <td>${esc(r.strategy_family_a)}</td>
-          <td>${r.agent_id_b.slice(0, 8)}</td>
+          <td>${esc(String(r.agent_id_b).slice(0, 8))}</td>
           <td>${esc(r.strategy_family_b)}</td>
           <td class="num ${r.composite_correlation >= 0.8 ? 'neg' : ''}">${pct(r.composite_correlation)}</td>
         </tr>`).join("");
@@ -849,18 +849,18 @@ async function refresh() {
       ]);
       challengersTbody.innerHTML = challengers.length ? challengers.map(c => `
         <tr>
-          <td style="font-family:monospace; font-size:11px;">${c.strategy_version_id.slice(0, 8)}</td>
-          <td>${c.pipeline_stage}</td>
+          <td style="font-family:monospace; font-size:11px;">${esc(String(c.strategy_version_id).slice(0, 8))}</td>
+          <td>${esc(c.pipeline_stage)}</td>
           <td>${dateStr(new Date(c.entered_stage_at).getTime())}</td>
-          <td style="color:var(--muted); font-size:12px;">${c.blocking_reasons.join(" · ")}</td>
+          <td style="color:var(--muted); font-size:12px;">${esc((c.blocking_reasons || []).join(" · "))}</td>
         </tr>`).join("") : `<tr><td colspan="4" class="empty">No challengers evaluated for this lineage yet</td></tr>`;
       historyTbody.innerHTML = history.map(e => `
         <tr>
-          <td>${e.event_type}</td>
-          <td style="font-family:monospace; font-size:11px;">${e.parent_strategy_version_id ? e.parent_strategy_version_id.slice(0, 8) : '-'}</td>
-          <td style="font-family:monospace; font-size:11px;">${e.child_strategy_version_id ? e.child_strategy_version_id.slice(0, 8) : '-'}</td>
+          <td>${esc(e.event_type)}</td>
+          <td style="font-family:monospace; font-size:11px;">${esc(e.parent_strategy_version_id ? String(e.parent_strategy_version_id).slice(0, 8) : '-')}</td>
+          <td style="font-family:monospace; font-size:11px;">${esc(e.child_strategy_version_id ? String(e.child_strategy_version_id).slice(0, 8) : '-')}</td>
           <td class="${e.accepted ? 'pos' : 'neg'}">${e.accepted ? 'PROMOTED' : 'REJECTED'}</td>
-          <td style="color:var(--muted); font-size:12px;">${e.rejection_reason || '-'}</td>
+          <td style="color:var(--muted); font-size:12px;">${esc(e.rejection_reason || '-')}</td>
           <td>${ago(e.created_at)}</td>
         </tr>`).join("");
     });
@@ -1030,7 +1030,7 @@ async function refreshSlow() {
     const rows = (c.analysts || []).map(a => `<tr><td>${esc(a.analyst)}</td><td>${esc(a.bias)}</td><td>${fmt(a.confidence)}</td><td>${a.valid ? "ok" : "FAILED"}</td><td>${esc(a.latency_ms)} ms</td><td style="white-space:normal;max-width:520px">${esc(a.reasoning)}</td></tr>`).join("");
     const fails = Object.entries(c.failure_reasons || {}).map(([k, v]) => esc(k) + ": " + esc(v)).join("; ") || "none";
     document.getElementById("council-panel").innerHTML =
-      `<div class="hgrid" style="margin-bottom:10px">${card("Status", c.status === "COMPLETE" ? "ok" : "degraded", c.status, "quorum " + (c.quorum_met ? "met" : "NOT met") + " · " + c.successful_analysts + "/" + c.expected_analysts + " analysts")}
+      `<div class="hgrid" style="margin-bottom:10px">${card("Status", c.status === "COMPLETE" ? "ok" : "degraded", c.status, "quorum " + (c.quorum_met ? "met" : "NOT met") + " · " + esc(c.successful_analysts) + "/" + esc(c.expected_analysts) + " analysts")}
         ${card("Consensus", "ok", esc(c.consensus_bias) + " " + fmt(c.consensus_confidence), "votes " + esc(JSON.stringify(c.vote_tally)))}
         ${card("Final", c.trade_allowed ? "ok" : "down", esc(c.final_bias) + " " + fmt(c.final_confidence), c.trade_allowed ? "entries allowed" : "NO NEW TRADES")}
         ${card("Latency", "ok", (c.latency_seconds != null ? c.latency_seconds.toFixed(1) + "s" : "-"), "judge " + (c.judge_invoked ? "invoked" : "not needed"))}

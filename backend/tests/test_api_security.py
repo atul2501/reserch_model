@@ -10,6 +10,8 @@ import pytest_asyncio
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.logging import _redact
+from pydantic import SecretStr
+
 from app.core.security import Role, hash_api_key, parse_api_keys
 from app.core.system_flags import KILL_SWITCH, trading_halt_reason
 from app.main import create_app
@@ -26,7 +28,7 @@ def _keys() -> str:
 async def client(db_session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "api_auth_required", True)
-    monkeypatch.setattr(settings, "api_keys", _keys())
+    monkeypatch.setattr(settings, "api_keys", SecretStr(_keys()))
     app = create_app()
 
     async def _override():
@@ -71,7 +73,7 @@ async def test_operator_kill_switch_blocks_new_entries(client, db_session):
 async def test_auth_required_without_configured_keys_fails_closed(db_session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "api_auth_required", True)
-    monkeypatch.setattr(settings, "api_keys", "")
+    monkeypatch.setattr(settings, "api_keys", SecretStr(""))
     app = create_app()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         assert (await c.get("/api/population", headers={"X-API-Key": "anything"})).status_code == 401
@@ -135,3 +137,94 @@ def test_every_key_in_env_example_is_a_real_setting():
     legacy_ok = {"HYPERLIQUID_WALLET_ADDRESS"}
     unknown = [k for k in keys if k not in known and k not in legacy_ok]
     assert unknown == [], unknown
+
+
+# --- hardening: malformed keys, lockout, docs exposure, CSP, SSE caps, audit ---
+
+
+async def test_malformed_api_keys_config_fails_closed_401_not_500(db_session, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "api_auth_required", True)
+    monkeypatch.setattr(settings, "api_keys", SecretStr("just-a-key"))
+    app = create_app()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        assert (await c.get("/api/population", headers={"X-API-Key": "anything"})).status_code == 401
+
+
+async def test_startup_refuses_malformed_api_keys(monkeypatch):
+    from app.main import lifespan
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "api_auth_required", True)
+    monkeypatch.setattr(settings, "api_keys", SecretStr("x:superuser:" + "a" * 64))
+    with pytest.raises(RuntimeError, match="invalid API_KEYS"):
+        async with lifespan(create_app()):
+            pass
+
+
+async def test_repeated_failed_auth_locks_the_client_out(client, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "api_auth_max_failures", 3)
+    for _ in range(3):
+        assert (await client.get("/api/population", headers={"X-API-Key": "bad"})).status_code == 401
+    locked = await client.get("/api/population", headers={"X-API-Key": VIEWER_KEY})
+    assert locked.status_code == 429  # even a VALID key is refused while locked out
+    assert int(locked.headers["retry-after"]) > 0
+
+
+async def test_success_resets_the_failure_count(client, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "api_auth_max_failures", 3)
+    for _ in range(2):
+        await client.get("/api/population", headers={"X-API-Key": "bad"})
+    assert (await client.get("/api/system/flags", headers={"X-API-Key": VIEWER_KEY})).status_code == 200
+    for _ in range(2):
+        assert (await client.get("/api/population", headers={"X-API-Key": "bad"})).status_code == 401
+
+
+async def test_per_principal_rate_limit(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "api_rate_limit_per_minute", 3)
+    codes = [(await client.get("/api/system/flags", headers={"X-API-Key": VIEWER_KEY})).status_code for _ in range(5)]
+    assert codes == [200, 200, 200, 429, 429]
+
+
+async def test_docs_and_openapi_are_not_exposed_by_default(client, monkeypatch):
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert (await client.get(path)).status_code == 404
+    monkeypatch.setattr(get_settings(), "expose_api_docs", True)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app()), base_url="http://test") as c:
+        assert (await c.get("/openapi.json")).status_code == 200
+
+
+async def test_csp_and_hsts_headers(client):
+    r = await client.get("/livez")
+    csp = r.headers["content-security-policy"]
+    assert "default-src 'none'" in csp and "frame-ancestors 'none'" in csp
+    assert "strict-transport-security" not in r.headers
+    r = await client.get("/livez", headers={"x-forwarded-proto": "https"})
+    assert "max-age" in r.headers["strict-transport-security"]
+
+
+async def test_unauthorized_attempts_are_audit_logged_without_the_key(client, capsys):
+    from app.core.logging import configure_logging
+
+    configure_logging()
+    await client.get("/api/population", headers={"X-API-Key": "super-secret-attempt"})
+    out = capsys.readouterr().out
+    assert "api.unauthorized" in out
+    assert "super-secret-attempt" not in out
+
+
+async def test_sse_stream_slots_are_capped_and_released(client, monkeypatch):
+    from app.api.routes import status as status_routes
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "api_max_sse_streams_per_principal", 1)
+    slot = status_routes._acquire_stream_slot("v")
+    with pytest.raises(Exception) as exc:
+        status_routes._acquire_stream_slot("v")
+    assert getattr(exc.value, "status_code", None) == 429
+    slot.release()
+    slot.release()  # idempotent
+    assert status_routes._acquire_stream_slot("v")
+    status_routes._active_streams.clear()

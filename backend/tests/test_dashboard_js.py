@@ -88,3 +88,20 @@ def test_injected_html_in_status_text_is_escaped_in_the_health_panel(tmp_path):
     st = status(flags={"<script>alert(1)</script>": "x"})
     out = run({"evil": "", "status": st}, tmp_path)
     assert "<script>alert" not in out["health"]
+
+
+API_TEXT_FIELDS = ("pipeline_stage", "event_type", "rejection_reason", "blocking_reasons", "trading_mode",
+                   "agent_id_a", "agent_id_b", "strategy_version_id", "parent_strategy_version_id",
+                   "child_strategy_version_id", "death_reason", "halt_reason")
+
+
+def test_api_text_fields_are_never_interpolated_unescaped():
+    """Static guard: a template `${...}` that touches an API-supplied string field must be inside esc(...)."""
+    offenders = []
+    for expr in re.findall(r"\$\{((?:[^{}]|\{[^{}]*\})*)\}", SCRIPT):
+        stripped = re.sub(r"esc\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)", "", expr)   # calls to esc(...) are safe
+        stripped = re.sub(r"[\w.]+\s*[!=]==?\s*(['\"])[^'\"]*\1", "", stripped)         # pure comparisons emit no API text
+        stripped = re.sub(r"[\w.]+\s*\?(?!\?)", "", stripped)                                 # ternary condition only tests truthiness
+        if any(f in stripped for f in API_TEXT_FIELDS):
+            offenders.append(expr)
+    assert not offenders, offenders

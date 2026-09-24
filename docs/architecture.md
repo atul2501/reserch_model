@@ -120,16 +120,29 @@ and **available margin**.
 
 ## 4. Execution, margin, funding
 
+* **Fill timing** (`PAPER_FILL_TIMING`, default `next_open`): a signal on the **close** of bar N becomes a
+  persisted `PENDING` order (entry) or a pending exit on the position, filled at the **open of bar N+1**
+  and managed on that same bar - exactly the backtest's model, so paper carries no signal-bar look-ahead.
+  A pending order not filled on bar N+1 (halt, gap, restart) is `CANCELLED`, never filled late. Sizing and the
+  risk check are priced at the signal close (the only price known then); the quantity is converted at the fill
+  price. SHADOW keeps immediate fills against the live book (that is what it measures).
 * **Paper adapter**: adverse slippage = base bps + size-aware impact (stops and liquidations slip
-  more; take-profit limits pay none and the maker fee), reported latency, lot-size rounding,
-  min-notional and random rejects, partial fills, all deterministic per order id.
+  more; take-profit limits pay none and the maker fee), reported latency **and latency price drift**,
+  lot-size rounding, the real **$10 minimum notional**, random rejects (entries only) and partial fills, all
+  deterministic per order id. Realism defaults are ON in production; unit tests pin the stochastic ones off.
+* **One accounting implementation** (`execution/accounting.py`): funding, close settlement, liquidation
+  penalty, protective levels and cooldown are shared by paper, shadow, backtest, walk-forward and rollover.
+  A close that would take an account below zero floors the balance at 0 and records the shortfall as
+  `bad_debt` (agent + trade) - never a silent `max(0, ...)`. For a flat account
+  `balance = starting + realized_pnl + bad_debt` (asserted in tests, including a gap through liquidation).
 * **Margin** (cross, one position per agent): `equity = balance + uPnL`, used/maintenance/available
   margin, liquidation price `P = (qE − balance)/(q(1−mmr))` (long). Liquidation is a real
   reduce-only order plus a penalty fee and is fatal by default.
 * **OHLC ambiguity (conservative, tested)**: adverse levels are assumed reached before favourable
   ones (a bar touching stop *and* take-profit takes the stop); the level reached first going
   against the position wins; a gap through a level fills at the **open**; take-profit limits get no
-  gap price-improvement; trailing uses the *prior* bars' peak and arms after `activation_pct`.
+  gap price-improvement; trailing counts the current bar's own extreme by default
+  (`TRAILING_STOP_USES_SAME_BAR_EXTREME`: rally first, then fall - the worst case) and arms after `activation_pct`.
 * **Funding**: hourly settlements from `fundingHistory` are stored in `funding_rates` and accrued to
   open positions as `funding_payments` (rate, notional, payment, timestamp). Nothing is hard-coded to 0.
 * **PnL**: `net = gross − fees − funding` (slippage is already in the fill prices; it is reported,
@@ -180,18 +193,27 @@ flowchart TD
   FI2 --> NOM[Nominate top-K]
   NOM --> OOS[[Final OOS lockbox<br/>once per version+dataset]]
   OOS --> CC[Champion/Challenger<br/>lineage-scoped, evidence-gated]
-  FI2 --> SEL[Select (dead never parents) -> crossover/mutation -> seeded RNG]
-  SEL --> VAL{Candidate validation<br/>train-slice backtest via Risk Engine}
-  VAL -->|fail| SEL
-  VAL --> NEW[New generation: fresh $100 · snapshots · events · retire old]
+  FI2 --> SEL[Select (dead/rejected/retired never parents) -> crossover/mutation -> seeded RNG]
+  SEL --> VAL{Candidate gate: schema + behaviour lint,<br/>then train-slice backtest via Risk Engine}
+  VAL -->|fail| REJ[REJECTED event, never inserted]
+  VAL --> NEW[ONE transaction: children + elites + snapshots + retire old + new generation]
+  CC -.->|champions and observed challengers<br/>carried as elites (same version)| NEW
 ```
 
-* **Experiment registry**: `experiment_id`, dataset fingerprint (sha256 of ordered OHLCV), train /
-  validation / OOS periods, strategy version, parameters, code version (git), schema version (alembic
-  head), random seed, timestamps.
-* **OOS protection**: the evolution process never loads the final slice; `evaluate_oos_once` is the
-  only reader, enforced by `UNIQUE(strategy_version_id, dataset_fingerprint)`. The score gates
-  promotion only and is *not* an input to fitness. Fitness uses the **validation-slice** score.
+* **Experiment registry**: `experiment_id`, dataset fingerprint, train / validation / OOS periods,
+  strategy version, parameters, code version (git or `CODE_VERSION`), schema version (alembic head),
+  **engine version and a hash of every result-shaping parameter**, random seed (derived from
+  `(research_seed, epoch, generation)` and persisted), timestamps.
+* **OOS protection (frozen holdout)**: the OOS range is **sealed once** in a `ResearchEpoch` (`oos_start_ms`,
+  `oos_end_ms`, `oos_fingerprint`) and never moves as candles arrive; train/validation are strictly before it.
+  The epoch frame is loaded by fixed bounds and its OOS slice is re-verified against the fingerprint on every
+  load (a revised/missing bar => the cycle is skipped, never evaluated). Only an explicit operator command
+  (`scripts.run_research --new-oos-epoch --reason ...`) replaces it. Sealed columns and every `oos_evaluations`
+  row are immutable (ORM guard **and DB triggers**). `evaluate_oos_once` is the only reader: once per version
+  (unique constraint) and at most `RESEARCH_OOS_MAX_EVALUATIONS_PER_LINEAGE` per strategy lineage per epoch
+  (adaptive-tuning guard). Each result stores lineage, code version, seed and train/validation/OOS periods. The
+  score gates promotion only (missing OOS blocks it; the validation score is never a substitute) and paper
+  trades overlapping the OOS window are excluded from fitness.
 * **Fitness** is a bounded composite (return, profit factor / win rate, expectancy, consistency, WFO,
   validation OOS, regime robustness, adversarial robustness, survival, drawdown/instability/correlation
   penalties). Every component is clipped and every weight is an env var, so no metric can dominate;
@@ -206,6 +228,18 @@ flowchart TD
   experiment id, code + schema version, dataset fingerprint. ORM guards **and database triggers**
   refuse UPDATE/DELETE. `StrategyVersion.dna` is immutable the same way.
 
+* **Champion / challenger drives the population**: champions and challengers under observation are carried
+  into the next generation *unchanged* (same `StrategyVersion`, fresh capital, up to `CHAMPION_ELITE_SLOTS`) so
+  their track record can accumulate to a promotion decision (a bred child lives one generation, which otherwise
+  made promotion unreachable). `REJECTED`/`RETIRED` versions are never carried and never parents.
+  `CHAMPION_MIN_STAGE_DAYS` / `CHAMPION_MIN_OBSERVATION_DAYS` are the real gates; promotion records `promoted_at`.
+* **Reality gap**: every stage row carries its observation window; live stages are computed from that stage's
+  own trades. Stages are compared per day / per trade and flagged `comparable` only with enough observed time
+  (`REALITY_GAP_MIN_OBSERVATION_DAYS`) and trades on both sides - otherwise promotion treats it as missing
+  evidence.
+* **Reproducibility**: no `random.Random()` without a seed anywhere in the research path; strategy codes are
+  seed-derived; adversarial reports persist seed, scenario config, dataset fingerprint and code version.
+
 ## 8. Agent lifecycle
 
 ```mermaid
@@ -216,8 +250,18 @@ stateDiagram-v2
   DEAD --> DEAD: permanent — never revived
 ```
 
-Every death stores reason, timestamp, final equity/PnL, generation and strategy version. A new
-generation gets fresh $100 accounts; old agents are never silently reset.
+Every death stores reason, timestamp, final equity/PnL (re-frozen *after* the forced exit's fee, slippage and
+liquidation penalty), generation and strategy version. A new generation gets fresh $100 accounts; old agents are
+never silently reset. A flat agent whose equity fell below `AGENT_MIN_VIABLE_EQUITY` (it can never open another
+order) is retired as `DEAD` (`untradeable_equity`); an agent with invalid DNA is parked `PAUSED`.
+
+**Positions are always protected.** After the per-agent loop a protection sweep runs funding, stop, take-profit,
+trailing and liquidation for *every* open position not yet managed on the bar - a failed agent, invalid DNA, a DEAD
+owner (orphan, closed deterministically), another generation. The worker also calls it for bars it could not
+decide on: failed attempts, quarantined poison candles and skipped catch-up bars (replayed in order). Management is
+idempotent per bar (`positions.last_processed_open_time`); an exit that keeps failing is force-settled at the modelled
+price after `EXIT_FORCE_SETTLE_AFTER_ATTEMPTS`. Positions carry the venue that opened them: switching
+`TRADING_MODE` with positions open on another venue blocks new entries until they close.
 
 ## 9. Shadow mode
 
@@ -233,9 +277,12 @@ only call the public read endpoint; tests assert no request other than an `info`
 * `/api/system/status` — worker heartbeat & last cycle (latency), database, market-data freshness &
   gap-halt, Hyperliquid stream, Ollama key health, council. The dashboard shows a red banner if the
   worker is down or data is stale; it receives updates over SSE (`/api/stream`) with polling fallback.
-* `/metrics` (operator) — Prometheus text: cycle & market-data latency, Ollama latency and
-  401/429/timeout counts, council quorum failures, orders/fills/rejections, risk vetoes, dead agents,
-  population equity, per-component `component_up`.
+* `/metrics` (operator) — Prometheus text (`# TYPE` lines, escaped labels, bounded label cardinality): cycle,
+  market-data (REST, backfill) and Ollama latency, Ollama outcomes, council quorum **and per-analyst** failures,
+  orders/fills/rejections, fill latency & slippage, risk vetoes **by reason**, DB errors, lease loss, WebSocket
+  reconnects/future/stale frames, dead agents, population equity, per-component `component_up`. Every series is
+  asserted to be emitted by its code path (`tests/test_metrics_emission.py`). Kill-switch changes are written to an
+  append-only `system_events` audit trail.
 
 ## 11. Failure handling
 
@@ -248,6 +295,11 @@ only call the public read endpoint; tests assert no request other than an `info`
 | Worker crash mid-cycle | candle stays pending; idempotent re-run (max 3 attempts, then quarantined) |
 | Cycle overrun | missed bars replayed in order with entries disabled (bounded) |
 | Second worker | refuses to trade (lease) |
+| Worker loses / cannot renew its lease | stops at the next agent (local TTL self-fence needs no DB); the cycle's single commit re-verifies owner + epoch + expiry inside the transaction (`FOR SHARE` on PostgreSQL) so a fenced worker persists nothing |
+| Council required but failed / late / mis-bound | `INCOMPLETE`: no new entries; exits still run (a judge failure on a weak vote is fail-closed too) |
+| Ollama returns non-JSON / malformed / resets the connection | typed `OllamaError`, counted as one abstaining analyst; never crashes the cycle |
+| Future / stale / duplicate WS frame | dropped without moving ordering state; REST reconciles |
+| Confirmed candle revised or a large gap after an outage | confirmed bars are immutable; backfill is paged and chunked under the driver's bind limit; unrecovered => entries halted, positions still protected |
 | One agent raises | SAVEPOINT rolls back that agent only |
 | Database down | `/api/system/health` -> 503; worker retries; no partial cycle commits |
 | Kill switch | no new entries anywhere; exits/risk management continue |

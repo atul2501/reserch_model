@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import traceback
 
 import structlog
 
@@ -73,8 +74,43 @@ def _redact(_, __, event_dict: dict) -> dict:
     return event_dict
 
 
+_original_record_factory = logging.getLogRecordFactory()
+_factory_installed = False
+
+
+def _install_stdlib_redaction() -> None:
+    """Scrub every stdlib/uvicorn/library log record at creation time.
+
+    A record factory (rather than a handler filter) covers loggers whose
+    handlers we do not own, e.g. uvicorn's. The traceback text is rendered
+    here, so it is scrubbed after formatting, never before.
+    """
+    global _factory_installed
+    if _factory_installed:
+        return
+
+    def factory(*args, **kwargs):
+        record = _original_record_factory(*args, **kwargs)
+        try:
+            record.msg = _scrub_text(record.getMessage())
+            record.args = ()
+            if record.exc_info and not record.exc_text:
+                record.exc_text = _scrub_text("".join(traceback.format_exception(*record.exc_info)).rstrip("\n"))
+            elif record.exc_text:
+                record.exc_text = _scrub_text(record.exc_text)
+            if record.stack_info:
+                record.stack_info = _scrub_text(record.stack_info)
+        except Exception:  # noqa: BLE001 - logging must never raise
+            pass
+        return record
+
+    logging.setLogRecordFactory(factory)
+    _factory_installed = True
+
+
 def configure_logging() -> None:
     settings = get_settings()
+    _install_stdlib_redaction()
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
     logging.basicConfig(
@@ -87,15 +123,14 @@ def configure_logging() -> None:
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
-        _redact,
         structlog.processors.StackInfoRenderer(),
         # Without this, logger.exception(...)'s exc_info=True is a raw
         # (type, value, traceback) tuple the JSON renderer can't serialize
-        # — it was silently degrading to the literal string/bool "true"
-        # with the actual exception and traceback dropped entirely. This
-        # is why "cycle.unhandled_error" never carried a traceback: it
-        # never made it into the log at all, not even for a human to grep.
+        # and the traceback would be dropped from the log.
         structlog.processors.format_exc_info,
+        # Redaction MUST run after format_exc_info: the rendered traceback
+        # text is where secrets embedded in exception messages end up.
+        _redact,
     ]
 
     if settings.log_json:

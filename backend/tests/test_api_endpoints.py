@@ -8,6 +8,7 @@ import uuid
 
 import httpx
 import pytest
+from pydantic import SecretStr
 import pytest_asyncio
 
 from app.core import metrics
@@ -31,7 +32,7 @@ V, O = "viewer-key-1234", "operator-key-1234"
 async def api(db_session, monkeypatch):
     s = get_settings()
     monkeypatch.setattr(s, "api_auth_required", True)
-    monkeypatch.setattr(s, "api_keys", f"v:viewer:{hash_api_key(V)},o:operator:{hash_api_key(O)}")
+    monkeypatch.setattr(s, "api_keys", SecretStr(f"v:viewer:{hash_api_key(V)},o:operator:{hash_api_key(O)}"))
     monkeypatch.setattr(s, "paper_latency_ms", 0)
     monkeypatch.setattr(s, "paper_latency_jitter_ms", 0)
     app = create_app()
@@ -128,7 +129,7 @@ async def test_shadow_summary_reports_expected_vs_actual_and_zero_real_orders(db
     (agent,) = await make_agents(db_session, [make_dna()])
     for i, slip in enumerate((1.0, 3.0)):
         db_session.add(Order(agent_id=agent.id, client_order_id=f"sh-{i}", symbol="SOL", side=Side.LONG, quantity=1, venue=ExecutionVenue.SHADOW,
-                             status=OrderStatus.FILLED, latency_ms=300, raw_venue_response={"sent_to_exchange": False, "slippage_bps": slip,
+                             status=OrderStatus.FILLED, filled_price=100.0, filled_quantity=1.0, latency_ms=300, raw_venue_response={"sent_to_exchange": False, "slippage_bps": slip,
                                                                                             "drift_after_latency_bps": 2.0}))
     await db_session.commit()
     r = (await api.get("/api/shadow/summary")).json()
@@ -242,7 +243,7 @@ async def test_ollama_health_endpoint_needs_operator_and_never_leaks_key_values(
     assert "key_value" not in r.text and "Bearer" not in r.text
 
 
-async def test_population_reports_trade_counts_open_positions_and_win_rate(db_session, api):
+async def test_population_reports_trade_counts_open_positions_and_win_rate(immediate_fills, db_session, api):
     from app.execution.paper_adapter import PaperExecutionAdapter
     agents = await make_agents(db_session, [make_dna(), make_dna()])
     eng = PaperExecutionAdapter()

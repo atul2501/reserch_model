@@ -34,33 +34,82 @@ from app.models.trading import Trade
 from app.schemas.strategy_dna import Condition, RuleSet, StrategyDNA
 
 
-def _bt_trade(net_pnl: float, exit_regime: str) -> BacktestTrade:
+def _bt_trade(net_pnl: float, entry_regime: str, exit_regime: str | None = None) -> BacktestTrade:
     return BacktestTrade(
         side=Side.LONG, entry_index=0, exit_index=1, entry_price=100.0, exit_price=100.0 + net_pnl,
-        quantity=1.0, net_pnl=net_pnl, exit_reason="signal", exit_regime=exit_regime,
+        quantity=1.0, net_pnl=net_pnl, exit_reason="signal", entry_regime=entry_regime, exit_regime=exit_regime or entry_regime,
     )
 
 
-def test_compute_regime_breakdown_backtest_groups_by_exit_regime():
+ALL_REGIMES = {"TREND_UP", "TREND_DOWN", "RANGE", "HIGH_VOLATILITY", "LOW_VOLATILITY", "BREAKOUT", "BREAKDOWN", "UNCERTAIN"}
+
+
+def test_compute_regime_breakdown_backtest_groups_by_entry_regime_and_reports_every_regime():
     result = BacktestResult(
         equity_curve=[100.0, 105.0, 103.0, 108.0],
-        trades=[
-            _bt_trade(5.0, "TREND_UP"),
-            _bt_trade(-2.0, "TREND_UP"),
-            _bt_trade(5.0, "RANGE"),
-        ],
-        final_equity=108.0,
-        starting_equity=100.0,
+        trades=[_bt_trade(5.0, "TREND_UP"), _bt_trade(-2.0, "TREND_UP"), _bt_trade(5.0, "RANGE")],
+        final_equity=108.0, starting_equity=100.0,
     )
-
     breakdown = compute_regime_breakdown_backtest(result)
 
-    assert set(breakdown.keys()) == {"TREND_UP", "RANGE"}
-    assert breakdown["TREND_UP"].trade_count == 2
-    assert breakdown["TREND_UP"].pnl == pytest.approx(3.0)
-    assert breakdown["RANGE"].trade_count == 1
-    assert breakdown["RANGE"].pnl == pytest.approx(5.0)
-    assert breakdown["RANGE"].expectancy == pytest.approx(5.0)
+    assert ALL_REGIMES <= set(breakdown)                     # all eight regimes are present ...
+    assert breakdown["TREND_UP"].trade_count == 2 and breakdown["TREND_UP"].pnl == pytest.approx(3.0)
+    assert breakdown["RANGE"].trade_count == 1 and breakdown["RANGE"].expectancy == pytest.approx(5.0)
+    for untested in ALL_REGIMES - {"TREND_UP", "RANGE"}:     # ... the untested ones explicitly, not by absence
+        assert breakdown[untested].observed is False and breakdown[untested].trade_count == 0
+    assert breakdown["TREND_UP"].observed is True
+
+
+def test_a_trade_is_attributed_to_the_regime_it_was_entered_in_not_the_one_it_closed_in():
+    result = BacktestResult(equity_curve=[100.0], trades=[_bt_trade(4.0, entry_regime="BREAKOUT", exit_regime="HIGH_VOLATILITY")],
+                            final_equity=104.0, starting_equity=100.0)
+    b = compute_regime_breakdown_backtest(result)
+    assert b["BREAKOUT"].trade_count == 1 and b["HIGH_VOLATILITY"].trade_count == 0
+
+
+def test_train_and_validation_slices_are_combined():
+    train = BacktestResult(equity_curve=[100.0], trades=[_bt_trade(1.0, "TREND_UP")], final_equity=101.0, starting_equity=100.0)
+    validation = BacktestResult(equity_curve=[100.0], trades=[_bt_trade(-1.0, "TREND_UP"), _bt_trade(2.0, "TREND_DOWN")],
+                                final_equity=101.0, starting_equity=100.0)
+    b = compute_regime_breakdown_backtest([train, validation])
+    assert b["TREND_UP"].trade_count == 2 and b["TREND_UP"].pnl == pytest.approx(0.0) and b["TREND_DOWN"].trade_count == 1
+
+
+def test_every_regime_can_produce_a_metric_and_classification_only_uses_tested_ones():
+    per = compute_regime_breakdown_backtest(BacktestResult(
+        equity_curve=[100.0], final_equity=100.0, starting_equity=100.0,
+        trades=[_bt_trade(1.0, r) for r in sorted(ALL_REGIMES) for _ in range(12)],
+    ))
+    assert all(per[r].observed and per[r].trade_count == 12 for r in ALL_REGIMES)
+    classification, reasoning = classify_robustness(per, min_trades_per_regime=10)
+    assert classification == "ROBUST"
+    thin = compute_regime_breakdown_backtest(BacktestResult(
+        equity_curve=[100.0], final_equity=100.0, starting_equity=100.0, trades=[_bt_trade(1.0, "RANGE") for _ in range(30)]))
+    cls2, why2 = classify_robustness(thin, min_trades_per_regime=10)
+    assert cls2 == "UNSTABLE" and "only 1 regime" in why2[0]        # untested regimes never count as evidence
+
+
+async def test_the_live_research_pipeline_persists_regime_reports_with_all_regimes(db_session, monkeypatch):
+    """Not dead code: run_research_cycle produces regime-level metrics for the evaluated versions."""
+    from sqlalchemy import select
+    from tests.test_evolution_pipeline import N_AGENTS, _seed_candles, _seed_population, cfg  # noqa: F401
+    from app.core.config import get_settings
+    from app.research.pipeline import run_research_cycle
+
+    s = get_settings()
+    for k, v in dict(agent_count=N_AGENTS, evolution_enabled=True, evolution_interval_hours=24, research_min_candles=800,
+                     research_window_candles=1600, research_min_generation_age_hours=0.0, research_min_closed_trades=0,
+                     research_adversarial_top_k=2, research_adversarial_bars=450, adversarial_n_dna_variants=1,
+                     research_candidate_min_trades=1, research_candidate_max_drawdown=0.95, research_max_child_attempts=1,
+                     paper_latency_ms=0, paper_latency_jitter_ms=0).items():
+        monkeypatch.setattr(s, k, v)
+    await _seed_candles(db_session)
+    await _seed_population(db_session, dead=0)
+    report = await run_research_cycle(db_session)
+    assert report.status == "COMPLETED", report.reason
+    rows = (await db_session.execute(select(RegimeValidationReport))).scalars().all()
+    assert rows and all(ALL_REGIMES <= set(r.per_regime) for r in rows)
+    assert all(r.classification in ("ROBUST", "REGIME_SPECIALIST", "FRAGILE", "UNSTABLE") for r in rows)
 
 
 def _stats(*, trade_count: int, pnl: float) -> RegimeStats:

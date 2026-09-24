@@ -95,6 +95,10 @@ class MarketContext(BaseModel):
     funding_rate: float | None = None
     open_interest: float | None = None
 
+    # True only after the worker re-read this exact bar from the store as a CONFIRMED (is_final) candle
+    # immediately before decisions. The decision loop refuses any context where this is not True.
+    is_final: bool = False
+
     model_config = {"extra": "forbid"}
 
     def flat_features(self) -> dict[str, float | int | bool | str | None]:

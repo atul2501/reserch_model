@@ -181,16 +181,21 @@ async def retire_generation(
     from app.models.strategy import StrategyVersion
     from app.models.trading import Position, Trade
 
-    agents = (
-        await db.execute(select(Agent).where(Agent.generation == generation_number, Agent.status == AgentStatus.ACTIVE))
+    from app.execution import accounting
+
+    everyone = (
+        await db.execute(select(Agent).where(Agent.generation == generation_number))
     ).scalars().all()
-    if not agents:
+    agents = [a for a in everyone if a.status == AgentStatus.ACTIVE]
+    by_id = {a.id: a for a in everyone}
+    if not everyone:
         return {"retired": 0, "positions_closed": 0}
-    by_id = {a.id: a for a in agents}
     stage_by_version = {
         v.id: v.stage
-        for v in (await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_({a.strategy_version_id for a in agents})))).scalars().all()
+        for v in (await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_({a.strategy_version_id for a in everyone})))).scalars().all()
     }
+    # EVERY open position of the generation is resolved - including those still held by DEAD/PAUSED agents
+    # (orphans): a rollover must never leave a position open behind a retired generation.
     positions = (
         await db.execute(select(Position).where(Position.agent_id.in_(list(by_id)), Position.is_open.is_(True)))
     ).scalars().all()
@@ -201,20 +206,35 @@ async def retire_generation(
             side=pos.side, quantity=pos.quantity, entry_price=pos.entry_price, exit_price=mark_price,
             entry_fee=pos.entry_fee, exit_fee=exit_fee, funding_paid=pos.funding_accrued,
         )
+        settlement = accounting.settle_close(agent.balance, pnl.gross_pnl, exit_fee)   # bad debt recorded, not hidden
         pos.is_open = False
         pos.closed_at = at
         pos.unrealized_pnl = 0.0
+        pos.pending_exit_reason = None
+        pos.pending_exit_signal_time = None
         db.add(Trade(
             agent_id=agent.id, position_id=pos.id, entry_order_id=pos.entry_order_id, symbol=pos.symbol, side=pos.side,
             quantity=pos.quantity, entry_price=pos.entry_price, exit_price=mark_price, gross_pnl=pnl.gross_pnl,
             fees=pnl.fees, funding=pnl.funding, slippage_cost=pos.entry_slippage_cost, net_pnl=pnl.net_pnl,
+            bad_debt=settlement.bad_debt,
             opened_at=pos.opened_at, closed_at=at, holding_seconds=max(0, int((at - pos.opened_at).total_seconds())),
             entry_regime=pos.entry_regime, exit_reason="generation_rollover", stage=stage_by_version.get(agent.strategy_version_id),
         ))
-        agent.balance = max(0.0, agent.balance + pnl.gross_pnl - exit_fee)
+        agent.balance = settlement.new_balance
+        agent.bad_debt += settlement.bad_debt
         agent.realized_pnl += pnl.net_pnl
         agent.fees_paid += exit_fee
         agent.equity = agent.balance
+        if agent.status == AgentStatus.DEAD:   # an orphan of a dead agent: refreeze its account after the exit costs
+            agent.final_equity = agent.balance
+            agent.final_pnl = agent.balance - agent.starting_balance
+    # cancel any entry that was still pending when the generation ended
+    from app.models.enums import OrderStatus
+    from app.models.trading import Order
+    from sqlalchemy import update as _update
+    await db.execute(_update(Order).where(Order.agent_id.in_(list(by_id)), Order.status == OrderStatus.PENDING)
+                     .values(status=OrderStatus.CANCELLED, rejection_reason="generation_rollover")
+                     .execution_options(synchronize_session=False))
     for agent in agents:
         agent.status = AgentStatus.RETIRED
         agent.final_equity = agent.equity

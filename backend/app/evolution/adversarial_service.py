@@ -6,14 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+import zlib
 from datetime import datetime, timezone
 
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backtesting.adversarial import compute_robustness_score, run_adversarial_suite
+from app.backtesting.adversarial import AdversarialConfig, compute_robustness_score, run_adversarial_suite
+from app.backtesting.data import candles_fingerprint
 from app.core.config import get_settings
 from app.models.adversarial import AdversarialTestReport
+from app.research.registry import code_version
 from app.models.strategy import StrategyVersion
 from app.schemas.strategy_dna import StrategyDNA
 
@@ -33,6 +36,9 @@ async def run_and_persist_adversarial_suite(
     global_max_position_size: float = 0.5,
     global_max_drawdown: float = 0.30,
     global_max_daily_loss: float = 0.10,
+    experiment_id: str | None = None,
+    seed: int | None = None,
+    funding: list[tuple[int, float]] | None = None,
 ) -> AdversarialTestReport:
     """Loads `strategy_version_id`'s DNA, runs the full adversarial suite
     (risk-gated by default — see run_backtest's enforce_risk_engine), and
@@ -41,6 +47,12 @@ async def run_and_persist_adversarial_suite(
     if version is None:
         raise ValueError(f"strategy_version {strategy_version_id} not found")
     dna = StrategyDNA.model_validate(version.dna)
+    settings = get_settings()
+    fingerprint = candles_fingerprint(candles)
+    if seed is None:
+        # Deterministic per (version, dataset, research seed): re-running the same evaluation reproduces the report.
+        seed = zlib.crc32(f"{strategy_version_id}:{fingerprint}:{settings.research_seed}".encode())
+    config = AdversarialConfig.from_settings(settings)
 
     # CPU-heavy: off the event loop so lease heartbeats / SSE keep running.
     report = await asyncio.to_thread(
@@ -57,9 +69,8 @@ async def run_and_persist_adversarial_suite(
         global_max_position_size=global_max_position_size,
         global_max_drawdown=global_max_drawdown,
         global_max_daily_loss=global_max_daily_loss,
-        max_acceptable_drawdown=get_settings().adversarial_max_acceptable_drawdown,
-        min_acceptable_worst_case_return=get_settings().adversarial_min_acceptable_worst_case_return,
-        cost_multipliers=[(1.0, 1.0), (get_settings().adversarial_fee_stress_multiplier, get_settings().adversarial_slippage_stress_multiplier)],
+        cost_multipliers=[(1.0, 1.0), (settings.adversarial_fee_stress_multiplier, settings.adversarial_slippage_stress_multiplier)],
+        seed=seed, config=config, funding=funding,
     )
 
     scenario_breakdown: dict[str, dict[str, float]] = {}
@@ -80,6 +91,8 @@ async def run_and_persist_adversarial_suite(
         scenario_breakdown=scenario_breakdown,
         robustness_score=compute_robustness_score(report),
         computed_at=datetime.now(timezone.utc),
+        experiment_id=experiment_id, random_seed=seed, scenario_config=report.scenario_config,
+        dataset_fingerprint=fingerprint, code_version=code_version(),
     )
     db.add(row)
     return row

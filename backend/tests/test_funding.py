@@ -12,6 +12,8 @@ from app.models.trading import FundingPayment, Position, Trade
 from app.schemas.strategy_dna import StopLossConfig, TakeProfitConfig
 from tests.helpers_agents import MINUTE, T0, cycle, make_agents, make_context, make_dna
 
+pytestmark = pytest.mark.usefixtures("immediate_fills")   # position mechanics; see conftest.immediate_fills
+
 
 @pytest.fixture(autouse=True)
 def _no_sleep(monkeypatch):

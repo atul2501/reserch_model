@@ -21,8 +21,11 @@ the reality-gap engine is meant to measure):
   * funding accrual from exchange settlements when supplied
   * mark-to-market equity curve (drawdown includes open-position losses)
 
-Documented deviations from live (kept small and visible): entries fill at the
-next open (paper fills at the signal-bar close); no latency/partial fills/rejects.
+Paper now uses the same model (a signal on bar N's close is a pending order filled at bar N+1's open), and the
+cash accounting (funding, close settlement with recorded bad debt, cooldown, protective levels) is the shared
+`app.execution.accounting`. Sizing and the risk check are priced at the signal bar's CLOSE - the only price known when
+the decision is made - and the quantity is converted at the fill price. Documented deviations from live (kept small
+and visible): no latency drift / random rejects / partial fills in a plain backtest (adversarial scenarios add them).
 """
 from __future__ import annotations
 
@@ -37,23 +40,26 @@ from app.agents.position_manager import (
     PositionLevels,
     advance_extremes,
     evaluate_bar,
-    stop_price,
-    take_profit_price,
 )
 from app.analytics.pnl_engine import compute_liquidation_price, compute_trade_pnl
 from app.backtesting.data import BacktestData, prepare_backtest_data
 from app.backtesting.risk_adapter import backtest_risk_check
 from app.core.config import get_settings
+from app.execution import accounting
 from app.execution.fillmodel import fee_rate_for, slipped_price, slippage_bps as slippage_bps_for
 from app.execution.margin import margin_state
 from app.execution.sizing import approve_against_margin, requested_notional, stop_distance_pct
-from app.market.feature_engine import MIN_CANDLES_REQUIRED, InsufficientDataError
+from app.market.feature_engine import FEATURE_WINDOW, MIN_CANDLES_REQUIRED, InsufficientDataError
 from app.market.hyperliquid_client import HyperliquidClient
 from app.models.enums import Bias, Side
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.engine import FeatureView, dna_indicator_specs, evaluate_signal
 
-FEATURE_WINDOW = 250  # kept for backward compatibility with callers/tests
+
+
+# Bumped whenever simulation semantics change (fill timing, sizing price, accounting, cooldown ...): part of every
+# experiment's provenance, so results from different engine generations are never silently compared.
+ENGINE_VERSION = "backtest-2.0"
 
 
 @dataclass
@@ -71,6 +77,7 @@ class BacktestTrade:
     entry_regime: str | None = None
     exit_regime: str | None = None
     funding: float = 0.0
+    bad_debt: float = 0.0
 
 
 @dataclass
@@ -81,6 +88,19 @@ class BacktestResult:
     starting_equity: float
     dead: bool = False
     total_funding: float = 0.0
+    total_bad_debt: float = 0.0
+    # The window this run actually simulated (reality-gap normalisation needs the observation length).
+    first_bar_open_ms: int | None = None
+    last_bar_open_ms: int | None = None
+    bars_simulated: int = 0
+
+    interval_ms: int = 60_000
+
+    @property
+    def observed_days(self) -> float | None:
+        if self.first_bar_open_ms is None or self.last_bar_open_ms is None:
+            return None
+        return (self.last_bar_open_ms - self.first_bar_open_ms + self.interval_ms) / 86_400_000
 
     @property
     def net_return_pct(self) -> float:
@@ -201,6 +221,7 @@ def run_backtest(
     trades: list[BacktestTrade] = []
     pos: _Pos | None = None
     total_funding = 0.0
+    total_bad_debt = 0.0
     dead = False
     fraction = position_fraction_override
 
@@ -213,24 +234,27 @@ def run_backtest(
         return slipped_price(ref, side, reduce_only=reduce_only, bps=bps)
 
     def close(position: _Pos, ref: float, kind: str, reason: str, at_index: int, regime: str | None) -> None:
-        nonlocal balance, pos, cooldown_until_index, dead
+        nonlocal balance, pos, cooldown_until_index, dead, total_bad_debt
         px = slip(kind, ref, position.side, ref * position.quantity, True)
         fee = px * position.quantity * fee_rate_for(kind, taker=fee_rate, maker=maker_rate)
         if kind == "liquidation":
-            fee += px * position.quantity * settings.liquidation_fee_rate
+            fee += accounting.liquidation_penalty(px, position.quantity, settings.liquidation_fee_rate)
         pnl = compute_trade_pnl(
             side=position.side, quantity=position.quantity, entry_price=position.entry_price, exit_price=px,
             entry_fee=position.entry_fee, exit_fee=fee, funding_paid=position.funding,
         )
-        balance = max(0.0, balance + pnl.gross_pnl - fee)
+        settlement = accounting.settle_close(balance, pnl.gross_pnl, fee)   # a shortfall is recorded, never hidden
+        balance = settlement.new_balance
+        total_bad_debt += settlement.bad_debt
         trades.append(BacktestTrade(
             side=position.side, entry_index=position.entry_index, exit_index=at_index, entry_price=position.entry_price,
             exit_price=px, quantity=position.quantity, net_pnl=pnl.net_pnl, exit_reason=reason,
             fee=position.entry_fee + fee, slippage_cost=position.entry_slippage_cost + abs(px - ref) * position.quantity,
-            entry_regime=position.entry_regime, exit_regime=regime, funding=position.funding,
+            entry_regime=position.entry_regime, exit_regime=regime, funding=position.funding, bad_debt=settlement.bad_debt,
         ))
-        bars = dna.cooldown.bars_after_win if pnl.net_pnl >= 0 else dna.cooldown.bars_after_loss
+        bars = accounting.cooldown_bars_after(dna, pnl.net_pnl)
         if bars:
+            # an exit in bar X blocks entry signals for bars X .. X+bars-1 (same rule as the live loop)
             cooldown_until_index = at_index + bars
         pos = None
         if reason == "liquidation" and settings.liquidation_is_fatal:
@@ -238,7 +262,9 @@ def run_backtest(
         if balance <= max(0.0, starting_equity * settings.agent_bankruptcy_equity_fraction):
             dead = True
 
+    last_processed = first
     for i in range(first, last):
+        last_processed = i
         ctx = data.contexts[i]
         if ctx is None:
             continue
@@ -258,7 +284,7 @@ def run_backtest(
             bar_close_ms = int(data.open_time[i]) + interval_ms - 1
             for settle_ms, rate in funding_events:
                 if pos.last_funding_ms < settle_ms <= bar_close_ms:
-                    payment = pos.quantity * bar_close * rate * (1 if pos.side == Side.LONG else -1)
+                    payment = accounting.funding_payment(pos.side, pos.quantity, bar_close, rate)
                     balance -= payment
                     pos.funding += payment
                     total_funding += payment
@@ -271,7 +297,7 @@ def run_backtest(
                 trailing_activation_pct=dna.trailing_stop.activation_pct if dna.trailing_stop.enabled else 0.0,
                 trailing_active=pos.trailing_active, peak_price=pos.peak, trough_price=pos.trough, liquidation_price=liq,
             )
-            trig = evaluate_bar(levels, bar)
+            trig = evaluate_bar(levels, bar, same_bar_extreme=settings.trailing_stop_uses_same_bar_extreme)
             if trig is not None:
                 close(pos, trig.reference_price, trig.order_kind, trig.exit_reason, i, regime)
                 exited_this_bar = True
@@ -316,7 +342,9 @@ def run_backtest(
             else:
                 side = Side.LONG if signal.bias == Bias.LONG else Side.SHORT
                 atr = ctx.volatility.atr_14
-                sl_pct = stop_distance_pct(dna, next_open, atr, ctx.structure.swing_low, ctx.structure.swing_high,
+                # Sizing/risk are priced at the signal bar's CLOSE (the only price known at decision time); the
+                # quantity is converted at the fill price below.
+                sl_pct = stop_distance_pct(dna, bar_close, atr, ctx.structure.swing_low, ctx.structure.swing_high,
                                            side == Side.LONG)
                 eq_now = balance
                 if fraction is not None:
@@ -325,11 +353,11 @@ def run_backtest(
                         method=dna.position_sizing.method, fraction_of_equity=fraction, max_notional=dna.position_sizing.max_notional)})
                 else:
                     sizing_dna = dna
-                notional = requested_notional(sizing_dna, equity=eq_now, price=next_open, atr=atr, stop_dist_pct=sl_pct)
+                notional = requested_notional(sizing_dna, equity=eq_now, price=bar_close, atr=atr, stop_dist_pct=sl_pct)
                 leverage = dna.leverage_limit
                 if enforce_risk_engine:
                     notional = backtest_risk_check(
-                        dna=dna, side=side, proposed_notional=notional, proposed_leverage=leverage, current_price=next_open,
+                        dna=dna, side=side, proposed_notional=notional, proposed_leverage=leverage, current_price=bar_close,
                         atr=atr, equity=eq_now, peak_equity=peak_equity, starting_equity=starting_equity,
                         day_start_equity=day_start_equity, global_max_leverage=global_max_leverage,
                         global_max_position_size=global_max_position_size, global_max_drawdown=global_max_drawdown,
@@ -347,16 +375,13 @@ def run_backtest(
                     fill = slip("market", next_open, side, qty * next_open, False)
                     entry_fee = fill * qty * fee_rate
                     slip_cost = abs(fill - next_open) * qty
-                    sl = stop_price(fill, side, method=dna.stop_loss.method, value=dna.stop_loss.value, atr=atr,
-                                    swing_low=ctx.structure.swing_low, swing_high=ctx.structure.swing_high) if dna.stop_loss.enabled else None
-                    tp = take_profit_price(fill, side, method=dna.take_profit.method, value=dna.take_profit.value, atr=atr,
-                                           stop=sl) if dna.take_profit.enabled else None
-                    trail = fill * dna.trailing_stop.trail_pct / 100 if dna.trailing_stop.enabled and dna.trailing_stop.trail_pct > 0 else None
+                    lv = accounting.entry_levels(dna, side, fill, atr=atr, swing_low=ctx.structure.swing_low,
+                                                 swing_high=ctx.structure.swing_high)
                     balance -= entry_fee
                     pos = _Pos(
                         side=side, entry_index=fill_idx, entry_price=fill, quantity=qty, entry_fee=entry_fee,
-                        entry_slippage_cost=slip_cost, entry_regime=regime, stop=sl, tp=tp, trail_distance=trail,
-                        trailing_active=bool(trail and dna.trailing_stop.activation_pct <= 0), peak=fill, trough=fill,
+                        entry_slippage_cost=slip_cost, entry_regime=regime, stop=lv.stop_loss, tp=lv.take_profit,
+                        trail_distance=lv.trailing_distance, trailing_active=lv.trailing_active, peak=fill, trough=fill,
                         last_funding_ms=int(data.open_time[i]) + interval_ms - 1,
                     )
                     daily_trades += 1
@@ -380,7 +405,10 @@ def run_backtest(
 
     return BacktestResult(
         equity_curve=equity_curve, trades=trades, final_equity=balance, starting_equity=starting_equity,
-        dead=dead, total_funding=total_funding,
+        dead=dead, total_funding=total_funding, total_bad_debt=total_bad_debt,
+        first_bar_open_ms=int(data.open_time[first]) if first < n else None,
+        last_bar_open_ms=int(data.open_time[min(last_processed, n - 1)]) if first < n else None,
+        bars_simulated=max(0, min(last_processed, n - 1) - first + 1), interval_ms=interval_ms,
     )
 
 

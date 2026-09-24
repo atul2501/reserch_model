@@ -33,6 +33,8 @@ class PromotionCriteria:
     max_reality_gap_return_degradation: float = 0.35   # paper return may not fall >35% below backtest
     min_paper_trade_count: int = 30
     min_observation_days: int = 14
+    # Real time a version must have spent in its current stage before it is even eligible (0 disables).
+    min_stage_days: int = 14
 
     @classmethod
     def from_settings(cls, settings=None) -> "PromotionCriteria":
@@ -46,6 +48,7 @@ class PromotionCriteria:
             max_strategy_correlation=s.max_strategy_correlation,
             max_reality_gap_return_degradation=s.reality_gap_max_acceptable_degradation_pct,
             min_paper_trade_count=s.champion_min_paper_trade_count, min_observation_days=s.champion_min_observation_days,
+            min_stage_days=s.champion_min_stage_days,
         )
 
 
@@ -82,7 +85,9 @@ def evaluate_promotion(
     required_oos = criteria.min_oos_score + (
         criteria.regime_penalty_oos_margin if challenger.regime_classification in criteria.regime_penalty_classes else 0.0
     )
-    if (challenger.oos_score or 0.0) < required_oos:
+    if challenger.oos_score is None:
+        reasons.append("missing_evidence: final OOS not evaluated (the validation score is not a substitute)")
+    elif challenger.oos_score < required_oos:
         reasons.append(f"oos_score {challenger.oos_score} < required {required_oos:.2f}")
     if (challenger.walk_forward_consistency or 0.0) < criteria.min_walk_forward_consistency:
         reasons.append(

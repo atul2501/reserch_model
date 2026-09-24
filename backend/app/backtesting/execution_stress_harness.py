@@ -47,7 +47,7 @@ class StressedExecutionAdapter(ExecutionEngine):
         self._partial_fill_min_pct = partial_fill_min_pct
         self._missed_fill_probability = missed_fill_probability
         self._extra_latency_ms = extra_latency_ms
-        self._rng = rng or random.Random()
+        self._rng = rng or random.Random(0)
 
     async def submit_order(self, request: ExecutionRequest) -> ExecutionResult:
         if self._rng.random() < self._missed_fill_probability:

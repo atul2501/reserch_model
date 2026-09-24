@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, Uuid
+from sqlalchemy import JSON, BigInteger, Boolean, Float, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -32,3 +32,10 @@ class AdversarialTestReport(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     robustness_score: Mapped[float] = mapped_column(Float, nullable=False)
 
     computed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+
+    # Provenance - what is needed to reproduce this exact run (see AdversarialConfig).
+    experiment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    random_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    scenario_config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    dataset_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    code_version: Mapped[str | None] = mapped_column(String(64), nullable=True)

@@ -37,6 +37,7 @@ class FitnessInputs:
     profit_factor_score_input: float | None = None
     starting_balance: float = 100.0
     daily_consistency: float | None = None      # fraction of profitable days, 0..1
+    dead: bool = False                          # the agent died (survival_days must then be time-to-death)
 
 
 @dataclass
@@ -56,6 +57,10 @@ class FitnessWeights:
     expectancy_weight: float = 0.5
     regime_weight: float = 1.0
     adversarial_weight: float = 1.0
+    # Doing nothing is not a strategy: the less trading evidence an agent has, the larger this penalty (0 at full
+    # confidence). A dead agent additionally pays `death_penalty_weight`.
+    inactivity_penalty_weight: float = 0.25
+    death_penalty_weight: float = 1.0
 
     @classmethod
     def from_settings(cls, settings=None) -> "FitnessWeights":
@@ -68,6 +73,7 @@ class FitnessWeights:
             drawdown_penalty_weight=s.fitness_w_drawdown, instability_penalty_weight=s.fitness_w_instability,
             correlation_penalty_weight=s.fitness_w_correlation, expectancy_weight=s.fitness_w_expectancy,
             regime_weight=s.fitness_w_regime, adversarial_weight=s.fitness_w_adversarial,
+            inactivity_penalty_weight=s.fitness_w_inactivity, death_penalty_weight=s.fitness_w_death,
         )
 
     def as_dict(self) -> dict[str, float]:
@@ -88,10 +94,35 @@ class FitnessResult:
     expectancy_score: float = 0.0
     regime_score: float = 0.0
     adversarial_score: float = 0.0
+    inactivity_penalty: float = 0.0
+    death_penalty: float = 0.0
     weights_used: dict[str, float] = field(default_factory=dict)
 
 
 MIN_TRADES_FOR_FULL_CONFIDENCE = 30
+PROFIT_FACTOR_CAP = 3.0   # mirrors app.analytics.performance_metrics_engine.PROFIT_FACTOR_CAP
+
+
+def _profit_factor_component(inputs: FitnessInputs) -> float:
+    """[-1, 1]. Explicit, never an `x or default` fallback (zero is a real, bad, value):
+       no trades            -> 0     (no evidence either way)
+       profit factor 0.0    -> -1    (only losses)
+       None with wins       -> cap   (no losing trade => infinite profit factor, capped)
+       None without wins    -> 0     (only flat trades)"""
+    if inputs.trade_count <= 0:
+        return 0.0
+    pf = inputs.profit_factor
+    if pf is None:
+        pf = PROFIT_FACTOR_CAP if (inputs.win_rate or 0.0) > 0 else 1.0
+    pf = min(pf, PROFIT_FACTOR_CAP)
+    return _clip(pf - 1.0, lo=-1.0, hi=1.0)
+
+
+def _win_rate_component(inputs: FitnessInputs) -> float:
+    """[-1, 1]. A 0% win rate over real trades is the WORST score (-1), not neutral; no trades/unknown is 0."""
+    if inputs.trade_count <= 0 or inputs.win_rate is None:
+        return 0.0
+    return _clip(inputs.win_rate - 0.5, lo=-0.5, hi=0.5) * 2
 
 
 def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None) -> FitnessResult:
@@ -103,13 +134,14 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
 
     return_score = _clip(inputs.net_return_pct) * sample_confidence
 
-    profit_factor_component = _clip((inputs.profit_factor or 1.0) - 1.0, lo=-1.0, hi=1.0)
-    win_rate_component = _clip((inputs.win_rate or 0.5) - 0.5, lo=-0.5, hi=0.5) * 2
+    profit_factor_component = _profit_factor_component(inputs)
+    win_rate_component = _win_rate_component(inputs)
     risk_score = ((profit_factor_component + win_rate_component) / 2) * sample_confidence
 
     consistency_score = (inputs.walk_forward_score or 0.0) * sample_confidence
 
-    survival_component = _clip(inputs.survival_days / 30.0, lo=0.0, hi=1.0)
+    # Survival only counts as evidence when the agent actually traded: sitting idle for 30 days proves nothing.
+    survival_component = _clip(inputs.survival_days / 30.0, lo=0.0, hi=1.0) * sample_confidence
     sharpe_component = _clip((inputs.sharpe_like or 0.0) / 2.0, lo=-1.0, hi=1.0)
     robustness_score = (survival_component + sharpe_component) / 2
 
@@ -130,6 +162,9 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
     regime_score = _clip(inputs.regime_robustness or 0.0, lo=0.0, hi=1.0)
     adversarial_score = _clip(inputs.adversarial_robustness or 0.0, lo=0.0, hi=1.0)
 
+    inactivity_penalty = 1.0 - sample_confidence
+    death_penalty = 1.0 if inputs.dead else 0.0
+
     fitness = (
         w.expectancy_weight * expectancy_score
         + w.regime_weight * regime_score
@@ -142,6 +177,8 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
         - w.drawdown_penalty_weight * drawdown_penalty
         - w.instability_penalty_weight * instability_penalty
         - w.correlation_penalty_weight * correlation_penalty
+        - w.inactivity_penalty_weight * inactivity_penalty
+        - w.death_penalty_weight * death_penalty
     )
 
     return FitnessResult(
@@ -157,6 +194,8 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
         expectancy_score=expectancy_score,
         regime_score=regime_score,
         adversarial_score=adversarial_score,
+        inactivity_penalty=inactivity_penalty,
+        death_penalty=death_penalty,
         weights_used=w.as_dict(),
     )
 

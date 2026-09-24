@@ -31,7 +31,7 @@ def make_context(
 ) -> MarketContext:
     open_time = T0 + i * MINUTE
     return MarketContext(
-        symbol="SOL", timeframe=timeframe, candle_open_time=open_time, close_price=close,
+        symbol="SOL", timeframe=timeframe, candle_open_time=open_time, close_price=close, is_final=True,
         candle_open=open_ if open_ is not None else close,
         candle_high=high if high is not None else close, candle_low=low if low is not None else close,
         candle_close_time=open_time + MINUTE - 1, funding_rate=funding,
@@ -102,7 +102,7 @@ def closed_position(db, agent, side=None):
 
 
 async def add_promotion_evidence(db, version_id, *, regime="ROBUST", robustness=0.8, backtest_return=0.30, paper_return=0.30,
-                                 correlation=None):
+                                 correlation=None, oos_score=0.8, with_oos=True):
     """The full evidence set the promotion gate demands beyond PnL: adversarial
     robustness, regime classification, a BACKTEST stage (for the reality gap)."""
     from datetime import datetime, timezone
@@ -117,5 +117,10 @@ async def add_promotion_evidence(db, version_id, *, regime="ROBUST", robustness=
     db.add(RegimeValidationReport(strategy_version_id=version_id, per_regime={}, classification=regime,
                                   classification_reasoning=[], computed_at=now))
     db.add(StageMetrics(strategy_version_id=version_id, stage=StrategyStage.BACKTEST, net_return_pct=backtest_return,
-                        max_drawdown_pct=0.05, win_rate=0.6, profit_factor=2.0, trade_count=200, computed_at=now))
+                        max_drawdown_pct=0.05, win_rate=0.6, profit_factor=2.0, trade_count=200, computed_at=now, observed_days=14.0))
+    # The FINAL out-of-sample evidence (the lockbox result). Promotion never falls back to a validation score.
+    if with_oos:
+        db.add(StageMetrics(strategy_version_id=version_id, stage=StrategyStage.OUT_OF_SAMPLE, net_return_pct=0.1,
+                            max_drawdown_pct=0.05, win_rate=0.6, profit_factor=2.0, trade_count=60, oos_score=oos_score,
+                            computed_at=now))
     await db.flush()
