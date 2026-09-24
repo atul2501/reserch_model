@@ -81,3 +81,30 @@ def test_stdlib_and_uvicorn_loggers_are_redacted():
     text = buf.getvalue()
     assert "boom" in text and "RuntimeError" in text
     assert fake_key not in text
+
+
+def test_uvicorn_access_log_formats_and_is_redacted():
+    """uvicorn's AccessFormatter unpacks record.args into 5 fields; the redaction
+    factory used to flatten args to (), so every access line raised
+    'not enough values to unpack (expected 5, got 0)'."""
+    import io
+    import logging
+
+    from uvicorn.logging import AccessFormatter
+
+    configure_logging()
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(AccessFormatter('%(client_addr)s - "%(request_line)s" %(status_code)s', use_colors=False))
+    access = logging.getLogger("uvicorn.access")
+    access.addHandler(handler)
+    try:
+        access.info(
+            '%s - "%s %s HTTP/%s" %d', "1.2.3.4:5678", "GET", "/api/market?api_key=supersecret123", "1.1", 200
+        )
+    finally:
+        access.removeHandler(handler)
+
+    text = buf.getvalue()
+    assert "GET /api/market" in text and "200" in text
+    assert "supersecret123" not in text

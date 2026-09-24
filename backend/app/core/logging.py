@@ -92,8 +92,13 @@ def _install_stdlib_redaction() -> None:
     def factory(*args, **kwargs):
         record = _original_record_factory(*args, **kwargs)
         try:
-            record.msg = _scrub_text(record.getMessage())
-            record.args = ()
+            if record.name == "uvicorn.access" and isinstance(record.args, tuple):
+                # uvicorn's AccessFormatter unpacks args as (client, method, path, version, status):
+                # flattening them into msg makes every access line raise. Scrub each arg in place.
+                record.args = tuple(_scrub_text(a) if isinstance(a, str) else a for a in record.args)
+            else:
+                record.msg = _scrub_text(record.getMessage())
+                record.args = ()
             if record.exc_info and not record.exc_text:
                 record.exc_text = _scrub_text("".join(traceback.format_exception(*record.exc_info)).rstrip("\n"))
             elif record.exc_text:
