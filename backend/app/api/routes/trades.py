@@ -152,6 +152,7 @@ async def get_strategy_performance(db: AsyncSession = Depends(get_db)):
     )
     rows = (await db.execute(stmt)).all()
     grand_total = sum(row[2] for row in rows)
+    grand_wins = sum(int(row[3] or 0) for row in rows)
     results = []
     for family, agents, count, wins, total_pnl, total_fees in rows:
         wins = int(wins or 0)
@@ -167,6 +168,7 @@ async def get_strategy_performance(db: AsyncSession = Depends(get_db)):
                 avg_pnl=total_pnl / count,
                 total_fees=float(total_fees or 0.0),
                 trade_share=count / grand_total,
+                win_share=wins / grand_wins if grand_wins else 0.0,
             )
         )
     results.sort(key=lambda r: r.total_pnl, reverse=True)

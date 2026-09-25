@@ -161,6 +161,7 @@ class StrategyPerformance(BaseModel):
     avg_pnl: float
     total_fees: float
     trade_share: float  # this family's fraction of all closed trades (0-1)
+    win_share: float  # this family's fraction of all winning trades (0-1)
 
 
 class SystemHealth(BaseModel):

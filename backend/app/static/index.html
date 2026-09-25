@@ -256,7 +256,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="strategy-table">
         <thead><tr>
-          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Allocation</th><th>Wins</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
+          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Trade Share</th><th>Wins</th><th>Win Share</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -689,24 +689,43 @@ async function refresh() {
   await section("strategy-performance", async () => {
     const rows = await get("/api/trades/by-strategy");
     const tbody = document.querySelector("#strategy-table tbody");
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">No closed trades yet</td></tr>`; return; }
-    tbody.innerHTML = rows.map(r => `
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No closed trades yet</td></tr>`; return; }
+    const shareCell = (share, color) => `
+        <td class="num" style="min-width:110px;">
+          <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;">
+            <div style="flex:1; height:6px; background:var(--border); border-radius:3px; min-width:50px;"><div style="width:${(share * 100).toFixed(1)}%; height:100%; background:${color}; border-radius:3px;"></div></div>
+            <span>${pct(share)}</span>
+          </div>
+        </td>`;
+    const body = rows.map(r => `
       <tr>
         <td>${esc(r.strategy_family || "-")}</td>
         <td class="num">${r.agent_count}</td>
         <td class="num">${r.trade_count}</td>
-        <td class="num" style="min-width:110px;">
-          <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;">
-            <div style="flex:1; height:6px; background:var(--border); border-radius:3px; min-width:50px;"><div style="width:${(r.trade_share * 100).toFixed(1)}%; height:100%; background:#b494ef; border-radius:3px;"></div></div>
-            <span>${pct(r.trade_share)}</span>
-          </div>
-        </td>
+        ${shareCell(r.trade_share, "#b494ef")}
         <td class="num">${r.win_count}</td>
+        ${shareCell(r.win_share, "#3fd096")}
         <td class="num">${pct(r.win_rate)}</td>
         <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
         <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
         <td class="num">$${fmt(r.total_fees)}</td>
       </tr>`).join("");
+    const sum = k => rows.reduce((a, r) => a + r[k], 0);
+    const totTrades = sum("trade_count"), totWins = sum("win_count"), totPnl = sum("total_pnl");
+    const total = `
+      <tr style="font-weight:650; border-top:2px solid var(--border);">
+        <td>All strategies</td>
+        <td class="num">${sum("agent_count")}</td>
+        <td class="num">${totTrades}</td>
+        <td class="num">100.0%</td>
+        <td class="num">${totWins}</td>
+        <td class="num">100.0%</td>
+        <td class="num">${pct(totTrades ? totWins / totTrades : null)}</td>
+        <td class="num ${totPnl >= 0 ? 'pos' : 'neg'}">${dollar(totPnl)}</td>
+        <td class="num ${totPnl >= 0 ? 'pos' : 'neg'}">${dollar(totTrades ? totPnl / totTrades : 0)}</td>
+        <td class="num">$${fmt(sum("total_fees"))}</td>
+      </tr>`;
+    tbody.innerHTML = body + total;
   });
 
   await section("side-performance", async () => {
