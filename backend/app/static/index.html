@@ -249,6 +249,18 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   </section>
 
   <section>
+    <h2>Performance by Strategy <span class="sub">closed trades, grouped by strategy family (best total PnL first)</span></h2>
+    <div class="panel table-scroll">
+      <table id="strategy-table">
+        <thead><tr>
+          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <h2>Performance by Side <span class="sub">closed trades, grouped by LONG / SHORT</span></h2>
     <div class="panel table-scroll">
       <table id="side-table">
@@ -642,6 +654,23 @@ async function refresh() {
         <td class="num">${pct(r.win_rate)}</td>
         <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
         <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
+      </tr>`).join("");
+  });
+
+  await section("strategy-performance", async () => {
+    const rows = await get("/api/trades/by-strategy");
+    const tbody = document.querySelector("#strategy-table tbody");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty">No closed trades yet</td></tr>`; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${esc(r.strategy_family || "-")}</td>
+        <td class="num">${r.agent_count}</td>
+        <td class="num">${r.trade_count}</td>
+        <td class="num">${r.win_count}</td>
+        <td class="num">${pct(r.win_rate)}</td>
+        <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
+        <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
+        <td class="num">$${fmt(r.total_fees)}</td>
       </tr>`).join("");
   });
 

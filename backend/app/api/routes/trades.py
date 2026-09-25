@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.market.regime_lookup import load_regime_lookup, regime_at
 from app.models.agent import Agent
 from app.models.enums import Side
+from app.models.strategy import Strategy, StrategyVersion
 from app.models.trading import Trade
-from app.schemas.api import RegimePerformance, SidePerformance, TradeSummary
+from app.schemas.api import RegimePerformance, SidePerformance, StrategyPerformance, TradeSummary
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
@@ -121,4 +122,46 @@ async def get_side_performance(db: AsyncSession = Depends(get_db)):
             )
         )
     results.sort(key=lambda r: r.trade_count, reverse=True)
+    return results
+
+
+@router.get("/by-strategy", response_model=list[StrategyPerformance])
+async def get_strategy_performance(db: AsyncSession = Depends(get_db)):
+    """Breaks down closed-trade performance by strategy family.
+
+    A trade's strategy is its agent's strategy version's family (same join
+    as the leaderboard). Aggregated in SQL since the trades table grows
+    without bound. Agents with no strategy version land in a null bucket.
+    """
+    stmt = (
+        select(
+            Strategy.family,
+            func.count(func.distinct(Trade.agent_id)),
+            func.count(Trade.id),
+            func.sum(case((Trade.net_pnl > 0, 1), else_=0)),
+            func.sum(Trade.net_pnl),
+            func.sum(Trade.fees),
+        )
+        .join(Agent, Agent.id == Trade.agent_id)
+        .outerjoin(StrategyVersion, StrategyVersion.id == Agent.strategy_version_id)
+        .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
+        .group_by(Strategy.family)
+    )
+    results = []
+    for family, agents, count, wins, total_pnl, total_fees in (await db.execute(stmt)).all():
+        wins = int(wins or 0)
+        total_pnl = float(total_pnl or 0.0)
+        results.append(
+            StrategyPerformance(
+                strategy_family=family.value if family is not None else None,
+                agent_count=agents,
+                trade_count=count,
+                win_count=wins,
+                win_rate=wins / count,
+                total_pnl=total_pnl,
+                avg_pnl=total_pnl / count,
+                total_fees=float(total_fees or 0.0),
+            )
+        )
+    results.sort(key=lambda r: r.total_pnl, reverse=True)
     return results

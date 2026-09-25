@@ -150,6 +150,17 @@ class SidePerformance(BaseModel):
     avg_pnl: float
 
 
+class StrategyPerformance(BaseModel):
+    strategy_family: str | None
+    agent_count: int
+    trade_count: int
+    win_count: int
+    win_rate: float
+    total_pnl: float
+    avg_pnl: float
+    total_fees: float
+
+
 class SystemHealth(BaseModel):
     database_ok: bool
     hyperliquid_configured: bool

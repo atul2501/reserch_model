@@ -255,3 +255,17 @@ async def test_population_reports_trade_counts_open_positions_and_win_rate(immed
     pop = (await api.get("/api/population")).json()
     assert pop["total_trades"] == 2 and pop["generation_trades"] == 2
     assert pop["open_positions"] == 0 and pop["win_rate"] == 1.0
+
+
+async def test_trades_by_strategy_groups_closed_trades_by_strategy_family(immediate_fills, db_session, api):
+    from app.execution.paper_adapter import PaperExecutionAdapter
+    await make_agents(db_session, [make_dna(), make_dna()])
+    assert (await api.get("/api/trades/by-strategy")).json() == []
+    eng = PaperExecutionAdapter()
+    c1 = make_context(1, 100.0, rsi=65.0)
+    await cycle(db_session, eng, c1)
+    await cycle(db_session, eng, make_context(2, 103.0, rsi=30.0), c1)         # both exit in profit
+    rows = (await api.get("/api/trades/by-strategy")).json()
+    assert sum(r["trade_count"] for r in rows) == 2
+    assert all(r["win_rate"] == 1.0 and r["total_pnl"] > 0 and r["total_fees"] > 0 for r in rows)
+    assert sum(r["agent_count"] for r in rows) == 2
