@@ -1,0 +1,6 @@
+# accury test in production
+
+gpt-oss:20b = 30%
+gemma 4b :31 = 15-20%
+nemotron-3-nano:30b =  27% starting
+gpt-oss:120b = 

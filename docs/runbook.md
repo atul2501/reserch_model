@@ -17,6 +17,12 @@ python -m scripts.bootstrap_population        # only if the database has no gene
 SQLite (dev/tests) runs in WAL mode; production must use PostgreSQL (pool, `statement_timeout`, partial
 unique indexes, immutability triggers).
 
+SQLite lock model (if you do run the deployment on SQLite): the API uses deferred transactions (reads never take the
+write lock); the worker and research scheduler call `use_immediate_transactions()` so they take the write lock at
+`BEGIN` and queue behind each other (`busy_timeout` 15 s) instead of failing with `database is locked` when a
+read snapshot goes stale (`tests/test_sqlite_locking.py`). One writer at a time is the ceiling: use PostgreSQL for
+anything beyond a single trading worker.
+
 ### PostgreSQL sizing and timeouts
 Three processes share the server: keep `3 x (DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW)` under ~90% of
 `max_connections` and set `DATABASE_SERVER_MAX_CONNECTIONS` to match (the app refuses to start otherwise).
