@@ -690,21 +690,15 @@ async function refresh() {
     const rows = await get("/api/trades/by-strategy");
     const tbody = document.querySelector("#strategy-table tbody");
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No closed trades yet</td></tr>`; return; }
-    const shareCell = (share, color) => `
-        <td class="num" style="min-width:110px;">
-          <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;">
-            <div style="flex:1; height:6px; background:var(--border); border-radius:3px; min-width:50px;"><div style="width:${(share * 100).toFixed(1)}%; height:100%; background:${color}; border-radius:3px;"></div></div>
-            <span>${pct(share)}</span>
-          </div>
-        </td>`;
+    const shareCell = (share) => `<td class="num">${pct(share)}</td>`;
     const body = rows.map(r => `
       <tr>
         <td>${esc(r.strategy_family || "-")}</td>
         <td class="num">${r.agent_count}</td>
         <td class="num">${r.trade_count}</td>
-        ${shareCell(r.trade_share, "#b494ef")}
+        ${shareCell(r.trade_share)}
         <td class="num">${r.win_count}</td>
-        ${shareCell(r.win_share, "#3fd096")}
+        ${shareCell(r.win_share)}
         <td class="num">${pct(r.win_rate)}</td>
         <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
         <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
