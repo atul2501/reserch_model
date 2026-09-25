@@ -14,6 +14,7 @@ from app.api.routes.reality_gap import router as reality_gap_router
 from app.api.routes.regime_validation import router as regime_validation_router
 from app.api.routes.council import router as council_router
 from app.api.routes.evolution import router as evolution_router
+from app.api.routes.export import router as export_router
 from app.api.routes.shadow import router as shadow_router
 from app.api.routes.status import router as status_router
 from app.api.routes.system import router as system_router
@@ -36,3 +37,4 @@ api_router.include_router(council_router, dependencies=[viewer_required])
 api_router.include_router(evolution_router, dependencies=[viewer_required])
 api_router.include_router(shadow_router, dependencies=[viewer_required])
 api_router.include_router(status_router, dependencies=[viewer_required])
+api_router.include_router(export_router, dependencies=[viewer_required])

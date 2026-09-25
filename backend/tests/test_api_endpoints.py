@@ -269,3 +269,38 @@ async def test_trades_by_strategy_groups_closed_trades_by_strategy_family(immedi
     assert sum(r["trade_count"] for r in rows) == 2
     assert all(r["win_rate"] == 1.0 and r["total_pnl"] > 0 and r["total_fees"] > 0 for r in rows)
     assert sum(r["agent_count"] for r in rows) == 2
+
+
+async def test_export_report_is_one_xlsx_with_every_dashboard_section(immediate_fills, db_session, api):
+    import io
+    from openpyxl import load_workbook
+    from app.execution.paper_adapter import PaperExecutionAdapter
+    agents = await make_agents(db_session, [make_dna(), make_dna()])
+    agents[0].identifier = "=HYPERLINK(\"http://evil\")"                     # untrusted text must not become a formula
+    await db_session.commit()
+    eng = PaperExecutionAdapter()
+    c1 = make_context(1, 100.0, rsi=65.0)
+    await cycle(db_session, eng, c1)
+    await cycle(db_session, eng, make_context(2, 103.0, rsi=30.0), c1)
+
+    r = await api.get("/api/export/report")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
+    assert "attachment" in r.headers["content-disposition"] and ".xlsx" in r.headers["content-disposition"]
+    wb = load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames[:6] == ["Summary", "By Strategy", "By Regime", "By Side", "Agents", "Open Positions"]
+    assert "Trades" in wb.sheetnames and "Council History" in wb.sheetnames
+    trades = list(wb["Trades"].values)
+    assert len(trades) == 1 + 2 and "net_pnl" in trades[0]                  # header + both closed trades
+    agent_rows = list(wb["Agents"].values)
+    ident = agent_rows[0].index("identifier")
+    assert any(row[ident] == "'=HYPERLINK(\"http://evil\")" for row in agent_rows[1:])
+    assert all(c.data_type != "f" for row in wb["Agents"].iter_rows() for c in row)
+    assert list(wb["Market Candles 24h"].values) == [("No data yet",)]
+    summary = [row for row in wb["Summary"].values]
+    assert any(str(row[1]).startswith("Not available") for row in summary if len(row) > 1)  # no market snapshot: noted, not a failure
+
+
+async def test_export_report_requires_authentication(api):
+    r = await api.get("/api/export/report", headers={"X-API-Key": ""})
+    assert r.status_code in (401, 403)

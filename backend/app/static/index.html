@@ -154,7 +154,10 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
 <div class="wrap">
   <header>
     <h1 id="title">Trading Lab <span id="market-title">loading...</span></h1>
-    <div class="badges" id="badges"></div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="badges" id="badges"></div>
+      <button id="export-report" type="button" title="Download every dashboard table as one Excel file">Export report</button>
+    </div>
   </header>
 
   <div class="grid" id="stat-cards"></div>
@@ -555,6 +558,32 @@ function formatRule(method, value) {
   if (method === "risk_reward_multiple") return `${fmt(value, 2)}R`;
   return `${esc(method)} ${fmt(value, 2)}`;
 }
+
+// One-click export: the server builds a single .xlsx with every dashboard
+// section (full agents/trades history, not just the rows shown here).
+async function exportReport() {
+  const btn = document.getElementById("export-report");
+  btn.disabled = true; btn.textContent = "Exporting…";
+  try {
+    const key = apiKey();
+    let res = await fetch("/api/export/report", { headers: key ? { "X-API-Key": key } : {} });
+    if ((res.status === 401 || res.status === 403) && promptForApiKey()) {
+      res = await fetch("/api/export/report", { headers: { "X-API-Key": apiKey() } });
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const name = ((res.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/) || [])[1] || "trading-report.xlsx";
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    window.alert("Export failed: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Export report";
+  }
+}
+document.getElementById("export-report").addEventListener("click", exportReport);
 
 document.getElementById("leaderboard-load-more").addEventListener("click", () => {
   leaderboardLimit = Math.min(LEADERBOARD_MAX, leaderboardLimit + LEADERBOARD_PAGE_SIZE);
