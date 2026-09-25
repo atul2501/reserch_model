@@ -21,8 +21,10 @@ async def list_trades(
     limit: int = Query(default=50, le=500),
 ):
     stmt = (
-        select(Trade, Agent.identifier)
+        select(Trade, Agent.identifier, Strategy.family)
         .join(Agent, Agent.id == Trade.agent_id)
+        .outerjoin(StrategyVersion, StrategyVersion.id == Agent.strategy_version_id)
+        .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
         .order_by(Trade.closed_at.desc())
         .limit(limit)
     )
@@ -32,6 +34,7 @@ async def list_trades(
             id=trade.id,
             agent_id=trade.agent_id,
             agent_identifier=identifier,
+            strategy_family=family.value if family is not None else None,
             symbol=trade.symbol,
             side=trade.side,
             quantity=trade.quantity,
@@ -46,7 +49,7 @@ async def list_trades(
             closed_at=trade.closed_at,
             holding_seconds=trade.holding_seconds,
         )
-        for trade, identifier in result.all()
+        for trade, identifier, family in result.all()
     ]
 
 
@@ -147,8 +150,10 @@ async def get_strategy_performance(db: AsyncSession = Depends(get_db)):
         .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
         .group_by(Strategy.family)
     )
+    rows = (await db.execute(stmt)).all()
+    grand_total = sum(row[2] for row in rows)
     results = []
-    for family, agents, count, wins, total_pnl, total_fees in (await db.execute(stmt)).all():
+    for family, agents, count, wins, total_pnl, total_fees in rows:
         wins = int(wins or 0)
         total_pnl = float(total_pnl or 0.0)
         results.append(
@@ -161,6 +166,7 @@ async def get_strategy_performance(db: AsyncSession = Depends(get_db)):
                 total_pnl=total_pnl,
                 avg_pnl=total_pnl / count,
                 total_fees=float(total_fees or 0.0),
+                trade_share=count / grand_total,
             )
         )
     results.sort(key=lambda r: r.total_pnl, reverse=True)

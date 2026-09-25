@@ -117,6 +117,7 @@ class TradeSummary(BaseModel):
     id: uuid.UUID
     agent_id: uuid.UUID
     agent_identifier: str
+    strategy_family: str | None
     symbol: str
     side: Side
     quantity: float
@@ -159,6 +160,7 @@ class StrategyPerformance(BaseModel):
     total_pnl: float
     avg_pnl: float
     total_fees: float
+    trade_share: float  # this family's fraction of all closed trades (0-1)
 
 
 class SystemHealth(BaseModel):

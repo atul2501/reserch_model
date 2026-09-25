@@ -1,0 +1,30 @@
+# accury test in production
+
+gpt-oss:20b = 30%
+gemma 4b :31 = 15-20%
+nemotron-3-nano:30b =  27% starting
+gpt-oss:120b = 
+
+
+
+
+cd <path-to>/reserch_model
+
+# 1. Stop everything
+./run.sh stop
+
+# 2. Back up the old database (keep it, in case you want the old results)
+mkdir -p backend/data/backups
+cp backend/data/trading_lab.db*  backend/data/backups/        # copies .db, -wal and -shm if present
+mv backend/data/backups/trading_lab.db backend/data/backups/trading_lab_$(date +%Y%m%d_%H%M).db
+
+# 3. Delete the live database (this is the "fresh start")
+rm -f backend/data/trading_lab.db backend/data/trading_lab.db-wal backend/data/trading_lab.db-shm
+
+# 4. Confirm the settings that will be used (expect 500 / 100 / paper)
+grep -E "^(AGENT_COUNT|AGENT_STARTING_BALANCE|TRADING_MODE|DATABASE_URL)" backend/.env
+
+# 5. Start: migrations, bootstrap a new generation 1, then worker + research + API
+./run.sh start
+./run.sh status
+./run.sh logs            # Ctrl+C to leave the log view

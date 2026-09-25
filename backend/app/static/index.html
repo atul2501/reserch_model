@@ -256,7 +256,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="strategy-table">
         <thead><tr>
-          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
+          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Allocation</th><th>Wins</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -434,7 +434,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="trades-table">
         <thead><tr>
-          <th>Agent</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Amount</th>
+          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Amount</th>
           <th>Net PnL</th><th>Reason</th><th>Opened</th><th>Closed</th>
         </tr></thead>
         <tbody></tbody>
@@ -689,12 +689,18 @@ async function refresh() {
   await section("strategy-performance", async () => {
     const rows = await get("/api/trades/by-strategy");
     const tbody = document.querySelector("#strategy-table tbody");
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty">No closed trades yet</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">No closed trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(r => `
       <tr>
         <td>${esc(r.strategy_family || "-")}</td>
         <td class="num">${r.agent_count}</td>
         <td class="num">${r.trade_count}</td>
+        <td class="num" style="min-width:110px;">
+          <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;">
+            <div style="flex:1; height:6px; background:var(--border); border-radius:3px; min-width:50px;"><div style="width:${(r.trade_share * 100).toFixed(1)}%; height:100%; background:#b494ef; border-radius:3px;"></div></div>
+            <span>${pct(r.trade_share)}</span>
+          </div>
+        </td>
         <td class="num">${r.win_count}</td>
         <td class="num">${pct(r.win_rate)}</td>
         <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
@@ -981,10 +987,11 @@ async function refresh() {
   await section("trades", async () => {
     const rows = await get("/api/trades?limit=50");
     const tbody = document.querySelector("#trades-table tbody");
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No trades yet</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="11" class="empty">No trades yet</td></tr>`; return; }
     tbody.innerHTML = rows.map(t => `
       <tr>
         <td>${esc(t.agent_identifier)}</td>
+        <td>${esc(t.strategy_family || "-")}</td>
         <td><span class="pill ${t.side === 'LONG' ? 'side-long' : 'side-short'}">${esc(t.side)}</span></td>
         <td class="num">$${fmt(t.entry_price)}</td>
         <td class="num">$${fmt(t.exit_price)}</td>
