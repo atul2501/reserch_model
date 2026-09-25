@@ -65,7 +65,7 @@ class PriceActionFeatures(BaseModel):
 class RegimeState(BaseModel):
     regime: MarketRegime
     confidence: float = Field(ge=0.0, le=1.0)
-    detector_version: str = "v1"
+    detector_version: str = "v2"
 
 
 class MarketContext(BaseModel):

@@ -145,8 +145,9 @@ async def test_min_notional_rejects_a_sub_ten_dollar_order(db_session, monkeypat
     eng = PaperExecutionAdapter()
     await cycle(db_session, eng, make_context(1, 100.0, rsi=65.0))   # 5% x $100 equity = a $5 order, below the $10 minimum
     await cycle(db_session, eng, make_context(2, 100.0, rsi=50.0))
-    (order,) = await _orders(db_session)
-    assert order.status == OrderStatus.FAILED and order.rejection_reason == "below_min_order_notional"
+    # refused at decision time (see test_min_notional_decision_time.py); the adapter's own check at the fill is the
+    # backstop, covered in test_paper_execution_v2.py
+    assert await _orders(db_session) == []
 
 
 def test_production_realism_defaults_are_not_silently_disabled():

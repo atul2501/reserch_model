@@ -59,6 +59,7 @@ from app.execution.margin import margin_state
 from app.execution.paper_adapter import new_client_order_id
 from app.execution.sizing import (
     approve_against_margin,
+    below_min_order_notional,
     build_sizing_result,
     requested_notional,
     stop_distance_pct,
@@ -576,6 +577,11 @@ async def _process_agent_inner(cc: CycleContext, agent: Agent) -> None:
         rejected = True
         decision.risk_decision = RiskDecision.REJECTED
         reasons.append("zero_notional_after_margin_cap")
+    if not rejected and cc.engine.venue == ExecutionVenue.PAPER and below_min_order_notional(approved, context.close_price):
+        # The exchange minimum is known NOW: refuse here rather than persist an order that can only fail at the fill.
+        rejected = True
+        decision.risk_decision = RiskDecision.REJECTED
+        reasons.insert(0, "below_min_order_notional")   # decisive reason first (audit + risk_vetoes metric label)
     sizing = build_sizing_result(
         method=dna.position_sizing.method, requested=requested, approved=approved,
         leverage=risk_result.approved_leverage or 0.0, price=context.close_price, stop_dist_pct=stop_dist,
@@ -585,6 +591,8 @@ async def _process_agent_inner(cc: CycleContext, agent: Agent) -> None:
         "margin": sizing.margin, "leverage": sizing.leverage, "risk_amount": sizing.risk_amount,
         "sizing_method": sizing.method, "council": council_audit,
     }
+    if "below_min_order_notional" in reasons:
+        decision.risk_reasoning["min_order_notional"] = settings.paper_min_order_notional   # the audit says what it missed
     if rejected:
         metrics.inc("risk_vetoes", reason=str(reasons[0]).split(":")[0] if reasons else "unknown")
         await _keep(db, decision)

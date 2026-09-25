@@ -167,6 +167,12 @@ class Settings(BaseSettings):
     paper_reject_probability: float = 0.005
     # Hyperliquid's real minimum order value is $10; 0 disables the check.
     paper_min_order_notional: float = 10.0
+    # An agent whose entry attempts are (almost) all refused by that minimum cannot produce trading evidence at its
+    # capital: it is reported UNTESTABLE and excluded from survivor ranking (never penalised, never rewarded). It needs
+    # at least `untestable_min_blocked_entries` blocked attempts, of which at least `untestable_blocked_share` of all
+    # its entry attempts (blocked + executed). Nothing about its DNA, sizing, risk or status changes.
+    untestable_min_blocked_entries: int = 20
+    untestable_blocked_share: float = 0.95
     # When a paper/backtest entry FILLS relative to the bar that produced the signal:
     #   next_open    - an entry/exit decided on the CLOSE of bar N is a persisted PENDING order filled at the OPEN
     #                  of bar N+1 (the backtest's model: no signal-bar look-ahead). The research default.

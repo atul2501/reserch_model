@@ -15,7 +15,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.tradability import untestable_agent_ids
 from app.core import metrics
+from app.core.logging import get_logger
 from app.evolution.crossover import crossover
 from app.evolution.diversity import dna_signature, most_similar_pair, population_diversity_score
 from app.evolution.mutation import mutate
@@ -29,6 +31,8 @@ from app.models.evolution import EvolutionEvent
 from app.models.strategy import Strategy, StrategyVersion
 from app.schemas.strategy_dna import StrategyDNA
 from app.strategies.factory import generate_population_dna
+
+logger = get_logger(__name__)
 
 # diversity.py's own documented threshold for a homogenized population.
 DIVERSITY_FLOOR = 0.15
@@ -105,7 +109,7 @@ async def select_elite_versions(db: AsyncSession, *, limit: int) -> list[uuid.UU
 
 async def select_survivors(
     db: AsyncSession, *, generation_number: int, survivor_count: int,
-    max_family_survivor_fraction: float | None = None,
+    max_family_survivor_fraction: float | None = None, exclude_untestable: bool = True,
 ) -> list[Agent]:
     """Ranks every agent in `generation_number` by `Agent.fitness` (falling
     back to `equity` for agents that haven't had fitness computed yet) and
@@ -115,7 +119,11 @@ async def select_survivors(
     come from any single strategy_family (anti-cloning: prevents one
     dominant, highly-correlated family from taking every survivor slot).
     None (the default) preserves the original pure-fitness-ranking
-    behavior exactly."""
+    behavior exactly.
+
+    `exclude_untestable` (default True) drops agents that could not reach the exchange minimum order at their capital
+    (see `app.agents.tradability`) from the ranking: they produced no trading evidence, and the fitness function
+    scores inaction above a losing trade, so ranking them would select strategies that never traded."""
     # DEAD agents are never parents (their DNA lost the entire account). RETIRED
     # agents of a finished generation are eligible: they survived to the end.
     agents = (
@@ -131,6 +139,12 @@ async def select_survivors(
         )
     )).scalars().all()) if agents else set()
     agents = [a for a in agents if a.strategy_version_id not in excluded]
+    if exclude_untestable and agents:
+        untestable = await untestable_agent_ids(db, agents)
+        if untestable:
+            logger.info("breeding.untestable_agents_excluded", generation=generation_number, excluded=len(untestable),
+                        ranked=len(agents) - len(untestable))
+            agents = [a for a in agents if a.id not in untestable]
     ranked = sorted(
         agents,
         key=lambda a: a.fitness if a.fitness is not None else a.equity,

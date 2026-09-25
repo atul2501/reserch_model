@@ -13,6 +13,7 @@ requested_notional, approved_notional, margin, leverage, quantity, risk_amount.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from app.core.config import get_settings
@@ -92,6 +93,22 @@ def approve_against_margin(approved_notional: float, *, leverage: float, availab
     if leverage <= 0:
         return 0.0
     return max(0.0, min(approved_notional, available_margin * leverage))
+
+
+def below_min_order_notional(notional: float, price: float) -> bool:
+    """True when an ENTRY of `notional` at `price` would be refused by the exchange minimum. Mirrors the paper
+    adapter exactly (quantity floored to the lot step, then quantity * price against `paper_min_order_notional`), so
+    the decision and the later fill can never disagree and a doomed order is never persisted."""
+    settings = get_settings()
+    if not settings.paper_min_order_notional:
+        return False
+    if price <= 0:
+        return True
+    quantity = notional / price
+    step = settings.paper_quantity_step
+    if step > 0:
+        quantity = math.floor(quantity / step + 1e-9) * step
+    return quantity * price < settings.paper_min_order_notional
 
 
 def build_sizing_result(

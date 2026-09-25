@@ -91,33 +91,30 @@ def _vwap(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series) 
 
 
 def _swing_points(high: pd.Series, low: pd.Series, window: int = 5) -> tuple[float | None, float | None, bool, bool, bool, bool]:
-    """Simple fractal swing detection over the trailing `window` bars on
-    each side within the available data."""
+    """Fractal swing detection: a swing high (low) is a bar whose high (low) is the extreme of the `window` bars on
+    EACH side. It is therefore only CONFIRMED `window` bars later, so the newest `window` bars are never a swing
+    (no look-ahead) and every confirmed bar in the frame is scanned. HH/HL/LH/LL compare the last two confirmed
+    swings of the same kind; `last_swing_*` is the most recent confirmed one."""
     n = len(high)
     if n < window * 2 + 1:
         return None, None, False, False, False, False
 
-    def is_swing_high(i: int) -> bool:
-        seg = high.iloc[max(0, i - window): i + window + 1]
-        return high.iloc[i] == seg.max()
+    span = window * 2 + 1
+    high_v, low_v = high.to_numpy(), low.to_numpy()
+    # Centered rolling extreme is NaN within `window` bars of either edge, so those bars compare False.
+    swing_highs = high_v[high_v == high.rolling(span, center=True).max().to_numpy()]
+    swing_lows = low_v[low_v == low.rolling(span, center=True).min().to_numpy()]
 
-    def is_swing_low(i: int) -> bool:
-        seg = low.iloc[max(0, i - window): i + window + 1]
-        return low.iloc[i] == seg.min()
-
-    swing_highs = [(i, high.iloc[i]) for i in range(n - window - 1, n) if i >= window and is_swing_high(i)]
-    swing_lows = [(i, low.iloc[i]) for i in range(n - window - 1, n) if i >= window and is_swing_low(i)]
-
-    last_swing_high = swing_highs[-1][1] if swing_highs else None
-    last_swing_low = swing_lows[-1][1] if swing_lows else None
+    last_swing_high = float(swing_highs[-1]) if len(swing_highs) else None
+    last_swing_low = float(swing_lows[-1]) if len(swing_lows) else None
 
     higher_high = lower_high = higher_low = lower_low = False
     if len(swing_highs) >= 2:
-        higher_high = swing_highs[-1][1] > swing_highs[-2][1]
-        lower_high = swing_highs[-1][1] < swing_highs[-2][1]
+        higher_high = bool(swing_highs[-1] > swing_highs[-2])
+        lower_high = bool(swing_highs[-1] < swing_highs[-2])
     if len(swing_lows) >= 2:
-        higher_low = swing_lows[-1][1] > swing_lows[-2][1]
-        lower_low = swing_lows[-1][1] < swing_lows[-2][1]
+        higher_low = bool(swing_lows[-1] > swing_lows[-2])
+        lower_low = bool(swing_lows[-1] < swing_lows[-2])
 
     return last_swing_high, last_swing_low, higher_high, lower_high, higher_low, lower_low
 
@@ -178,8 +175,8 @@ def compute_features(candles: pd.DataFrame, symbol: str, timeframe: str) -> Mark
         bb_width=bb_width,
         vol_percentile=vol_percentile,
         break_of_structure=break_of_structure,
-        close_above_swing_high=bool(swing_high is not None and close.iloc[-1] > swing_high),
-        close_below_swing_low=bool(swing_low is not None and close.iloc[-1] < swing_low),
+        close_above_swing_high=bool(swing_high is not None and close.iloc[-1] > swing_high >= close.iloc[-2]),
+        close_below_swing_low=bool(swing_low is not None and close.iloc[-1] < swing_low <= close.iloc[-2]),
     )
 
     return MarketContext(
@@ -256,25 +253,33 @@ def detect_regime(
     close_above_swing_high: bool,
     close_below_swing_low: bool,
 ) -> RegimeState:
-    """Deterministic regime classifier (spec section 7). Thresholds are
+    """Deterministic regime classifier (spec section 7), detector v2. Thresholds are
     intentionally simple/interpretable rather than ML-fit — this is a
     baseline the evolution/research loop can later challenge with
-    data-driven alternatives, but the *interface* stays deterministic."""
+    data-driven alternatives, but the *interface* stays deterministic.
+
+    v2 (correctness only, no new thresholds):
+      * `close_above_swing_high` / `close_below_swing_low` are EVENTS: this bar is the first close beyond the last
+        confirmed swing (v1 passed the persistent state, labelling 33-39% of bars BREAKOUT/BREAKDOWN).
+      * A trend is checked BEFORE the ATR-percentile buckets (v1 checked it after, so a strong trend - which raises
+        ATR - was always pre-empted by HIGH_VOLATILITY and TREND_UP/DOWN were practically unreachable).
+      * RANGE is the residual class ("nothing above applies"): 1m Bollinger width is < 2% on ~97% of bars, so it
+        carries no ranging information - choppiness does not persist at this timeframe (corr ~0.01)."""
 
     if close_above_swing_high and trend_strength > 0:
         return RegimeState(regime=MarketRegime.BREAKOUT, confidence=min(0.95, 0.6 + vol_percentile * 0.3))
     if close_below_swing_low and trend_strength < 0:
         return RegimeState(regime=MarketRegime.BREAKDOWN, confidence=min(0.95, 0.6 + vol_percentile * 0.3))
 
-    if vol_percentile > 0.85:
-        return RegimeState(regime=MarketRegime.HIGH_VOLATILITY, confidence=vol_percentile)
-    if vol_percentile < 0.15:
-        return RegimeState(regime=MarketRegime.LOW_VOLATILITY, confidence=1 - vol_percentile)
-
     if trend_strength > 0.004 and ema_slope > 0:
         return RegimeState(regime=MarketRegime.TREND_UP, confidence=min(0.9, abs(trend_strength) * 100))
     if trend_strength < -0.004 and ema_slope < 0:
         return RegimeState(regime=MarketRegime.TREND_DOWN, confidence=min(0.9, abs(trend_strength) * 100))
+
+    if vol_percentile > 0.85:
+        return RegimeState(regime=MarketRegime.HIGH_VOLATILITY, confidence=vol_percentile)
+    if vol_percentile < 0.15:
+        return RegimeState(regime=MarketRegime.LOW_VOLATILITY, confidence=1 - vol_percentile)
 
     if bb_width < 0.02:
         return RegimeState(regime=MarketRegime.RANGE, confidence=0.7)
