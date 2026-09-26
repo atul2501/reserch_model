@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.ports import PositionCloseSettler
 from app.core.logging import get_logger
 from app.models.agent import Agent
 from app.models.enums import AgentStatus, PopulationEventType, PopulationStatus
@@ -171,17 +172,21 @@ async def record_extinction(db: AsyncSession, generation_number: int, report: di
 
 async def retire_generation(
     db: AsyncSession, generation_number: int, *, mark_price: float, at: datetime, fee_rate: float,
+    settle_close: PositionCloseSettler,
 ) -> dict:
     """Ends a superseded generation cleanly: every open position is closed at
     `mark_price` (a real Trade with exit_reason='generation_rollover', fees and
     funding included) and every still-ACTIVE agent becomes RETIRED with its
     final equity/PnL frozen. DEAD agents stay DEAD (never revived); nothing is
-    deleted. Returns counts for the report."""
+    deleted. Returns counts for the report.
+
+    `settle_close` is the position-close-settlement capability (see
+    app/agents/ports.py) - callers pass `app.execution.accounting.settle_close`
+    (the one production implementation); this module never imports execution
+    itself."""
     from app.analytics.pnl_engine import compute_trade_pnl
     from app.models.strategy import StrategyVersion
     from app.models.trading import Position, Trade
-
-    from app.execution import accounting
 
     everyone = (
         await db.execute(select(Agent).where(Agent.generation == generation_number))
@@ -206,7 +211,7 @@ async def retire_generation(
             side=pos.side, quantity=pos.quantity, entry_price=pos.entry_price, exit_price=mark_price,
             entry_fee=pos.entry_fee, exit_fee=exit_fee, funding_paid=pos.funding_accrued,
         )
-        settlement = accounting.settle_close(agent.balance, pnl.gross_pnl, exit_fee)   # bad debt recorded, not hidden
+        settlement = settle_close(agent.balance, pnl.gross_pnl, exit_fee)   # bad debt recorded, not hidden
         pos.is_open = False
         pos.closed_at = at
         pos.unrealized_pnl = 0.0

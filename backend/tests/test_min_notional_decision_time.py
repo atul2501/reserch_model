@@ -71,3 +71,58 @@ def test_check_mirrors_the_adapter_lot_rounding(monkeypatch):
     assert below_min_order_notional(0.0, 100.0) is True
     monkeypatch.setattr(s, "paper_min_order_notional", 0.0)
     assert below_min_order_notional(0.01, 100.0) is False
+
+
+async def test_backtest_currently_agrees_with_below_min_order_notional_at_a_real_nonzero_threshold(monkeypatch):
+    """Initiative 1 (LIVE_BACKTEST_PARITY_PLAN.md), Phase 1.1 - characterization only, no
+    production code changed.
+
+    `app.backtesting.engine.run_backtest` reimplements the minimum-notional check inline
+    (`qty * next_open < settings.paper_min_order_notional`, after its own lot-step rounding)
+    instead of calling the shared `below_min_order_notional()` used everywhere else (the paper
+    adapter, and decision_loop.py's decision-time check above). This is a real, if narrow,
+    duplication (see LIVE_BACKTEST_PARITY_PLAN.md SS3-4) - but `test_live_backtest_parity.py`'s
+    own `deterministic` fixture zeroes `paper_min_order_notional` before every live-vs-backtest
+    comparison, so NO existing test exercises this path at a real, non-zero threshold in either
+    direction. This test establishes - against the CURRENT, unmodified implementation - that
+    backtest's inline logic already agrees with the shared function at both boundaries, using
+    a real backtest run (not a synthetic notional) as the evidence. It must remain passing,
+    unmodified in its assertions, as the reference point for Phase 1.2's proposed change (swapping
+    the inline check for a direct call to below_min_order_notional)."""
+    from app.backtesting.engine import run_backtest
+    from app.execution.sizing import below_min_order_notional
+    from tests.test_backtest_parity import KW, candles, ema_cross_dna
+
+    settings = get_settings()
+    c = candles(seed=3)                 # same fixture test_backtest_parity.py's own tests use with this DNA
+    dna = ema_cross_dna(5, 20)          # proven to trade under KW (test_declared_indicator_periods_drive_backtest_behaviour)
+    # Slippage fully zeroed HERE ONLY (a local kwarg override, KW itself is untouched, PLUS the
+    # size-aware impact component, which is a Settings field, not a run_backtest parameter) so
+    # BacktestTrade.entry_price (the post-slippage fill) is bit-identical to `next_open` (the
+    # pre-slippage reference price the engine's own min-notional gate actually checks against) -
+    # otherwise even a few bps of slippage can shift which side of an exact boundary a trade falls
+    # on, which would be a bug in this test's arithmetic, not in the engine.
+    monkeypatch.setattr(settings, "paper_slippage_impact_bps_per_10k", 0.0)
+    kw = {**KW, "slippage_bps": 0.0}
+
+    baseline = run_backtest(c, dna, **kw)
+    assert baseline.trades, "scenario must actually trade for this test to mean anything"
+    first = baseline.trades[0]
+    first_notional = first.entry_price * first.quantity
+
+    # ---- order notional AT the configured minimum (inclusive boundary): must still open ----
+    monkeypatch.setattr(settings, "paper_min_order_notional", first_notional)
+    at_minimum = run_backtest(c, dna, **kw)
+    assert at_minimum.trades, "a notional exactly AT the minimum must not be rejected"
+    assert at_minimum.trades[0].entry_index == first.entry_index
+    assert at_minimum.trades[0].entry_price == pytest.approx(first.entry_price)
+    assert at_minimum.trades[0].quantity == pytest.approx(first.quantity)
+    # the shared reference function, given the same notional/price, agrees this is NOT below minimum
+    assert below_min_order_notional(first_notional, first.entry_price) is False
+
+    # ---- order notional BELOW the configured minimum: every entry must be rejected ----
+    monkeypatch.setattr(settings, "paper_min_order_notional", first_notional * 1_000)
+    starved = run_backtest(c, dna, **kw)
+    assert starved.trades == [], "a minimum far above any attainable notional must block every entry, not just the first"
+    # the shared reference function, given the same (now sub-minimum) notional/price, agrees
+    assert below_min_order_notional(first_notional, first.entry_price) is True

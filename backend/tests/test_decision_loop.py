@@ -187,6 +187,69 @@ async def test_daily_loss_breaker_rejects_new_entry_after_intraday_loss(db_sessi
 
 
 @pytest.mark.asyncio
+async def test_daily_loss_breaker_lifts_at_the_next_utc_day_even_without_recovering_equity(db_session):
+    """Phase 4.0 characterization gap: the day-rollover reset (day_start_equity,
+    day_start_date, daily_trade_count - decision_loop.py's `_process_agent_inner`,
+    the `if agent.day_start_date != market_ts.date()` block) is proven for
+    daily_trade_count by test_max_trades_per_day_stops_new_entries_and_resets_next_utc_day,
+    but nothing previously proved day_start_equity itself resets - the field the
+    daily-loss breaker actually reads. Same scenario as
+    test_daily_loss_breaker_rejects_new_entry_after_intraday_loss, extended one more
+    day: the breaker lifts at UTC rollover even though the agent's equity never
+    recovered - because the anchor moved, not because the loss was undone."""
+    DAY_MS = 86_400_000
+    agent = await _make_agent(db_session, leverage_limit=3.0)
+    execution_engine = PaperExecutionAdapter()
+
+    entry_context = _context(open_time=1, close=100.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, entry_context, None, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+    exit_context = _context(open_time=2, close=40.0, rsi=30.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, exit_context, entry_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+    await db_session.refresh(agent)
+    reduced_equity = agent.equity
+    assert reduced_equity < agent.day_start_equity * 0.9   # same-day breaker armed, as in the sibling test
+
+    second_entry_context = _context(open_time=3, close=40.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, second_entry_context, exit_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+    await db_session.refresh(agent)
+    assert agent.equity == pytest.approx(reduced_equity)   # still blocked same day: nothing changed
+
+    # Next UTC day. Equity has NOT recovered - reduced_equity is unchanged - but the
+    # breaker must lift because day_start_equity re-anchors to the current equity.
+    next_day_context = _context(open_time=DAY_MS + 4, close=40.0, rsi=65.0, trend_strength=0.01)
+    await run_decision_cycle(
+        db_session, execution_engine, next_day_context, second_entry_context, generation=100, council_decision_id=None,
+        global_max_leverage=5.0, global_max_position_size=0.5, global_max_drawdown=0.3, global_max_daily_loss=0.1,
+        market_data_age_seconds=1.0,
+    )
+    await db_session.refresh(agent)
+    from datetime import datetime, timezone
+    assert agent.day_start_date == datetime.fromtimestamp(next_day_context.candle_open_time / 1000, tz=timezone.utc).date()
+    assert agent.day_start_equity == pytest.approx(reduced_equity)   # re-anchored to CURRENT equity, not restored
+
+    last_decision = (
+        await db_session.execute(
+            select(Decision).where(Decision.agent_id == agent.id).order_by(Decision.market_candle_open_time.desc())
+        )
+    ).scalars().first()
+    assert "max_daily_loss_exceeded" not in (last_decision.risk_reasoning or {}).get("reasons", [])
+    positions = (await db_session.execute(select(Position).where(Position.agent_id == agent.id))).scalars().all()
+    assert len(positions) == 2   # the breaker lifted: a second position was allowed to open
+
+
+@pytest.mark.asyncio
 async def test_duplicate_position_not_opened_while_one_is_active(db_session):
     agent = await _make_agent(db_session)
     execution_engine = PaperExecutionAdapter()

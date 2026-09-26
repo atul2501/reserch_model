@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.core.logging import get_logger
+from app.council.ports import AIClientPort
 from app.schemas.council import ANALYST_NAMES, AnalystResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -78,7 +78,7 @@ def build_prompt(analyst: str, context: MarketContext) -> tuple[str, str]:
 
 
 async def run_analyst(
-    client: OllamaClient, analyst: str, context: MarketContext, *, deadline_seconds: float | None = None
+    client: AIClientPort, analyst: str, context: MarketContext, *, deadline_seconds: float | None = None
 ) -> AnalystRunResult:
     """Never raises — one bad or unreachable Ollama call must never block
     the rest of the council or crash the whole trading cycle (spec section

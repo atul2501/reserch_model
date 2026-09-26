@@ -395,6 +395,21 @@ async def protect_open_positions(
     return done
 
 
+def _force_close_reason(agent: Agent) -> tuple[str, str]:
+    """(order_kind, exit_reason) for force-closing a position whose owner
+    survived the bar's management but can no longer hold it. Phase 4.2
+    extraction (REFACTOR_PLAN.md): previously this mapping was spelled out
+    twice - as a bare literal pair in _process_agent_inner (which only ever
+    reaches the DEAD case: an agent in that loop starts ACTIVE and can only
+    become DEAD during it, never PAUSED) and as an inline ternary in
+    _protect_one (which also handles PAUSED/RETIRED orphans). Both callers'
+    own condition for WHETHER to force-close is unchanged - only the WHAT,
+    once they decide to, is now shared."""
+    if agent.status == AgentStatus.DEAD:
+        return "liquidation", "agent_death"
+    return "market", "orphan_resolution"
+
+
 async def _protect_one(cc: CycleContext, agent: Agent, dna: StrategyDNA | None, stage, position: Position) -> None:
     context = cc.context
     decision = Decision(
@@ -413,9 +428,9 @@ async def _protect_one(cc: CycleContext, agent: Agent, dna: StrategyDNA | None, 
     closed = await _manage_open_position(cc, agent, dna, stage, position, decision, cc.bar)
     if not closed and agent.status != AgentStatus.ACTIVE and position.is_open:
         # Owner is DEAD/PAUSED: an orphan must be resolved deterministically, never left open forever.
+        order_kind, exit_reason = _force_close_reason(agent)
         await _close_position(cc, agent, dna, stage, position, decision, reference_price=cc.bar.close,
-                              order_kind="liquidation" if agent.status == AgentStatus.DEAD else "market",
-                              exit_reason="agent_death" if agent.status == AgentStatus.DEAD else "orphan_resolution")
+                              order_kind=order_kind, exit_reason=exit_reason)
 
 
 async def _cancel_stale_pending(db: AsyncSession, context: MarketContext, interval_ms: int) -> None:
@@ -481,19 +496,16 @@ async def _process_agent_inner(cc: CycleContext, agent: Agent) -> None:
     )
 
     # ---- 0. execute what the PREVIOUS bar's close decided (next-open engines) ------------------- #
-    pending_entry = cc.pending.get(agent.id)
-    if position is not None and position.pending_exit_signal_time is not None:
-        position = await _execute_pending_exit(cc, agent, dna, stage, position, decision)
-    elif position is None and pending_entry is not None:
-        position = await _execute_pending_entry(cc, agent, dna, stage, pending_entry, decision)
+    position = await _execute_next_open_decisions(cc, agent, dna, stage, position, decision)
 
     # ---- 1. manage the open position ------------------------------------- #
     if position is not None:
         if await _manage_open_position(cc, agent, dna, stage, position, decision, bar):
             return
         if agent.status == AgentStatus.DEAD:  # died on mark-to-market: force-close, never orphan a position
+            order_kind, exit_reason = _force_close_reason(agent)
             await _close_position(cc, agent, dna, stage, position, decision, reference_price=bar.close,
-                                  order_kind="liquidation", exit_reason="agent_death")
+                                  order_kind=order_kind, exit_reason=exit_reason)
             return
 
     # ---- 2. strategy signal ---------------------------------------------- #
@@ -654,6 +666,24 @@ def _cancel_order(order: Order, reason: str) -> None:
 # --------------------------------------------------------------------------- #
 # Next-open execution of what the previous bar's close decided
 # --------------------------------------------------------------------------- #
+async def _execute_next_open_decisions(
+    cc: CycleContext, agent: Agent, dna: StrategyDNA, stage, position: Position | None, decision: Decision,
+) -> Position | None:
+    """Resolves whatever the PREVIOUS bar's close decided for this agent: a pending
+    exit takes priority over a pending entry (a position can never carry both at
+    once - see position_manager). Returns the position unchanged if nothing was
+    pending. Phase 4.1 extraction (REFACTOR_PLAN.md): identical dispatch, moved out
+    of _process_agent_inner's own body so that function no longer needs to know
+    this priority rule itself - _execute_pending_exit/_execute_pending_entry
+    themselves are unchanged."""
+    pending_entry = cc.pending.get(agent.id)
+    if position is not None and position.pending_exit_signal_time is not None:
+        return await _execute_pending_exit(cc, agent, dna, stage, position, decision)
+    if position is None and pending_entry is not None:
+        return await _execute_pending_entry(cc, agent, dna, stage, pending_entry, decision)
+    return position
+
+
 async def _execute_pending_entry(
     cc: CycleContext, agent: Agent, dna: StrategyDNA, stage, order: Order, decision: Decision
 ) -> Position | None:

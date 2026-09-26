@@ -138,7 +138,11 @@ def compute_fitness(inputs: FitnessInputs, weights: FitnessWeights | None = None
     win_rate_component = _win_rate_component(inputs)
     risk_score = ((profit_factor_component + win_rate_component) / 2) * sample_confidence
 
-    consistency_score = (inputs.walk_forward_score or 0.0) * sample_confidence
+    # Two independent consistency signals: walk_forward_score (backtest cross-window
+    # consistency) and daily_consistency (fraction of profitable live days). Average
+    # whichever are actually available; 0 only when neither is (never guessed).
+    consistency_inputs = [v for v in (inputs.walk_forward_score, inputs.daily_consistency) if v is not None]
+    consistency_score = (sum(consistency_inputs) / len(consistency_inputs) if consistency_inputs else 0.0) * sample_confidence
 
     # Survival only counts as evidence when the agent actually traded: sitting idle for 30 days proves nothing.
     survival_component = _clip(inputs.survival_days / 30.0, lo=0.0, hi=1.0) * sample_confidence

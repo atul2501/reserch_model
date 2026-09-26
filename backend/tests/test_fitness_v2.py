@@ -73,6 +73,25 @@ def test_survival_and_consistency_reward_longevity():
     assert old.fitness > young.fitness
 
 
+def test_consistency_score_uses_daily_consistency_when_walk_forward_is_unavailable():
+    """BUG: FitnessInputs.daily_consistency is computed and passed by every caller
+    (fitness_service, fitness_forward) but compute_fitness never reads it -
+    consistency_score depended on walk_forward_score alone, which is unavailable
+    for most agents (no WALK_FORWARD-stage metrics yet in their generation)."""
+    r = compute_fitness(base(walk_forward_score=None, daily_consistency=0.8, trade_count=90))
+    assert r.consistency_score == pytest.approx(0.8)
+
+
+def test_consistency_score_blends_walk_forward_and_daily_when_both_available():
+    r = compute_fitness(base(walk_forward_score=0.4, daily_consistency=0.8, trade_count=90))
+    assert r.consistency_score == pytest.approx(0.6)   # mean of the two available signals
+
+
+def test_consistency_score_is_still_zero_when_both_signals_are_missing():
+    r = compute_fitness(base(walk_forward_score=None, daily_consistency=None, trade_count=90))
+    assert r.consistency_score == 0.0
+
+
 async def test_service_never_reads_the_final_oos_stage_metrics(db_session):
     """The protected OUT_OF_SAMPLE score must not influence selection fitness."""
     import uuid
