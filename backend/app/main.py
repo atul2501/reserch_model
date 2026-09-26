@@ -91,6 +91,14 @@ def create_app() -> FastAPI:
     async def frontend():
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/exits")
+    async def exits_page():
+        return FileResponse(STATIC_DIR / "exits.html")
+
+    @app.get("/experiments")
+    async def experiments_page():
+        return FileResponse(STATIC_DIR / "experiments.html")
+
     return app
 
 

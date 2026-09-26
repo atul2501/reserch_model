@@ -100,7 +100,12 @@ async def compute_generation_correlation_report(
     lookback_days: int = 30,
     max_strategy_correlation: float = 0.80,
     top_n_pairs: int = DEFAULT_TOP_N_PAIRS,
+    now: datetime | None = None,
 ) -> GenerationCorrelationReport:
+    """`now`, when given, overrides real wall-clock time for the lookback window (mirrors
+    `app.research.pipeline.evaluate_gates`'s existing `now` override pattern) - so a replay
+    of a past generation computes correlation from trades as of that generation's own time,
+    not real "today"."""
     agents = (await db.execute(select(Agent).where(Agent.generation == generation))).scalars().all()
     if len(agents) < 2:
         return GenerationCorrelationReport(generation=generation)
@@ -113,7 +118,7 @@ async def compute_generation_correlation_report(
 
     agent_ids = [a.id for a in agents]
     direction_corr, return_corr, timing_corr, overlap_jaccard = await _compute_behavioral_correlations(
-        db, agent_ids=agent_ids, bucket=bucket, lookback_days=lookback_days
+        db, agent_ids=agent_ids, bucket=bucket, lookback_days=lookback_days, now=now
     )
 
     # The pairwise build is CPU-bound (~125k pairs for 500 agents): per-agent structures are computed ONCE, matrix
@@ -218,15 +223,16 @@ def _lookup(matrix: pd.DataFrame | None, id_a: uuid.UUID, id_b: uuid.UUID) -> fl
 
 
 async def _compute_behavioral_correlations(
-    db: AsyncSession, *, agent_ids: list[uuid.UUID], bucket: str, lookback_days: int
+    db: AsyncSession, *, agent_ids: list[uuid.UUID], bucket: str, lookback_days: int, now: datetime | None = None
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None]:
     """Single batch query for the whole generation, then vectorized pandas
     correlation — not one query per pair."""
-    since = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    now_ref = now or datetime.now(timezone.utc)
+    since = now_ref - timedelta(days=lookback_days)
     trades = (
         await db.execute(
             select(Trade.agent_id, Trade.side, Trade.net_pnl, Trade.opened_at, Trade.closed_at).where(
-                Trade.agent_id.in_(agent_ids), Trade.closed_at >= since
+                Trade.agent_id.in_(agent_ids), Trade.closed_at >= since, Trade.closed_at <= now_ref
             )
         )
     ).all()

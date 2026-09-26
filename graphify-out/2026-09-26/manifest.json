@@ -1182,10 +1182,10 @@
     "semantic_hash": "fb2f8f3e78b02b3196fa5b7ba99073ad"
   },
   "backend/tests/test_analytics_migration.py": {
-    "mtime": 1790419056.8616908,
-    "seen": 1790424250.3957288,
-    "ast_hash": "bbe79bd9aa15839d47e35e7bb8e62ed6",
-    "semantic_hash": "bbe79bd9aa15839d47e35e7bb8e62ed6"
+    "mtime": 1790438995.9443285,
+    "seen": 1790439148.090324,
+    "ast_hash": "3f999e4fdc9a45df7c449a42d6506652",
+    "semantic_hash": ""
   },
   "backend/tests/test_analytics_store.py": {
     "mtime": 1790419056.8643472,
@@ -1752,27 +1752,27 @@
     "semantic_hash": "1f4c1d42f0153f6413259399964e090a"
   },
   "backend/alembic/versions/c1d5e9a3f7b2_widen_snapshot_source.py": {
-    "mtime": 1790438350.1092987,
-    "seen": 1790438693.286478,
-    "ast_hash": "ea158e629ccb4d8871693d66eb04b338",
+    "mtime": 1790438984.1632802,
+    "seen": 1790439148.090174,
+    "ast_hash": "4b7c840d94f1e1c0091e2c83111dbb76",
     "semantic_hash": ""
   },
   "backend/scripts/compare_fitness_correction.py": {
-    "mtime": 1790438111.8552713,
-    "seen": 1790438693.286602,
-    "ast_hash": "71531574b2fa03445671b04794eaf5c6",
+    "mtime": 1790439036.5920496,
+    "seen": 1790439148.090303,
+    "ast_hash": "28e63726d246676462f46db4e5983288",
     "semantic_hash": ""
   },
   "backend/scripts/migrate_sqlite_to_postgres.py": {
-    "mtime": 1790438270.153562,
-    "seen": 1790438693.2866051,
-    "ast_hash": "1e2d97762152e7ebae52662d1fb76f09",
+    "mtime": 1790439055.7892408,
+    "seen": 1790439148.090307,
+    "ast_hash": "a0881e3f378f8569246de41682e2d05b",
     "semantic_hash": ""
   },
   "backend/scripts/report_population_baseline.py": {
-    "mtime": 1790438168.9528298,
-    "seen": 1790438693.286609,
-    "ast_hash": "f37f911546289c07a21ffa2cf9a84c7f",
+    "mtime": 1790439019.7711928,
+    "seen": 1790439148.0903108,
+    "ast_hash": "312cf6f0e86b95e0ea27a09c4271cced",
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {

@@ -24,9 +24,10 @@ async def compute_agent_performance_metric(
     """Builds (does not persist) a PerformanceMetric snapshot for `agent`
     from its full closed-trade history. Caller adds + commits."""
     if trades is None:
-        trades = list(
-            (await db.execute(select(Trade).where(Trade.agent_id == agent.id).order_by(Trade.closed_at))).scalars().all()
-        )
+        stmt = select(Trade).where(Trade.agent_id == agent.id).order_by(Trade.closed_at)
+        if as_of is not None:
+            stmt = stmt.where(Trade.closed_at <= as_of)
+        trades = list((await db.execute(stmt)).scalars().all())
 
     stats = compute_trade_stats([t.net_pnl for t in trades], [t.holding_seconds for t in trades])
 

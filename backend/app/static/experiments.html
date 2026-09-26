@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiments — Trading Lab</title>
+<style>
+:root {
+  --bg: #060810; --surface: #0b0e15; --surface-2: #10141c; --surface-3: #151a24;
+  --line: #1d232d; --line-strong: #2b3340; --text: #e6e9ee; --text-strong: #f8f9fb; --muted: #8791a0;
+  --blue: #6ea8ff; --green: #3fd096; --red: #f16b7c; --amber: #e2ac57; --purple: #b494ef;
+  --radius: 10px; --shadow: 0 6px 20px -8px rgba(0,0,0,.5); --ease: cubic-bezier(.4,0,.2,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 0 40px; background-color: var(--bg);
+  background-image: radial-gradient(circle at 12% -10%, rgba(110,168,255,.06), transparent 50%), radial-gradient(circle at 90% 0%, rgba(63,208,150,.05), transparent 45%);
+  background-repeat: no-repeat; color: var(--text); font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.wrap { width: min(1400px, calc(100% - 32px)); margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+header { position: sticky; top: 0; z-index: 10; margin: 0 0 20px; padding: 14px 0; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; flex-wrap: wrap; background: rgba(6,8,16,.86); backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); border-bottom: 1px solid var(--line); box-shadow: 0 10px 24px -18px rgba(0,0,0,.7); }
+h1 { margin: 0; font-size: 16px; font-weight: 700; background: linear-gradient(95deg, var(--text-strong) 40%, var(--blue) 140%);
+  -webkit-background-clip: text; background-clip: text; color: var(--text-strong); }
+.page-nav { display: flex; gap: 4px; }
+.page-nav a { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 650; letter-spacing: .03em;
+  padding: 6px 10px; border-radius: 6px; }
+.page-nav a:hover { color: var(--text); background: var(--surface-2); }
+.page-nav a.active { color: var(--text-strong); background: var(--surface-3); }
+section { margin-bottom: 20px; }
+section h2 { margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8; }
+.panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+td { color: #bcc3cc; }
+tbody tr { cursor: pointer; transition: background .12s var(--ease); }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr.selected { background: rgba(110,168,255,.1); }
+.pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 650; }
+.pill.completed { color: var(--green); background: rgba(63,208,150,.13); }
+.pill.running { color: var(--amber); background: rgba(226,172,87,.13); }
+.pill.failed, .pill.skipped { color: var(--muted); background: var(--surface-3); }
+.pos { color: var(--green); } .neg { color: var(--red); }
+.empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.filters select { background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 11px; }
+.hint { color: var(--muted); font-size: 10.5px; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Experiments</h1>
+    <nav class="page-nav"><a href="/">Home</a><a href="/exits">Exit Research</a><a href="/experiments" class="active">Experiments</a></nav>
+  </header>
+
+  <div class="filters">
+    <select id="f-kind"><option value="">All kinds</option><option value="evaluation">evaluation (baseline/candidate)</option><option value="evolution">evolution (research cycles)</option><option value="oos">oos</option></select>
+    <span class="hint">Click two rows to compare baseline vs. candidate.</span>
+  </div>
+
+  <section>
+    <h2>Experiment Log <span class="hint" id="count-hint"></span></h2>
+    <div class="panel table-scroll">
+      <table id="table-experiments">
+        <thead><tr><th></th><th>Experiment ID</th><th>Kind</th><th>Status</th><th>Name / Role</th><th>Trades</th><th>Net P&amp;L</th><th>Sample</th><th>Created</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="compare-section" style="display:none">
+    <h2>Baseline vs. Candidate</h2>
+    <div class="panel table-scroll">
+      <table id="table-compare"><thead><tr><th>Metric</th><th id="col-a">A</th><th id="col-b">B</th><th>Difference</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <footer>Every row is a real, non-overwritten Experiment record. Results here are diagnostic — a single ~24h dataset is not sufficient to declare a candidate superior; see the sample label per row.</footer>
+</div>
+
+<script>
+const fmt = (n, d=4) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) { const k = window.prompt("API key (viewer role or higher):", ""); if (k) { sessionStorage.setItem("apiKey", k.trim()); return await get(path); } throw new Error("auth required"); }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+async function section(name, fn) { try { await fn(); } catch (e) { console.error(`section "${esc(name)}" failed:`, e); } }
+
+let selected = [];
+let experiments = [];
+
+function rowClickHandler(id) {
+  const idx = selected.indexOf(id);
+  if (idx >= 0) selected.splice(idx, 1);
+  else { selected.push(id); if (selected.length > 2) selected.shift(); }
+  renderTable();
+  if (selected.length === 2) compare(selected[0], selected[1]);
+  else document.getElementById("compare-section").style.display = "none";
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#table-experiments tbody");
+  if (!experiments.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">No experiments recorded yet</td></tr>`; return; }
+  tbody.innerHTML = experiments.map(e => {
+    const r = e.result || {};
+    const p = e.parameters || {};
+    const isSel = selected.includes(e.experiment_id);
+    return `<tr class="${isSel ? 'selected' : ''}" data-id="${esc(e.experiment_id)}">
+      <td><input type="checkbox" ${isSel ? "checked" : ""} readonly></td>
+      <td>${esc(e.experiment_id)}</td>
+      <td>${esc(e.kind)}</td>
+      <td><span class="pill ${esc((e.status||'').toLowerCase())}">${esc(e.status)}</span></td>
+      <td>${esc(p.name || "-")}${p.role ? " / " + esc(p.role) : ""}</td>
+      <td class="num">${r.trade_count ?? "-"}</td>
+      <td class="num ${r.net_pnl > 0 ? 'pos' : (r.net_pnl < 0 ? 'neg' : '')}">${r.net_pnl != null ? fmt(r.net_pnl,2) : "-"}</td>
+      <td>${esc(r.sample_label || "-")}</td>
+      <td>${new Date(e.created_at).toLocaleString()}</td>
+    </tr>`;
+  }).join("");
+  tbody.querySelectorAll("tr[data-id]").forEach(tr => tr.addEventListener("click", () => rowClickHandler(tr.dataset.id)));
+}
+
+async function compare(a, b) {
+  await section("compare", async () => {
+    const d = await get(`/api/evolution/experiments/diff?experiment_a=${encodeURIComponent(a)}&experiment_b=${encodeURIComponent(b)}`);
+    if (d.error) { document.getElementById("compare-section").style.display = "none"; return; }
+    document.getElementById("compare-section").style.display = "block";
+    document.getElementById("col-a").textContent = d.experiment_a.experiment_id;
+    document.getElementById("col-b").textContent = d.experiment_b.experiment_id;
+    const rows = Object.entries(d.diff).filter(([k]) => k !== "oos");
+    document.querySelector("#table-compare tbody").innerHTML = rows.map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="num">${typeof v.a === "number" ? fmt(v.a) : esc(v.a)}</td><td class="num">${typeof v.b === "number" ? fmt(v.b) : esc(v.b)}</td>
+       <td class="num ${v.delta > 0 ? 'pos' : (v.delta < 0 ? 'neg' : '')}">${v.delta != null ? (v.delta > 0 ? "+" : "") + fmt(v.delta) : "n/a"}</td></tr>`
+    ).join("");
+  });
+}
+
+async function load() {
+  await section("experiments", async () => {
+    const kind = document.getElementById("f-kind").value;
+    experiments = await get("/api/evolution/experiments?limit=100" + (kind ? `&kind=${kind}` : ""));
+    document.getElementById("count-hint").textContent = `(${experiments.length})`;
+    renderTable();
+  });
+}
+
+document.getElementById("f-kind").addEventListener("change", load);
+load();
+</script>
+</body>
+</html>

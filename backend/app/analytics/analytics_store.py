@@ -69,9 +69,18 @@ def _bar_ms(candles: Sequence[tq.Bar]) -> int:
 # --------------------------------------------------------------------------- #
 # Phase 1: trade_analytics
 # --------------------------------------------------------------------------- #
-async def refresh_trade_analytics(db: AsyncSession, *, computation_version: str = COMPUTATION_VERSION) -> RefreshResult:
+async def refresh_trade_analytics(
+    db: AsyncSession, *, computation_version: str = COMPUTATION_VERSION, as_of: datetime | None = None
+) -> RefreshResult:
+    """`as_of`, when given, bounds every piece of data this refresh may see (candles,
+    trades, decisions) to `<= as_of` — so re-running this later, once more candles/trades
+    have accumulated, reproduces byte-identical rows for the same `as_of` instead of
+    silently pulling in more post-exit history than existed at that point in time.
+    `computed_at` (when this refresh actually ran) is real wall-clock time regardless —
+    it's provenance metadata, not part of the as_of data boundary."""
     result = RefreshResult()
     now = datetime.now(timezone.utc)
+    as_of_ms = _ms(as_of) if as_of is not None else None
 
     # (trade_id -> (computation_version, analytics_row_id or None)) — the None id
     # marks a row added earlier in THIS run (still pending flush).
@@ -83,10 +92,11 @@ async def refresh_trade_analytics(db: AsyncSession, *, computation_version: str 
     }
 
     # ---- load the replay corpus (confirmed candles, once) ------------------ #
+    candle_stmt = select(MarketCandle).where(MarketCandle.is_final.is_(True))
+    if as_of_ms is not None:
+        candle_stmt = candle_stmt.where(MarketCandle.open_time <= as_of_ms)
     candle_rows = (
-        await db.execute(
-            select(MarketCandle).where(MarketCandle.is_final.is_(True)).order_by(MarketCandle.symbol, MarketCandle.timeframe, MarketCandle.open_time)
-        )
+        await db.execute(candle_stmt.order_by(MarketCandle.symbol, MarketCandle.timeframe, MarketCandle.open_time))
     ).scalars().all()
     bars_by_key: dict[tuple[str, str], list[tq.Bar]] = {}
     for c in candle_rows:
@@ -96,11 +106,13 @@ async def refresh_trade_analytics(db: AsyncSession, *, computation_version: str 
     bar_ms_by_key = {k: _bar_ms(v) for k, v in bars_by_key.items()}
 
     # ---- regime series -> episode ids (per symbol+timeframe) ---------------- #
+    regime_stmt = select(MarketRegimeRecord.symbol, MarketRegimeRecord.timeframe,
+                          MarketRegimeRecord.candle_open_time, MarketRegimeRecord.regime)
+    if as_of_ms is not None:
+        regime_stmt = regime_stmt.where(MarketRegimeRecord.candle_open_time <= as_of_ms)
     regime_rows = (
         await db.execute(
-            select(MarketRegimeRecord.symbol, MarketRegimeRecord.timeframe,
-                   MarketRegimeRecord.candle_open_time, MarketRegimeRecord.regime)
-            .order_by(MarketRegimeRecord.symbol, MarketRegimeRecord.timeframe, MarketRegimeRecord.candle_open_time)
+            regime_stmt.order_by(MarketRegimeRecord.symbol, MarketRegimeRecord.timeframe, MarketRegimeRecord.candle_open_time)
         )
     ).all()
     episodes_by_key: dict[tuple[str, str], dict[int, int]] = {}
@@ -120,23 +132,24 @@ async def refresh_trade_analytics(db: AsyncSession, *, computation_version: str 
         episodes_by_key[current_key] = sr.episode_ids(series)
 
     # ---- entry decisions + orders + positions for every trade ---------------- #
-    rows = (
-        await db.execute(
-            select(Trade, Position, Order, Decision, Strategy.family)
-            .join(Position, Position.id == Trade.position_id)
-            .join(Order, Order.id == Trade.entry_order_id, isouter=True)
-            .join(Decision, Decision.id == Order.decision_id, isouter=True)
-            .outerjoin(StrategyVersion, StrategyVersion.id == Decision.strategy_version_id)
-            .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
-            .order_by(Trade.closed_at)
-        )
-    ).all()
+    trades_stmt = (
+        select(Trade, Position, Order, Decision, Strategy.family)
+        .join(Position, Position.id == Trade.position_id)
+        .join(Order, Order.id == Trade.entry_order_id, isouter=True)
+        .join(Decision, Decision.id == Order.decision_id, isouter=True)
+        .outerjoin(StrategyVersion, StrategyVersion.id == Decision.strategy_version_id)
+        .outerjoin(Strategy, Strategy.id == StrategyVersion.strategy_id)
+    )
+    if as_of is not None:
+        trades_stmt = trades_stmt.where(Trade.closed_at <= as_of)
+    rows = (await db.execute(trades_stmt.order_by(Trade.closed_at))).all()
 
     # exit-signal decision per trade (pending exits set decision.trade_id on close)
+    exit_dec_stmt = select(Decision).where(Decision.trade_id.is_not(None))
+    if as_of_ms is not None:
+        exit_dec_stmt = exit_dec_stmt.where(Decision.market_candle_open_time <= as_of_ms)
     exit_dec_by_trade: dict[uuid.UUID, Decision] = {}
-    for d in (
-        await db.execute(select(Decision).where(Decision.trade_id.is_not(None)).order_by(Decision.market_candle_open_time))
-    ).scalars():
+    for d in (await db.execute(exit_dec_stmt.order_by(Decision.market_candle_open_time))).scalars():
         exit_dec_by_trade.setdefault(d.trade_id, d)
 
     # exit orders for exit slippage
@@ -300,10 +313,15 @@ async def refresh_trade_analytics(db: AsyncSession, *, computation_version: str 
 
 
 async def refresh_strategy_regime_matrix(
-    db: AsyncSession, *, computation_version: str = COMPUTATION_VERSION,
+    db: AsyncSession, *, computation_version: str = COMPUTATION_VERSION, as_of: datetime | None = None,
 ) -> RefreshResult:
     """Rebuild the matrix for `computation_version` (derived aggregate: DELETE the
-    previous rows of this version, then INSERT — inside the caller's transaction)."""
+    previous rows of this version, then INSERT — inside the caller's transaction).
+
+    `as_of`, when given, bounds trade selection to `closed_at <= as_of` and anchors the
+    "24h"/"7d" rolling windows to `min(as_of, max closed_at)` instead of always the latest
+    trade — so a replay for a past `as_of` can't have its windows silently widened by
+    trades that close after it."""
     from app.models.enums import MarketRegime
 
     result = RefreshResult()
@@ -315,7 +333,10 @@ async def refresh_strategy_regime_matrix(
     ).scalars().all()
     ta_by_trade = {ta.trade_id: ta for ta in ta_rows}
 
-    trade_rows = (await db.execute(select(Trade).order_by(Trade.closed_at))).scalars().all()
+    trade_stmt = select(Trade).order_by(Trade.closed_at)
+    if as_of is not None:
+        trade_stmt = trade_stmt.where(Trade.closed_at <= as_of)
+    trade_rows = (await db.execute(trade_stmt)).scalars().all()
     pairs = [(t, ta_by_trade.get(t.id)) for t in trade_rows]
 
     agent_ids = {t.agent_id for t, _ in pairs}
@@ -324,7 +345,7 @@ async def refresh_strategy_regime_matrix(
         for a in (await db.execute(select(Agent).where(Agent.id.in_(agent_ids)))).scalars()
     } if agent_ids else {}
 
-    data_end = max((t.closed_at for t, _ in pairs), default=now)
+    data_end = max((t.closed_at for t, _ in pairs), default=(as_of or now))
     windows: dict[str, datetime | None] = {
         "full": None,
         "24h": data_end - timedelta(hours=24),
