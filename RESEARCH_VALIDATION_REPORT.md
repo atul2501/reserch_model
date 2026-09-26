@@ -300,6 +300,37 @@ the bar of evidence this task set for touching working code.
 
 ## 5. EXIT ANALYSIS
 
+> **CORRECTION (added in a later phase, PostgreSQL-first architecture work): the figures
+> in this section were computed under a real bug that has since been found and fixed.**
+> `app/analytics/analytics_store.py` converted `Trade.side` (a `Side` enum instance) via
+> `str(trade.side).upper()`, which in this codebase's Python version yields Python's
+> default enum repr `"SIDE.LONG"`/`"SIDE.SHORT"`, not the plain value `"LONG"`/`"SHORT"`.
+> Every downstream comparison against the literal strings `"LONG"`/`"SHORT"` (including
+> `app.analytics.trade_quality._is_long`, which decides the favorable/adverse excursion
+> direction for MFE/MAE) therefore silently matched neither, string comparisons ultimately
+> defaulting every trade to look SHORT regardless of its real side. For the ~44% of trades
+> that were actually LONG, this inverted their true favorable/adverse direction throughout
+> this section's MFE/MAE, reversal-rate, and left-on-table figures. It was invisible on
+> SQLite (which never enforces column length, so the same bug also silently overflowed the
+> `TradeAnalytics.side` column's intended `VARCHAR(5)` with the 10-character
+> `"SIDE.SHORT"`) and was only surfaced when the PostgreSQL migration's stricter typing
+> turned it into a hard `INSERT` failure — a direct, concrete demonstration of the kind of
+> latent defect a stricter database catches that SQLite does not.
+>
+> **Fixed** at the root (`trade.side.value` instead of `str(trade.side)`, with a fallback
+> for the one case where SQLAlchemy's identity map can hand back an already-raw string),
+> verified with a new regression test proving correct excursion direction for both an
+> actual LONG and an actual SHORT trade
+> (`tests/test_analytics_store.py::test_side_is_stored_clean_and_mfe_direction_is_correct_for_both_sides`).
+> **Corrected figures, re-verified against the same live dataset (now 8,500 trades, grown
+> since this section was first written) — see `MULTI_WEEK_RESEARCH_READINESS_REPORT.md` §5
+> for the full corrected breakdown and before/after comparison.** Headline correction:
+> REVERSAL_AFTER_PROFIT drops from the originally-reported 22.6% to **3.8%** — most of what
+> looked like "reached +1R then reversed" was actually LONG trades whose true MFE/MAE had
+> been computed backwards. This section is left below **exactly as originally written**,
+> per this program's own rule against silently changing historical calculations — read it
+> as a record of what was reported and when, not as the current, accurate figures.
+
 Verified against the actual data (`scripts/refresh_analytics.py` then
 `scripts/report_trade_quality.py`), not assumed:
 

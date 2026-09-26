@@ -286,3 +286,82 @@ async def test_trade_analytics_regime_episodes_tracked(db_session):
     # RANGE trades share episode 1; the TREND_UP trade is a different episode
     episodes = {r.regime_episode_id for r in rows}
     assert len(episodes) == 2
+
+
+async def test_side_is_stored_clean_and_mfe_direction_is_correct_for_both_sides(db_session):
+    """Regression for a real bug: `trade.side` is a `Side` enum instance, and `str(Side.SHORT)`
+    is Python's default "Side.SHORT" repr, NOT the plain value "SHORT" - comparing/storing
+    that (as analytics_store.py used to) never matches "LONG"/"SHORT" either way. Two
+    consequences, both checked here: (1) the persisted `side` column must be the clean
+    value, not "SIDE.LONG"/"SIDE.SHORT" (which also silently overflowed Postgres's
+    VARCHAR(5) column - invisible on SQLite, which never enforces column length); (2) every
+    trade must not be silently treated as SHORT in the MFE/MAE excursion-direction math -
+    a real LONG trade's favorable direction is UP, a real SHORT trade's is DOWN."""
+    from app.models.enums import Side
+
+    now = datetime.now(timezone.utc)
+    gen = Generation(number=1, population_target=10, population_created=1, starting_balance=100.0,
+                     total_capital_allocated=100.0, triggered_by="test", notes="", created_at=now)
+    db_session.add(gen)
+    strategy = Strategy(code="S-SIDE", family=StrategyFamily.MOMENTUM, name="S")
+    db_session.add(strategy)
+    await db_session.flush()
+    version = StrategyVersion(strategy_id=strategy.id, version=1, generation=1, dna={}, stage=StrategyStage.PAPER,
+                              hypothesis="", proposed_by="test")
+    db_session.add(version)
+    await db_session.flush()
+    agent = Agent(identifier="SIDE-A1", generation=1, strategy_version_id=version.id, status=AgentStatus.ACTIVE,
+                  starting_balance=100.0, balance=100.0, equity=100.0, peak_equity=100.0,
+                  day_start_equity=100.0, day_start_date=now.date(), created_at=datetime.fromtimestamp(T0 / 1000, tz=timezone.utc))
+    db_session.add(agent)
+    await db_session.flush()
+
+    # Price rises monotonically 100 -> 106 over 6 bars: favorable for a LONG, adverse for a SHORT.
+    db_session.add_all([
+        # low never dips below 100 (entry price for both trades): the rise from here is
+        # PURELY favorable for the LONG and PURELY adverse for the SHORT, with no accidental
+        # favorable dip for the SHORT to muddy the direction assertions below.
+        MarketCandle(symbol="SOL", timeframe="1m", open_time=T0 + i * MINUTE, close_time=T0 + (i + 1) * MINUTE - 1,
+                    open=100.0 + i, high=100.0 + i + 0.5, low=max(100.0, 100.0 + i - 0.5), close=100.0 + i,
+                    volume=100, is_final=True, source="test")
+        for i in range(10)
+    ])
+
+    trades = {}
+    for side in (Side.LONG, Side.SHORT):
+        position = Position(
+            agent_id=agent.id, symbol="SOL", side=side, quantity=1.0, entry_price=100.0, leverage=1.0,
+            initial_margin=100.0, maintenance_margin=1.0, entry_fee=0.0, entry_slippage_cost=0.0,
+            entry_candle_open_time=T0, entry_regime="RANGE", stop_loss_price=None, take_profit_price=None,
+            opened_at=datetime.fromtimestamp(T0 / 1000, tz=timezone.utc),
+            closed_at=datetime.fromtimestamp((T0 + 5 * MINUTE) / 1000, tz=timezone.utc),
+            is_open=False, venue="PAPER", peak_price=106.0, trough_price=100.0,
+        )
+        db_session.add(position)
+        await db_session.flush()
+        net = 5.0 if side == Side.LONG else -5.0   # LONG profits from the rise, SHORT loses
+        trade = Trade(
+            agent_id=agent.id, position_id=position.id, symbol="SOL", side=side, quantity=1.0,
+            entry_price=100.0, exit_price=105.0, gross_pnl=net, fees=0.0, net_pnl=net,
+            opened_at=position.opened_at, closed_at=position.closed_at, holding_seconds=300,
+            entry_regime="RANGE", exit_regime="RANGE", exit_reason="exit_rules", stage=StrategyStage.PAPER,
+        )
+        db_session.add(trade)
+        trades[side] = trade
+    await db_session.commit()
+
+    await store.refresh_trade_analytics(db_session)
+    await db_session.commit()
+
+    rows = {r.trade_id: r for r in (await db_session.execute(select(TradeAnalytics))).scalars().all()}
+    long_ta, short_ta = rows[trades[Side.LONG].id], rows[trades[Side.SHORT].id]
+
+    # (1) clean values, never the enum-repr artifact.
+    assert long_ta.side == "LONG" and short_ta.side == "SHORT"
+
+    # (2) direction: the LONG trade's favorable excursion must reflect the price RISE
+    # (positive unrealized profit); the SHORT trade's favorable excursion must be ~0 (price
+    # never fell) while its adverse excursion reflects that same rise as a loss.
+    assert long_ta.max_unrealized_profit > 0
+    assert short_ta.max_unrealized_profit == pytest.approx(0.0, abs=1e-9)
+    assert short_ta.max_unrealized_loss < 0

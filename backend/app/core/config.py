@@ -131,10 +131,16 @@ class Settings(BaseSettings):
     # --- Database -----------------------------------------------------------
     # All database files live in ONE folder: backend/data/  (relative SQLite paths are resolved
     # against the backend directory, never the current working directory).
+    # PostgreSQL is REQUIRED for every real runtime (research/paper/shadow/production) — see
+    # `_require_postgres_outside_tests` below. These class-level defaults stay SQLite on purpose:
+    # if DATABASE_URL is ever left unset, the app fails with a clear "PostgreSQL configuration is
+    # required" error instead of silently starting against SQLite or a fake placeholder host.
     database_url: str = "sqlite+aiosqlite:///./data/trading_lab.db"
     database_url_sync: str = "sqlite:///./data/trading_lab.db"
-    # Production: DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trading_lab
-    # (SQLite stays the default for local development and the test-suite.)
+    # postgresql+asyncpg://user:pass@host:5432/trading_lab — see .env.example.
+    # Explicit escape hatch for isolated unit tests ONLY. Set by tests/conftest.py; never by a
+    # real runtime process. Do not set this to bypass the check for a real run.
+    testing: bool = False
     # Sized against PostgreSQL's max_connections (default 100) for THREE processes (api, worker, research):
     # 3 x (pool_size + max_overflow) must stay well below it. See the startup check in `_check_pool_budget`.
     database_pool_size: int = 10
@@ -389,6 +395,22 @@ class Settings(BaseSettings):
                     "council_deadline_seconds + council_outer_grace_seconds must be below the candle interval "
                     f"({interval}s): a late council decision must never be applied to a newer candle"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _require_postgres_outside_tests(self) -> "Settings":
+        """PostgreSQL is required for research, paper, shadow and production — every real
+        runtime process (API, worker, research scheduler, Alembic) constructs Settings
+        through this same validator, so this one check covers all of them. `testing=True`
+        is the ONLY escape hatch, and it is explicit (set once, by tests/conftest.py) rather
+        than inferred (no "are we under pytest" sniffing) — the task that added this rule
+        called for that distinction to be explicit, not implicit."""
+        if not self.testing and self.database_url.startswith("sqlite"):
+            raise ValueError(
+                "PostgreSQL configuration is required for this runtime mode. "
+                "Set DATABASE_URL to a postgresql+asyncpg:// URL (see .env.example). "
+                "SQLite is only permitted with TESTING=true, for isolated unit tests."
+            )
         return self
 
     @model_validator(mode="after")

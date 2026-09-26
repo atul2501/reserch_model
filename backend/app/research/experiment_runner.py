@@ -72,7 +72,7 @@ def _stop_loss_price(dna: StrategyDNA, trade: BacktestTrade) -> float | None:
     if not dna.stop_loss.enabled or dna.stop_loss.method != "fixed_pct":
         return None
     pct = dna.stop_loss.value / 100.0
-    long = trade.side.value.upper() != "SHORT" if hasattr(trade.side, "value") else str(trade.side).upper() != "SHORT"
+    long = trade.side.value != "SHORT"
     return trade.entry_price * (1 - pct) if long else trade.entry_price * (1 + pct)
 
 
@@ -85,7 +85,7 @@ def compute_metrics(result: BacktestResult, frame: pd.DataFrame, dna: StrategyDN
     mfe_capture_values: list[float] = []
     stop_method = dna.stop_loss.method if dna.stop_loss.enabled else None
     for t in trades:
-        long = str(t.side).upper().endswith("LONG")
+        long = t.side.value == "LONG"
         stop_price = _stop_loss_price(dna, t)
         facts = tq.TradeFacts(
             side="LONG" if long else "SHORT", entry_price=t.entry_price, exit_price=t.exit_price,

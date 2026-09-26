@@ -1061,6 +1061,7 @@ function renderHealth(st) {
   if (w.status === "down" || w.status === "unknown") { msgs.push("TRADING WORKER IS NOT RUNNING — no decisions are being made (heartbeat " + secs(w.heartbeat_age_seconds) + " ago)."); critical = true; }
   if (m.status === "down") msgs.push("MARKET DATA IS STALE OR HAS AN UNRECOVERED GAP — new entries are blocked.");
   if (st.database.status !== "ok") { msgs.push("DATABASE UNREACHABLE."); critical = true; }
+  if (st.database.dialect === "sqlite") { msgs.push("SQLITE ⚠ NOT SUPPORTED FOR THIS RUNTIME — PostgreSQL is required for research/paper/shadow/production."); critical = true; }
   if (o.status === "down") msgs.push("OLLAMA CREDENTIALS UNHEALTHY — councils will be INCOMPLETE (no new trades).");
   if ((st.flags || {}).kill_switch) msgs.push("KILL SWITCH ACTIVE — no new entries.");
   banner.style.display = msgs.length ? "block" : "none";

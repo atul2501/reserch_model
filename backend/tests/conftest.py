@@ -7,6 +7,9 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./data/test_trading_lab.db")
+# Explicit escape hatch for the PostgreSQL-required startup check (app/core/config.py::
+# _require_postgres_outside_tests) — the unit test suite is the one sanctioned SQLite user.
+os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
 os.environ.setdefault("OLLAMA_MODEL", "test-model")
 # Unit tests run against DETERMINISTIC execution: the production realism defaults (random rejects, partial fills,
