@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import select, update
 
 from app.agents.lifecycle import retire_generation
+from app.execution import accounting
 from app.execution.paper_adapter import PaperExecutionAdapter
 from app.models.enums import AgentStatus
 from app.models.strategy import AgentSnapshot, ImmutableRecordError, StrategyVersion
@@ -112,7 +113,8 @@ async def test_retire_generation_closes_positions_freezes_results_and_never_touc
     await cycle(db_session, PaperExecutionAdapter(), make_context(1, 100.0, rsi=65.0))
     open_before = (await db_session.execute(select(Position).where(Position.is_open.is_(True)))).scalars().all()
     assert len(open_before) == 2
-    res = await retire_generation(db_session, 100, mark_price=103.0, at=datetime.now(timezone.utc), fee_rate=0.00045)
+    res = await retire_generation(db_session, 100, mark_price=103.0, at=datetime.now(timezone.utc), fee_rate=0.00045,
+                                   settle_close=accounting.settle_close)
     await db_session.commit()
     assert res == {"retired": 2, "positions_closed": 2}
     for a in (a1, a2):

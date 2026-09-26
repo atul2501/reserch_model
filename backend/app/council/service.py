@@ -28,11 +28,11 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.council.analysts import AnalystRunResult, run_analyst
 from app.council.consensus import apply_judge, compute_consensus, tally_votes
+from app.council.ports import AIClientPort
 from app.models.council import CouncilAnalysis, CouncilDecision
 from app.models.enums import Bias
 from app.schemas.council import ANALYST_NAMES, AnalystResponse, ConsensusResult, JudgeResponse
 from app.schemas.market_context import MarketContext
-from app.services.ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -67,7 +67,7 @@ def _failed_result(analyst: str, reason: str, started: datetime | None = None) -
 
 
 async def _gather_analysts_with_deadline(
-    client: OllamaClient, context: MarketContext, *, analyst_timeout: float, deadline: float
+    client: AIClientPort, context: MarketContext, *, analyst_timeout: float, deadline: float
 ) -> list[AnalystRunResult]:
     """Runs every analyst concurrently, each with its own timeout, and the
     whole set under one hard deadline. Anything still running at the deadline
@@ -104,7 +104,7 @@ async def _gather_analysts_with_deadline(
 
 async def run_council_cycle(
     db: AsyncSession,
-    client: OllamaClient,
+    client: AIClientPort,
     context: MarketContext,
     *,
     deadline_seconds: float | None = None,
@@ -296,7 +296,7 @@ async def run_council_cycle(
     return consensus
 
 
-async def _run_judge(client: OllamaClient, context: MarketContext, responses: list[AnalystResponse]) -> JudgeResponse | None:
+async def _run_judge(client: AIClientPort, context: MarketContext, responses: list[AnalystResponse]) -> JudgeResponse | None:
     analyses_text = "\n".join(
         f"- {r.analyst}: {r.bias.value} (confidence {r.confidence:.2f}) — {r.reasoning}" for r in responses
     )

@@ -60,6 +60,34 @@ async def test_a_failing_agent_still_gets_its_position_stopped_by_the_sweep(db_s
     assert trade.exit_reason == "stop_loss"
 
 
+async def test_a_position_from_a_different_generation_than_the_one_being_cycled_is_still_protected(db_session):
+    """Phase 4.0 characterization gap: protect_open_positions's own docstring names
+    'other generation' as one of the sweep's four target cases (failed agent, invalid
+    DNA, DEAD/orphan owner, other generation) - the other three are covered by this
+    file's other tests, but nothing previously exercised this one directly. The
+    sweep queries ALL open positions with no generation filter; run_decision_cycle's
+    per-agent loop only ever processes the ONE generation it's called with (100,
+    cycle()'s default here) - a position belonging to an agent in a different,
+    never-cycled generation must still be swept."""
+    (other_gen_agent,) = await make_agents(db_session, [make_dna()], generation=99)
+    pos = await open_position(db_session, other_gen_agent, stop=99.0)
+    assert pos.last_processed_open_time is None
+
+    # generation=100 (cycle()'s default) has ZERO agents - the per-agent loop does
+    # nothing at all; only the mandatory sweep can reach this position.
+    ctx1 = make_context(1, 100.0, rsi=50.0)
+    await cycle(db_session, PaperExecutionAdapter(), ctx1)
+    await db_session.refresh(pos)
+    assert pos.last_processed_open_time == ctx1.candle_open_time
+    assert pos.is_open is True   # not stopped this bar - this just proves the sweep reached it
+
+    await cycle(db_session, PaperExecutionAdapter(), make_context(2, 95.0, **CRASH, rsi=50.0))
+    await db_session.refresh(pos)
+    assert pos.is_open is False   # the sweep closed it via the stop, exactly as it would within generation=100
+    (trade,) = (await db_session.execute(select(Trade))).scalars().all()
+    assert trade.agent_id == other_gen_agent.id and trade.exit_reason == "stop_loss"
+
+
 async def _invalid_dna_agents(db, n):
     """Agents whose stored DNA no longer validates (schema drift). DNA is immutable in the DB, so create them that way."""
     import uuid

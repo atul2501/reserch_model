@@ -48,7 +48,7 @@ from app.core.config import get_settings
 from app.execution import accounting
 from app.execution.fillmodel import fee_rate_for, slipped_price, slippage_bps as slippage_bps_for
 from app.execution.margin import margin_state
-from app.execution.sizing import approve_against_margin, requested_notional, stop_distance_pct
+from app.execution.sizing import approve_against_margin, below_min_order_notional, requested_notional, stop_distance_pct
 from app.market.feature_engine import FEATURE_WINDOW, MIN_CANDLES_REQUIRED, InsufficientDataError
 from app.market.hyperliquid_client import HyperliquidClient
 from app.models.enums import Bias, Side
@@ -371,7 +371,12 @@ def run_backtest(
                 step = settings.paper_quantity_step
                 if step > 0:
                     qty = int(qty / step + 1e-9) * step
-                if qty > 0 and not (settings.paper_min_order_notional and qty * next_open < settings.paper_min_order_notional):
+                # Initiative 1 Phase 1.2 (LIVE_BACKTEST_PARITY_PLAN.md): was a hand-written
+                # duplicate of this exact rule; now the same shared function the paper adapter's
+                # decision-time check uses. `qty` is already lot-rounded (above), so this passes
+                # its own already-rounded notional straight through - below_min_order_notional's
+                # internal re-rounding is idempotent on an already-rounded quantity.
+                if qty > 0 and not below_min_order_notional(qty * next_open, next_open):
                     fill = slip("market", next_open, side, qty * next_open, False)
                     entry_fee = fill * qty * fee_rate
                     slip_cost = abs(fill - next_open) * qty

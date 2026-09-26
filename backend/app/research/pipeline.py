@@ -43,6 +43,7 @@ from app.evolution.champion_challenger_service import advance_pipeline_stage
 from app.evolution.correlation_service import (
     apply_diversity_pressure, compute_generation_correlation_report, persist_generation_correlation,
 )
+from app.execution import accounting
 from app.market.feature_engine import InsufficientDataError
 from app.models.agent import Agent
 from app.models.enums import AgentStatus, StrategyStage
@@ -336,7 +337,8 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
         await create_agent_snapshot(db, agent, versions[agent.strategy_version_id], experiment_id=exp.experiment_id,
                                     dataset_fingerprint=epoch.dataset_fingerprint)
     last_close = float(candles["close"].iloc[-1])
-    counts["retired"] = await retire_generation(db, gen_no, mark_price=last_close, at=now, fee_rate=s.paper_fee_rate)
+    counts["retired"] = await retire_generation(db, gen_no, mark_price=last_close, at=now, fee_rate=s.paper_fee_rate,
+                                                 settle_close=accounting.settle_close)
     new_gen = await create_generation(
         db, generation_number=gen_no + 1, strategy_version_ids=new_ids, starting_balance=s.agent_starting_balance,
         triggered_by=f"research:{exp.experiment_id}",
