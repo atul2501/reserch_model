@@ -60,6 +60,11 @@ h1 {
 }
 h1 span { -webkit-background-clip: initial; background-clip: initial; margin-left: 9px; color: var(--muted); font-size: 11px; font-weight: 500; }
 
+.page-nav { display: flex; gap: 4px; margin-right: 4px; }
+.page-nav a { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 650; letter-spacing: .03em;
+  padding: 6px 10px; border-radius: 6px; transition: background .15s var(--ease), color .15s var(--ease); }
+.page-nav a:hover { color: var(--text); background: var(--surface-2); }
+.page-nav a.active { color: var(--text-strong); background: var(--surface-3); }
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -155,6 +160,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <header>
     <h1 id="title">Trading Lab <span id="market-title">loading...</span></h1>
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <nav class="page-nav"><a href="/" class="active">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a></nav>
       <div class="badges" id="badges"></div>
       <button id="export-report" type="button" title="Download every dashboard table as one Excel file">Export report</button>
     </div>
@@ -1050,13 +1056,15 @@ function renderHealth(st) {
 
   const banner = document.getElementById("alert-banner");
   const msgs = [];
-  if (w.status === "down" || w.status === "unknown") msgs.push("TRADING WORKER IS NOT RUNNING — no decisions are being made (heartbeat " + secs(w.heartbeat_age_seconds) + " ago).");
+  let critical = false;
+  if (st.trading_mode === "live") { msgs.push("⚠ LIVE TRADING MODE IS ENABLED — this is the research phase; real capital is at risk. Verify TRADING_MODE immediately if unexpected."); critical = true; }
+  if (w.status === "down" || w.status === "unknown") { msgs.push("TRADING WORKER IS NOT RUNNING — no decisions are being made (heartbeat " + secs(w.heartbeat_age_seconds) + " ago)."); critical = true; }
   if (m.status === "down") msgs.push("MARKET DATA IS STALE OR HAS AN UNRECOVERED GAP — new entries are blocked.");
-  if (st.database.status !== "ok") msgs.push("DATABASE UNREACHABLE.");
+  if (st.database.status !== "ok") { msgs.push("DATABASE UNREACHABLE."); critical = true; }
   if (o.status === "down") msgs.push("OLLAMA CREDENTIALS UNHEALTHY — councils will be INCOMPLETE (no new trades).");
   if ((st.flags || {}).kill_switch) msgs.push("KILL SWITCH ACTIVE — no new entries.");
   banner.style.display = msgs.length ? "block" : "none";
-  banner.className = (w.status === "down" || st.database.status !== "ok" || w.status === "unknown") ? "" : "warn";
+  banner.className = critical ? "" : "warn";
   banner.innerHTML = msgs.map(esc).join("<br>");
   document.getElementById("health-sub").textContent = "updated " + new Date().toLocaleTimeString();
 }
@@ -1144,6 +1152,13 @@ async function loadAgentDetail(id) {
   try {
     const [dna, curve, fit, reg] = await Promise.all([get(`/api/agents/${encodeURIComponent(id)}/dna`), get(`/api/agents/${encodeURIComponent(id)}/equity-curve`),
       get(`/api/agents/${encodeURIComponent(id)}/fitness`), get(`/api/agents/${encodeURIComponent(id)}/regime-performance`)]);
+    let exitCard = "";
+    try {
+      const ex = await get(`/api/exit-analytics?agent_id=${encodeURIComponent(id)}&limit=5000`);
+      exitCard = card("MFE / MAE (this agent)", "ok",
+        ex.trades_analysed ? `MFE ${fmt(ex.mfe_r.mean)}R / MAE ${fmt(ex.mae_r.mean)}R` : "-",
+        ex.trades_analysed ? `n=${ex.trades_analysed} · reversal ${pct(ex.reversal_rate)} · <a href="/exits" style="color:var(--blue)">exit research →</a>` : "no analytics rows yet");
+    } catch (e) { /* exit-analytics is a nice-to-have on this panel; never block the rest of the detail view */ }
     const pts = curve.points.map(p => ({ v: p.equity }));
     const f0 = fit[0];
     box.innerHTML = `<div class="hgrid">
@@ -1152,6 +1167,7 @@ async function loadAgentDetail(id) {
         ${card("Lineage", "ok", dna.parent_a ? "child" : "founder", "parent A " + esc((dna.parent_a || "-").slice(0, 8)) + " · parent B " + esc((dna.parent_b || "-").slice(0, 8)) + "<br>experiment " + esc(dna.experiment_id || "-"))}
         ${card("Equity / drawdown", "ok", "$" + fmt(curve.current_equity), "max drawdown " + pct(curve.max_drawdown))}
         ${card("Fitness", "ok", f0 ? f0.fitness.toFixed(3) : "-", f0 ? `return ${f0.return.toFixed(2)} · risk ${f0.risk.toFixed(2)} · oos ${f0.oos.toFixed(2)} · regime ${(f0.regime || 0).toFixed(2)} · adv ${(f0.adversarial || 0).toFixed(2)} · corr −${(f0.correlation_penalty || 0).toFixed(2)}` : "not computed yet")}
+        ${exitCard}
       </div>
       <div class="chart-wrap" style="margin:10px 0"><svg id="agentChart"></svg></div>
       <div class="table-scroll"><table><thead><tr><th>Regime</th><th>Trades</th><th>PnL</th><th>Win rate</th><th>Expectancy</th></tr></thead><tbody>

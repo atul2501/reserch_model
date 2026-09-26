@@ -108,4 +108,22 @@ def test_oos_score_needs_trades_and_cannot_be_high_for_a_losing_run():
     assert compute_oos_score(_result([1, 1], 102.0), min_trades=3) == 0.0                # too few trades
     losing = compute_oos_score(_result([-1, -1, 1, -1], 97.0, [100, 97]), min_trades=3)
     winning = compute_oos_score(_result([2, 2, -1, 2], 105.0, [100, 105]), min_trades=3)
-    assert losing <= 0.3 and winning > 0.8 and winning <= 1.0
+    assert losing <= 0.3 and winning > losing and winning <= 1.0
+
+
+def test_oos_score_is_confidence_scaled_by_its_own_trade_count():
+    """A handful of trades cannot earn a near-full score regardless of how clean they
+    look - this is what stops a 3-4 trade, low-drawdown, barely-profitable slice from
+    scoring the same as a well-evidenced one (see compute_oos_score's docstring)."""
+    few_trades = compute_oos_score(_result([2, 2, -1, 2], 105.0, [100, 105]), min_trades=3)
+    many_trades = compute_oos_score(_result([2, 2, -1, 2] * 8, 105.0, [100, 105]), min_trades=3)
+    assert few_trades < many_trades
+    assert many_trades > 0.8 and many_trades <= 1.0                 # >= FULL_CONFIDENCE_TRADES -> full weight
+    assert few_trades == pytest.approx(many_trades * (4 / 30))      # linear confidence scaling below the threshold
+
+
+def test_oos_score_pain_term_no_longer_rewards_a_flat_low_drawdown_run_at_low_n():
+    """The bug this fix closes: a 3-trade, ~flat-return, small-drawdown run used to
+    score ~0.29 purely off the drawdown ('pain') term, independent of profit."""
+    flat_low_drawdown = compute_oos_score(_result([0.1, -0.05, 0.02], 100.07, [100, 100.07]), min_trades=3)
+    assert flat_low_drawdown < 0.1     # previously ~0.29 before confidence-scaling (3/30 = 0.1x)

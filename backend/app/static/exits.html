@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exit Research — Trading Lab</title>
+<style>
+:root {
+  --bg: #060810; --surface: #0b0e15; --surface-2: #10141c; --surface-3: #151a24;
+  --line: #1d232d; --line-strong: #2b3340; --text: #e6e9ee; --text-strong: #f8f9fb; --muted: #8791a0;
+  --blue: #6ea8ff; --green: #3fd096; --red: #f16b7c; --amber: #e2ac57; --purple: #b494ef;
+  --radius: 10px; --shadow: 0 6px 20px -8px rgba(0,0,0,.5); --ease: cubic-bezier(.4,0,.2,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 0 40px; background-color: var(--bg);
+  background-image: radial-gradient(circle at 12% -10%, rgba(110,168,255,.06), transparent 50%), radial-gradient(circle at 90% 0%, rgba(63,208,150,.05), transparent 45%);
+  background-repeat: no-repeat; color: var(--text); font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.wrap { width: min(1400px, calc(100% - 32px)); margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+header { position: sticky; top: 0; z-index: 10; margin: 0 0 20px; padding: 14px 0; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; flex-wrap: wrap; background: rgba(6,8,16,.86); backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); border-bottom: 1px solid var(--line); box-shadow: 0 10px 24px -18px rgba(0,0,0,.7); }
+h1 { margin: 0; font-size: 16px; font-weight: 700; background: linear-gradient(95deg, var(--text-strong) 40%, var(--blue) 140%);
+  -webkit-background-clip: text; background-clip: text; color: var(--text-strong); }
+.page-nav { display: flex; gap: 4px; }
+.page-nav a { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 650; letter-spacing: .03em;
+  padding: 6px 10px; border-radius: 6px; }
+.page-nav a:hover { color: var(--text); background: var(--surface-2); }
+.page-nav a.active { color: var(--text-strong); background: var(--surface-3); }
+.grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 22px; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.card { position: relative; padding: 14px 15px 14px 17px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--blue); opacity: .75; }
+.card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.pos { color: var(--green); } .neg { color: var(--red); }
+section { margin-bottom: 20px; }
+section h2 { margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.chart-wrap { height: 190px; }
+.chart-wrap svg { width: 100%; height: 100%; display: block; }
+.chart-caption { color: var(--muted); font-size: 10px; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+td { color: #bcc3cc; }
+.empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filters select, .filters input { background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 11px; }
+.filters button { appearance: none; border: 1px solid var(--blue); background: rgba(110,168,255,.12); color: var(--blue);
+  border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Exit Research</h1>
+    <nav class="page-nav"><a href="/">Home</a><a href="/exits" class="active">Exit Research</a><a href="/experiments">Experiments</a></nav>
+  </header>
+
+  <div class="filters">
+    <select id="f-family"><option value="">All families</option></select>
+    <select id="f-side"><option value="">Long &amp; Short</option><option value="LONG">Long</option><option value="SHORT">Short</option></select>
+    <select id="f-regime"><option value="">All regimes</option></select>
+    <input id="f-generation" type="number" placeholder="Generation" style="width:110px">
+    <input id="f-since" type="datetime-local" title="Since">
+    <input id="f-until" type="datetime-local" title="Until">
+    <button id="f-apply" type="button">Apply</button>
+  </div>
+
+  <div class="grid" id="stat-cards"></div>
+
+  <section>
+    <h2>MFE / MAE / Left-on-Table Distributions</h2>
+    <div class="chart-grid">
+      <div class="panel"><div class="chart-wrap"><svg id="chart-mfe"></svg></div><div class="chart-caption" id="cap-mfe"></div></div>
+      <div class="panel"><div class="chart-wrap"><svg id="chart-mae"></svg></div><div class="chart-caption" id="cap-mae"></div></div>
+      <div class="panel"><div class="chart-wrap"><svg id="chart-lot"></svg></div><div class="chart-caption" id="cap-lot"></div></div>
+      <div class="panel"><div class="chart-wrap"><svg id="chart-hold"></svg></div><div class="chart-caption" id="cap-hold"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Trade-Quality Classification</h2>
+    <div class="panel table-scroll"><table id="table-class"><thead><tr><th>Class</th><th>Count</th><th>Share</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Exit Reason Distribution</h2>
+    <div class="panel table-scroll"><table id="table-reason"><thead><tr><th>Exit reason</th><th>Count</th><th>Share</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <footer>Diagnostic view over TradeAnalytics — avoid reading statistical certainty into thin-sample bins.</footer>
+</div>
+
+<script>
+const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) { const k = window.prompt("API key (viewer role or higher):", ""); if (k) { sessionStorage.setItem("apiKey", k.trim()); return await get(path); } throw new Error("auth required"); }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+async function section(name, fn) { try { await fn(); } catch (e) { console.error(`section "${esc(name)}" failed:`, e); } }
+
+function renderBarChart(svg, bins, counts, color) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 30, padR = 8, padT = 8, padB = 18;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!counts || !counts.length || counts.every(c => c === 0)) {
+    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data</text>`;
+    return;
+  }
+  const maxC = Math.max(...counts);
+  const n = counts.length;
+  const barW = plotW / n;
+  let out = "";
+  for (let i = 0; i <= 3; i++) {
+    const gy = padT + plotH - (plotH * i / 3);
+    out += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#1d232d"/>`;
+    out += `<text x="${padL-4}" y="${(gy+3).toFixed(1)}" text-anchor="end" font-size="8" fill="#8791a0">${Math.round(maxC*i/3)}</text>`;
+  }
+  counts.forEach((c, i) => {
+    const bh = (c / maxC) * plotH;
+    const x = padL + i * barW, y = padT + plotH - bh;
+    const zeroCrossing = bins[i] < 0 && bins[i+1] >= 0;
+    out += `<rect x="${(x+1).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,barW-2).toFixed(1)}" height="${bh.toFixed(1)}" fill="${zeroCrossing ? '#e2ac57' : color}" opacity="0.85"/>`;
+  });
+  out += `<line x1="${padL}" y1="${(padT+plotH).toFixed(1)}" x2="${w-padR}" y2="${(padT+plotH).toFixed(1)}" stroke="#2b3340"/>`;
+  const mid = Math.floor(n/2);
+  out += `<text x="${padL}" y="${h-4}" font-size="8" fill="#8791a0">${bins[0].toFixed(1)}</text>`;
+  out += `<text x="${w-padR}" y="${h-4}" text-anchor="end" font-size="8" fill="#8791a0">${bins[bins.length-1].toFixed(1)}</text>`;
+  svg.innerHTML = out;
+}
+
+function qs(params) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== "" && v !== null && v !== undefined) p.set(k, v);
+  return p.toString();
+}
+
+async function load() {
+  const params = {
+    family: document.getElementById("f-family").value, side: document.getElementById("f-side").value,
+    regime: document.getElementById("f-regime").value, generation: document.getElementById("f-generation").value,
+    since: document.getElementById("f-since").value ? new Date(document.getElementById("f-since").value).toISOString() : "",
+    until: document.getElementById("f-until").value ? new Date(document.getElementById("f-until").value).toISOString() : "",
+  };
+  await section("exit-analytics", async () => {
+    const d = await get("/api/exit-analytics?" + qs(params));
+
+    document.getElementById("stat-cards").innerHTML = [
+      ["Trades Analysed", d.trades_analysed, ""],
+      ["Reversal Rate", pct(d.reversal_rate), "reached ≥+1R then gave it back"],
+      ["MFE Capture (mean)", d.mfe_capture_ratio.mean != null ? fmt(d.mfe_capture_ratio.mean) : "-", `n=${d.mfe_capture_ratio.n}`],
+      ["Post-Exit Favourable (mean bps)", d.post_exit_favourable_bps.mean != null ? fmt(d.post_exit_favourable_bps.mean,1) : "-", `n=${d.post_exit_favourable_bps.n}`],
+      ["Left-on-Table R (median)", d.left_on_table_r.median != null ? fmt(d.left_on_table_r.median) : "-", `n=${d.left_on_table_r.n}`],
+    ].map(([label, value, detail]) => `<div class="card"><div class="label">${esc(label)}</div><div class="value num">${esc(value)}</div><div style="color:var(--muted);font-size:10px;margin-top:4px">${esc(detail)}</div></div>`).join("");
+
+    renderBarChart(document.getElementById("chart-mfe"), d.mfe_r.bins, d.mfe_r.counts, "#6ea8ff");
+    document.getElementById("cap-mfe").textContent = `MFE (R) — mean ${fmt(d.mfe_r.mean)} median ${fmt(d.mfe_r.median)} n=${d.mfe_r.n}`;
+    renderBarChart(document.getElementById("chart-mae"), d.mae_r.bins, d.mae_r.counts, "#f16b7c");
+    document.getElementById("cap-mae").textContent = `MAE (R) — mean ${fmt(d.mae_r.mean)} median ${fmt(d.mae_r.median)} n=${d.mae_r.n}`;
+    renderBarChart(document.getElementById("chart-lot"), d.left_on_table_r.bins, d.left_on_table_r.counts, "#e2ac57");
+    document.getElementById("cap-lot").textContent = `Left on table (R, 30 bars post-exit) — mean ${fmt(d.left_on_table_r.mean)} n=${d.left_on_table_r.n}`;
+    renderBarChart(document.getElementById("chart-hold"), d.holding_seconds.bins.map(v => v/60), d.holding_seconds.counts, "#b494ef");
+    document.getElementById("cap-hold").textContent = `Holding time (minutes) — mean ${fmt(d.holding_seconds.mean/60,1)} n=${d.holding_seconds.n}`;
+
+    const classTotal = Object.values(d.trade_quality_class_distribution).reduce((a,b) => a+b, 0) || 1;
+    document.querySelector("#table-class tbody").innerHTML = Object.entries(d.trade_quality_class_distribution)
+      .sort((a,b) => b[1]-a[1]).map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td><td class="num">${pct(v/classTotal)}</td></tr>`).join("")
+      || `<tr><td colspan="3" class="empty">No data</td></tr>`;
+
+    const reasonTotal = Object.values(d.exit_reason_distribution).reduce((a,b) => a+b, 0) || 1;
+    document.querySelector("#table-reason tbody").innerHTML = Object.entries(d.exit_reason_distribution)
+      .sort((a,b) => b[1]-a[1]).map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td><td class="num">${pct(v/reasonTotal)}</td></tr>`).join("")
+      || `<tr><td colspan="3" class="empty">No data</td></tr>`;
+  });
+}
+
+document.getElementById("f-apply").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>

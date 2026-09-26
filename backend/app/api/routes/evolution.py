@@ -51,9 +51,30 @@ async def summary(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/experiments")
-async def experiments(db: AsyncSession = Depends(get_db), limit: int = Query(default=30, le=200)):
-    rows = (await db.execute(select(Experiment).order_by(Experiment.created_at.desc()).limit(limit))).scalars().all()
+async def experiments(db: AsyncSession = Depends(get_db), kind: str | None = None, limit: int = Query(default=30, le=200)):
+    stmt = select(Experiment).order_by(Experiment.created_at.desc()).limit(limit)
+    if kind is not None:
+        stmt = stmt.where(Experiment.kind == kind)
+    rows = (await db.execute(stmt)).scalars().all()
     return [{"experiment_id": e.experiment_id, "kind": e.kind, "status": e.status, "generation": e.generation,
              "dataset_fingerprint": e.dataset_fingerprint, "epoch_id": e.epoch_id, "random_seed": e.random_seed,
-             "code_version": e.code_version, "schema_version": e.schema_version, "result": e.result,
-             "created_at": e.created_at.isoformat()} for e in rows]
+             "code_version": e.code_version, "schema_version": e.schema_version, "parameters": e.parameters,
+             "result": e.result, "created_at": e.created_at.isoformat(),
+             "finished_at": e.finished_at.isoformat() if e.finished_at else None} for e in rows]
+
+
+@router.get("/experiments/diff")
+async def experiment_diff(experiment_a: str, experiment_b: str, db: AsyncSession = Depends(get_db)):
+    """Baseline-vs-candidate diff for two experiment_ids (see
+    app.research.experiment_runner.diff_experiments)."""
+    from app.research.experiment_runner import diff_experiments
+
+    a = (await db.execute(select(Experiment).where(Experiment.experiment_id == experiment_a))).scalar_one_or_none()
+    b = (await db.execute(select(Experiment).where(Experiment.experiment_id == experiment_b))).scalar_one_or_none()
+    if a is None or b is None:
+        return {"error": "one or both experiment_ids not found", "experiment_a": experiment_a, "experiment_b": experiment_b}
+    return {
+        "experiment_a": {"experiment_id": a.experiment_id, "parameters": a.parameters, "created_at": a.created_at.isoformat()},
+        "experiment_b": {"experiment_id": b.experiment_id, "parameters": b.parameters, "created_at": b.created_at.isoformat()},
+        "diff": {k: {"a": va, "b": vb, "delta": d} for k, (va, vb, d) in diff_experiments(a, b).items()},
+    }

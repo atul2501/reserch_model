@@ -304,3 +304,61 @@ async def test_export_report_is_one_xlsx_with_every_dashboard_section(immediate_
 async def test_export_report_requires_authentication(api):
     r = await api.get("/api/export/report", headers={"X-API-Key": ""})
     assert r.status_code in (401, 403)
+
+
+async def test_exit_analytics_endpoint_summarises_and_filters_trade_analytics(db_session, api):
+    import app.analytics.analytics_store as store
+    from tests.test_analytics_store import _seed as seed_trade_analytics
+
+    agent, trades = await seed_trade_analytics(db_session)
+    await db_session.commit()
+    await store.refresh_trade_analytics(db_session)
+    await db_session.commit()
+
+    r = (await api.get("/api/exit-analytics")).json()
+    assert r["trades_analysed"] == 3
+    assert r["mfe_r"]["n"] >= 0 and "bins" in r["mfe_r"]
+    assert set(r["trade_quality_class_distribution"].values()) or r["trade_quality_class_distribution"] == {}
+
+    filtered = (await api.get(f"/api/exit-analytics?agent_id={agent.id}")).json()
+    assert filtered["trades_analysed"] == 3
+    none_match = (await api.get(f"/api/exit-analytics?agent_id={uuid.uuid4()}")).json()
+    assert none_match["trades_analysed"] == 0
+
+    long_only = (await api.get("/api/exit-analytics?side=LONG")).json()
+    assert long_only["trades_analysed"] == 3   # the fixture's trades are all LONG (stored as "SIDE.LONG")
+
+
+async def test_experiments_diff_endpoint_computes_deltas_between_two_real_experiments(db_session, api):
+    from app.models.market import MarketCandle
+    from app.research import dataset as ds
+    from app.research.experiment_runner import run_baseline_vs_candidate
+    from tests.test_backtest_parity import candles as make_candles, ema_cross_dna
+
+    c = make_candles(1400, seed=21, drift=0.01)
+    db_session.add_all([
+        MarketCandle(symbol="SOL", timeframe="1m", open_time=int(r.open_time), close_time=int(r.open_time) + 59_999,
+                    open=float(r.open), high=float(r.high), low=float(r.low), close=float(r.close),
+                    volume=float(r.volume), is_final=True)
+        for r in c.itertuples()
+    ])
+    await db_session.commit()
+    await ds.seal_epoch(db_session, c, symbol="SOL", timeframe="1m", reason="api test")
+    await db_session.commit()
+
+    baseline, candidate = await run_baseline_vs_candidate(
+        db_session, baseline_dna=ema_cross_dna(5, 20), candidate_dna=ema_cross_dna(3, 15), name="api_diff_test",
+    )
+    await db_session.commit()
+
+    r = (await api.get(
+        f"/api/evolution/experiments/diff?experiment_a={baseline.experiment.experiment_id}"
+        f"&experiment_b={candidate.experiment.experiment_id}"
+    )).json()
+    assert r["experiment_a"]["experiment_id"] == baseline.experiment.experiment_id
+    assert "net_pnl" in r["diff"]
+    va, vb, delta = r["diff"]["net_pnl"]["a"], r["diff"]["net_pnl"]["b"], r["diff"]["net_pnl"]["delta"]
+    assert delta == pytest.approx(vb - va)
+
+    missing = (await api.get("/api/evolution/experiments/diff?experiment_a=nope&experiment_b=also-nope")).json()
+    assert "error" in missing
