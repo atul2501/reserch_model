@@ -50,11 +50,47 @@ def upgrade_schema(pg_url: str) -> None:
         raise SystemExit(f"alembic upgrade head failed:\n{r.stderr}")
 
 
+async def _aggregate_summary(conn, tables: dict) -> dict[str, object]:
+    """One row of headline aggregates, computed identically against either engine, for the
+    "verify important aggregates" requirement -- row-count-per-table alone proves nothing
+    was dropped or duplicated, but says nothing about whether the VALUES came across intact
+    (a swapped column, a silently-truncated JSON blob, a mis-cast enum would all still pass
+    a row-count check)."""
+    from app.models.enums import AgentStatus
+
+    agents = tables["agents"]
+    out: dict[str, object] = {}
+    out["total_agents"] = (await conn.execute(sa.select(sa.func.count()).select_from(agents))).scalar()
+    out["active_agents"] = (await conn.execute(
+        sa.select(sa.func.count()).select_from(agents).where(agents.c.status == AgentStatus.ACTIVE)
+    )).scalar()
+    out["dead_agents"] = (await conn.execute(
+        sa.select(sa.func.count()).select_from(agents).where(agents.c.status == AgentStatus.DEAD)
+    )).scalar()
+    if "trades" in tables:
+        trades = tables["trades"]
+        out["total_trades"] = (await conn.execute(sa.select(sa.func.count()).select_from(trades))).scalar()
+        out["sum_net_pnl"] = (await conn.execute(sa.select(sa.func.sum(trades.c.net_pnl)))).scalar()
+        out["sum_fees"] = (await conn.execute(sa.select(sa.func.sum(trades.c.fees)))).scalar()
+        out["earliest_trade_closed_at"] = (await conn.execute(sa.select(sa.func.min(trades.c.closed_at)))).scalar()
+        out["latest_trade_closed_at"] = (await conn.execute(sa.select(sa.func.max(trades.c.closed_at)))).scalar()
+    if "decisions" in tables:
+        out["total_decisions"] = (await conn.execute(sa.select(sa.func.count()).select_from(tables["decisions"]))).scalar()
+    if "experiments" in tables:
+        out["total_experiments"] = (await conn.execute(sa.select(sa.func.count()).select_from(tables["experiments"]))).scalar()
+    if "generations" in tables:
+        out["generation_count"] = (await conn.execute(sa.select(sa.func.count()).select_from(tables["generations"]))).scalar()
+    if "strategies" in tables:
+        out["strategy_count"] = (await conn.execute(sa.select(sa.func.count()).select_from(tables["strategies"]))).scalar()
+    return out
+
+
 async def migrate(sqlite_path: str, pg_url: str) -> None:
     sqlite_engine = create_async_engine(f"sqlite+aiosqlite:///{sqlite_path}")
     pg_engine = create_async_engine(pg_url)
 
     tables = Base.metadata.sorted_tables
+    tables_by_name = {t.name: t for t in tables}
     mismatches = []
     async with sqlite_engine.connect() as sqlite_conn, pg_engine.begin() as pg_conn:
         for table in tables:
@@ -69,12 +105,28 @@ async def migrate(sqlite_path: str, pg_url: str) -> None:
                 mismatches.append(table.name)
             print(f"{table.name:32s} {sqlite_count:6d} -> {pg_count:6d}  [{status}]")
 
+        print("\n=== aggregate verification (SQLite vs. Postgres) ===")
+        sqlite_agg = await _aggregate_summary(sqlite_conn, tables_by_name)
+        pg_agg = await _aggregate_summary(pg_conn, tables_by_name)
+        agg_mismatches = []
+        for key in sqlite_agg:
+            a, b = sqlite_agg[key], pg_agg.get(key)
+            # Sums of floats can differ in the last bit across SQLite/Postgres float arithmetic;
+            # treat anything within 1e-6 as equal rather than flagging float noise as data loss.
+            equal = (a == b) if not isinstance(a, float) else (b is not None and abs(a - b) < 1e-6)
+            status = "OK" if equal else "MISMATCH"
+            if not equal:
+                agg_mismatches.append(key)
+            print(f"  {key:28s} {str(a):>28s} -> {str(b):<28s} [{status}]")
+
     await sqlite_engine.dispose()
     await pg_engine.dispose()
 
     if mismatches:
         raise SystemExit(f"\nRow-count mismatch in: {mismatches} -- destination data is NOT trustworthy, investigate before use.")
-    print(f"\nDone. All tables verified row-for-row. Source SQLite file untouched: {sqlite_path}")
+    if agg_mismatches:
+        raise SystemExit(f"\nAggregate mismatch in: {agg_mismatches} -- destination data is NOT trustworthy, investigate before use.")
+    print(f"\nDone. All tables verified row-for-row, all aggregates verified. Source SQLite file untouched: {sqlite_path}")
 
 
 def main() -> None:

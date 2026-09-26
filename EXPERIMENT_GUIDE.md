@@ -5,6 +5,11 @@ run/recover the multi-week 500-agent paper/shadow experiment.
 
 All commands assume `cd backend && source .venv/bin/activate` unless noted.
 
+**The runtime database is now PostgreSQL** (`POSTGRESQL_MIGRATION_GUIDE.md`,
+`POSTGRESQL_MIGRATION_REPORT.md`) — `DATABASE_URL` in `backend/.env` must be a
+`postgresql+asyncpg://` URL for every command below; a `sqlite://` URL now fails fast at
+startup with a clear error unless `TESTING=true` (the unit-test-only escape hatch).
+
 ---
 
 ## 1. Running a baseline vs. candidate experiment

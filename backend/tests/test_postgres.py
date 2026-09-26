@@ -130,3 +130,22 @@ def test_pool_settings_are_applied_for_postgres_urls():
     from app.core.config import Settings
     s = Settings(database_url="postgresql+asyncpg://u:p@h/db", database_pool_size=7, database_max_overflow=3)
     assert (s.database_pool_size, s.database_max_overflow) == (7, 3)
+
+
+def test_sqlite_is_refused_outside_explicit_testing_mode():
+    from app.core.config import Settings
+    with pytest.raises(ValueError, match="PostgreSQL configuration is required"):
+        Settings(database_url="sqlite+aiosqlite:///./data/trading_lab.db", testing=False)
+
+
+def test_sqlite_is_permitted_with_explicit_testing_true():
+    from app.core.config import Settings
+    s = Settings(database_url="sqlite+aiosqlite:///./data/trading_lab.db", testing=True)
+    assert s.database_url.startswith("sqlite")
+
+
+def test_postgres_is_always_permitted_regardless_of_testing_flag():
+    from app.core.config import Settings
+    for testing in (True, False):
+        s = Settings(database_url="postgresql+asyncpg://u:p@h/db", testing=testing)
+        assert s.database_url.startswith("postgresql")

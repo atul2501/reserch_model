@@ -169,15 +169,56 @@ and OOS-status labels per side, never silently picking the higher-P&L one.
 
 ## 5. EXIT RESEARCH
 
-Reuses phase 1's independently-verified figures (`RESEARCH_VALIDATION_REPORT.md` §5):
-entry slippage +0.1bps (not the originally-cited −0.1bps), 64.4% of trades leave ≥1R on the
-table, 22.6% become +1R reversals — now also live on the `/exits` dashboard page with
-family/regime/side/generation/agent/date-range filtering, backed by the new
-`/api/exit-analytics` endpoint reading `TradeAnalytics` (no new backend tracking). §3's two
-controlled exit experiments are the "then run controlled exit experiments" step; the
-remaining five previously-planned exit designs (trailing, volatility-adjusted, time-based,
+**Correction, found and fixed during the PostgreSQL-first architecture phase**: the figures
+this section originally cited from phase 1 (`RESEARCH_VALIDATION_REPORT.md` §5) were
+computed under a real bug — `analytics_store.py` stored/compared `Trade.side` via
+`str(trade.side).upper()`, which yields Python's enum repr `"SIDE.LONG"`/`"SIDE.SHORT"`,
+not the plain `"LONG"`/`"SHORT"` value. Every direction-sensitive comparison against those
+literal strings (including the MFE/MAE excursion-direction check) silently failed to match
+either way, so **every trade's favorable/adverse excursion was computed as if it were
+SHORT** — inverted for the ~44% of trades that were actually LONG. Invisible on SQLite (no
+column-length enforcement); it also silently overflowed `TradeAnalytics.side`'s
+`VARCHAR(5)` with the 10-character `"SIDE.SHORT"`, which is what actually surfaced it: a
+hard `INSERT` failure the moment `refresh_analytics.py` ran for real against the new
+Postgres database (§6). Fixed at the root (`trade.side.value`), verified by a new
+regression test asserting correct excursion direction for both an actual LONG and an
+actual SHORT trade, then the full dataset (now 8,500 trades) was re-analyzed:
+
+| figure | phase-1 report (buggy) | corrected | change |
+|---|---|---|---|
+| entry slippage | +0.1 bps | **+1.9 bps** | direction-dependent calc was also affected |
+| trades leaving ≥1R on the table | 64.4% | **69.0%** | up |
+| REVERSAL_AFTER_PROFIT share | 22.6% | **3.8%** | **down sharply — most were misclassified LONG trades** |
+| STOP_IMMEDIATE share | 18.9% | **32.7%** | up — the true classification for most of those trades |
+| STOP_LOSS_OTHER share | 5.7% | **11.0%** | up |
+| MFE mean | +0.98R | +0.94R | similar magnitude, now genuinely direction-correct |
+| MAE mean | -0.94R | -0.97R | similar magnitude, now genuinely direction-correct |
+| MFE by side | SHORT +0.97R / LONG +1.00R (near-identical — a red flag in hindsight: both sides being computed as if SHORT is exactly why they looked similar) | **SHORT +0.97R / LONG +0.91R** | now genuinely differentiated per side |
+
+**What this actually supports, corrected**: exit behavior is still a measurable source of
+left-on-table opportunity (69.0% leave ≥1R, left-on-table mean now +2.57R) — if anything a
+*larger* opportunity than phase 1 reported, not smaller. But the specific "reversal" framing
+from phase 1 was substantially overstated: only 3.8% of trades actually fit the
+"ran to +1R profit, then gave it all back" pattern, not 22.6%. The dominant real issue,
+corrected, is **STOP_IMMEDIATE (32.7%)** — bad signal/entry timing (adverse move
+immediately, before ever reaching +0.25R), not bad exit management on trades that were
+genuinely working. This changes which of §6's exit-experiment candidates deserve priority:
+a reversal-aware exit (targeting REVERSAL_AFTER_PROFIT) is now a much lower-value target
+than phase 1 suggested; a volatility-adjusted or wider-initial-stop design (targeting
+STOP_IMMEDIATE) is the better-supported next experiment.
+
+Now also live on the `/exits` dashboard page with family/regime/side/generation/agent/
+date-range filtering, backed by the new `/api/exit-analytics` endpoint reading
+`TradeAnalytics` (no new backend tracking) — the dashboard reads the corrected data, since
+the fix landed before this session's dashboard verification (§4). §3's two controlled exit
+experiments are the "then run controlled exit experiments" step (their own DNA-encoded
+stop-loss logic was unaffected by this bug — it lives in the backtest engine, not
+`analytics_store.py`, and the experiment runner computes its own MFE/MAE via
+`trade_quality.analyze_trade` directly with the correct side value already); the remaining
+five previously-planned exit designs (trailing, volatility-adjusted, time-based,
 partial-profit, MFE-adaptive, reversal-aware) remain a documented plan (phase 1 report §6),
-now runnable through §2's tooling whenever pursued.
+now runnable through §2's tooling whenever pursued, and should be re-prioritized per the
+corrected classification above.
 
 ---
 

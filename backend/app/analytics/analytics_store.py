@@ -169,9 +169,21 @@ async def refresh_trade_analytics(
         bars = bars_by_key.get(sym_key, [])
         bar_ms = bar_ms_by_key.get(sym_key, 60_000)
 
-        long = str(trade.side).upper() != "SHORT"
+        # trade.side is normally a Side enum instance, but SQLAlchemy's identity map can
+        # hand back the raw string a caller originally constructed the row with (e.g. a
+        # fixture that passed side="LONG" instead of Side.LONG) when it's re-queried in the
+        # SAME session rather than freshly deserialized from the database - so this must
+        # handle both. str(trade.side) gives Python's default "Side.LONG"/"Side.SHORT" repr
+        # in the enum case, NOT the plain value - comparing that against "LONG"/"SHORT" (as
+        # this line and tq._is_long() both used to) silently never matches either way,
+        # making every trade look SHORT to the excursion-direction math (favorable/adverse
+        # computed backwards for every actual LONG trade) and making the persisted `side`
+        # column overflow Postgres's VARCHAR(5) with "SIDE.SHORT"/"SIDE.LONG" (invisible on
+        # SQLite, which never enforces column length).
+        side_value = trade.side.value if hasattr(trade.side, "value") else trade.side
+        long = side_value != "SHORT"
         facts = tq.TradeFacts(
-            side=str(trade.side).upper(), entry_price=trade.entry_price, exit_price=trade.exit_price,
+            side=side_value, entry_price=trade.entry_price, exit_price=trade.exit_price,
             quantity=trade.quantity, opened_at_ms=_ms(trade.opened_at), closed_at_ms=_ms(trade.closed_at),
             stop_loss_price=position.stop_loss_price, take_profit_price=position.take_profit_price,
             persisted_peak_price=position.peak_price, persisted_trough_price=position.trough_price,
@@ -259,7 +271,7 @@ async def refresh_trade_analytics(
         payload = dict(
             trade_id=trade.id, agent_id=trade.agent_id,
             family=family.value if family is not None else None,
-            strategy_version_id=version_id, regime=regime, side=str(trade.side).upper(),
+            strategy_version_id=version_id, regime=regime, side=side_value,
             signal_bar_open_time_ms=signal_bar, signal_close_time_ms=signal_close_ms,
             entry_delay_seconds=entry_delay, expected_entry_price=entry_order.requested_price if entry_order is not None else None,
             entry_slippage_bps=entry_slip_bps,

@@ -66,10 +66,9 @@ async def exit_analytics(
     if family is not None:
         stmt = stmt.where(TradeAnalytics.family == family)
     if side is not None:
-        # TradeAnalytics.side is stored as "SIDE.SHORT"/"SIDE.LONG" (an enum-repr artifact
-        # from analytics_store.py's `str(trade.side).upper()`, pre-existing and out of this
-        # endpoint's scope to fix) rather than the clean "SHORT"/"LONG" - match by suffix so
-        # the API's own query parameter stays the clean, obvious spelling.
+        # endswith (not ==) tolerates any not-yet-refreshed rows still carrying the old
+        # "SIDE.SHORT"/"SIDE.LONG" enum-repr artifact analytics_store.py used to write
+        # (fixed at the source; existing rows get the clean value on their next refresh).
         stmt = stmt.where(TradeAnalytics.side.endswith(side.upper()))
     if regime is not None:
         stmt = stmt.where(TradeAnalytics.regime == regime)
