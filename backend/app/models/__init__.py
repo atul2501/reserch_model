@@ -2,6 +2,7 @@
 autogenerate and for `Base.metadata.create_all` in tests."""
 from app.models.adversarial import AdversarialTestReport
 from app.models.agent import Agent
+from app.models.analytics import FitnessForwardPerformance, StrategyRegimeMatrix, TradeAnalytics
 from app.models.champion_challenger import ChallengerEvaluation
 from app.models.correlation import AgentCorrelation, CorrelationConvergenceSnapshot, StrategyFamilyCorrelation
 from app.models.council import CouncilAnalysis, CouncilDecision
@@ -24,6 +25,9 @@ __all__ = [
     "AgentCorrelation",
     "CorrelationConvergenceSnapshot",
     "StrategyFamilyCorrelation",
+    "TradeAnalytics",
+    "StrategyRegimeMatrix",
+    "FitnessForwardPerformance",
     "CouncilAnalysis",
     "CouncilDecision",
     "Decision",

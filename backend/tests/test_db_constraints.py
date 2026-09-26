@@ -292,7 +292,9 @@ def test_migration_refuses_when_existing_rows_violate_a_constraint_and_changes_n
 def test_migration_downgrade_removes_the_constraints(tmp_path):
     db = tmp_path / "d.db"
     assert _alembic(db, "upgrade", "head").returncode == 0
-    assert _alembic(db, "downgrade", "-1").returncode == 0
+    # target the constraints revision explicitly: newer migrations sit on top of it,
+    # so a relative "-1" would remove those instead (the chain grew after this test was written)
+    assert _alembic(db, "downgrade", "a6c2e8f4b0d7").returncode == 0
     con = sqlite3.connect(db)
     _insert(con, "strategies", id="s1", code="C1", family="MOMENTUM", name="n")
     _insert(con, "strategy_versions", id="v1", strategy_id="s1", version=1, generation=1, dna="{}", stage="PAPER")
