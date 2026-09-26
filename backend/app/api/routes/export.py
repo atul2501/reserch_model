@@ -35,6 +35,7 @@ from app.api.routes.shadow import shadow_summary
 from app.api.routes.trades import get_regime_performance, get_side_performance, get_strategy_performance, list_trades
 from app.core.database import get_db
 from app.core.runtime_status import compute_system_status
+from app.schemas.correlation import CorrelationConvergenceOut
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
@@ -200,6 +201,13 @@ def _build(generated_at: datetime, data: dict[str, tuple[Any, str | None]]) -> b
     return buf.getvalue()
 
 
+async def _convergence_rows(db: AsyncSession) -> list[CorrelationConvergenceOut]:
+    # This route returns ORM rows and relies on FastAPI's response_model to
+    # serialize them; called directly here, that step has to be done by hand.
+    rows = await get_convergence_history(db, limit=None)
+    return [CorrelationConvergenceOut.model_validate(r) for r in rows]
+
+
 @router.get("/report")
 async def export_report(db: AsyncSession = Depends(get_db)):
     generated_at = datetime.now(timezone.utc)
@@ -222,7 +230,7 @@ async def export_report(db: AsyncSession = Depends(get_db)):
         "evolution_events": evolution.events(db, generation=None, limit=None),
         "experiments": evolution.experiments(db, limit=None),
         "council_history": council.history(db, limit=None),
-        "correlation": get_convergence_history(db, limit=None),
+        "correlation": _convergence_rows(db),
         "market_history": get_market_history(db, limit=MARKET_CANDLES),
     }
     data = {}
