@@ -92,7 +92,11 @@ def test_analytics_indexes_created(migrated_db):
 
 
 def test_downgrade_drops_analytics_tables(migrated_db):
-    r = _alembic(migrated_db, "downgrade", "-1")
+    # Target the revision by name, not "-1": head has since gained c1d5e9a3f7b2
+    # (a later, unrelated column-width fix) on top of the analytics-foundation
+    # migration this test is actually about, so "-1" from head no longer means
+    # "undo the analytics migration".
+    r = _alembic(migrated_db, "downgrade", "b7d1f3a9c5e2")
     assert r.returncode == 0, r.stderr
     con = sqlite3.connect(migrated_db)
     tables = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}

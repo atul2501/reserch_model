@@ -45,17 +45,42 @@ def _clip(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
 
+# Trade count at which this slice's score is treated as fully evidenced. Below it, the
+# score is scaled down linearly (see compute_oos_score) rather than granted in full -
+# mirrors app.analytics.fitness_engine.MIN_TRADES_FOR_FULL_CONFIDENCE's convention, but
+# applied to *this* result's own trade count (the only population this function actually
+# scores), not to some other, unrelated trade count supplied by a caller.
+FULL_CONFIDENCE_TRADES = 30
+
+
 def compute_oos_score(result: BacktestResult, *, min_trades: int) -> float:
     """[0, 1]. Zero without enough trades to say anything. Otherwise:
-        0.4 * clip(profit_factor - 1)        (edge)
-      + 0.3 * clip(1 - max_drawdown / 30%)   (pain)
-      + 0.3 * clip(return / 5%)              (payoff over the slice)
-    A losing or flat OOS run therefore cannot score above 0.3."""
+        (0.4 * clip(profit_factor - 1)          (edge)
+       + 0.3 * clip(1 - max_drawdown / 30%)     (pain)
+       + 0.3 * clip(return / 5%))                (payoff over the slice)
+      * clip(len(trades) / 30, 0, 1)             (confidence: don't award a near-full
+                                                   score off a handful of trades)
+    A losing or flat OOS run therefore cannot score above 0.3 even at full confidence.
+
+    The confidence factor was added because the "pain" term alone could award up to 0.3
+    to any run with >= min_trades and a merely-small drawdown, independent of profit -
+    e.g. a 3-trade, flat-return run with 2% drawdown scored ~0.29 same as a 300-trade
+    one. It uses len(result.trades) (this call's own slice), never a caller-supplied
+    count: an earlier attempt at this fix lived in fitness_engine.py and scaled by the
+    AGENT's live paper trade_count instead, which is always 0 for a freshly-bred
+    candidate being evaluated for the very first time - that zeroed out the only
+    evidence such candidates have before they've ever placed a live trade, and broke
+    generation backfill (tests/test_evolution_pipeline.py caught it). Scaling by this
+    function's own `len(result.trades)` has no such mismatch, for either of its two
+    callers (the validation-slice score in app/research/evaluation.py, and the sealed
+    final-OOS score in evaluate_oos_once below)."""
     if len(result.trades) < min_trades:
         return 0.0
     pf = result.profit_factor
     pf = 3.0 if pf is None and result.net_return_pct > 0 else (1.0 if pf is None else min(pf, 3.0))
-    return 0.4 * _clip(pf - 1.0) + 0.3 * _clip(1.0 - result.max_drawdown_pct / 0.30) + 0.3 * _clip(result.net_return_pct / 0.05)
+    raw = 0.4 * _clip(pf - 1.0) + 0.3 * _clip(1.0 - result.max_drawdown_pct / 0.30) + 0.3 * _clip(result.net_return_pct / 0.05)
+    confidence = _clip(len(result.trades) / FULL_CONFIDENCE_TRADES, lo=0.0, hi=1.0)
+    return raw * confidence
 
 
 async def evaluate_oos_once(

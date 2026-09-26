@@ -174,7 +174,7 @@ class FitnessForwardPerformance(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)
-    snapshot_source: Mapped[str] = mapped_column(String(12), nullable=False)  # recorded | reconstructed
+    snapshot_source: Mapped[str] = mapped_column(String(16), nullable=False)  # recorded | reconstructed
     as_of: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     fitness_at_t: Mapped[float] = mapped_column(Float, nullable=False)
     fitness_components_at_t: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

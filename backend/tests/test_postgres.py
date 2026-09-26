@@ -111,6 +111,21 @@ async def test_partial_unique_open_position_index_exists_on_postgres(pg_database
     assert idx and "UNIQUE" in idx and "WHERE" in idx
 
 
+async def test_snapshot_source_column_fits_its_own_documented_values_on_postgres(pg_database):
+    """Regression for a real bug the migration dry run caught: the column was
+    VARCHAR(12), but its own comment documents "reconstructed" (13 chars) as a
+    legal value - invisible on SQLite (no length enforcement), a hard INSERT
+    failure on Postgres."""
+    assert _alembic(pg_database, "upgrade", "head").returncode == 0
+    conn = await asyncpg.connect(pg_database.replace("postgresql+asyncpg://", "postgresql://"))
+    max_len = await conn.fetchval(
+        "SELECT character_maximum_length FROM information_schema.columns "
+        "WHERE table_name = 'fitness_forward_performance' AND column_name = 'snapshot_source'"
+    )
+    await conn.close()
+    assert max_len >= len("reconstructed")
+
+
 def test_pool_settings_are_applied_for_postgres_urls():
     from app.core.config import Settings
     s = Settings(database_url="postgresql+asyncpg://u:p@h/db", database_pool_size=7, database_max_overflow=3)
