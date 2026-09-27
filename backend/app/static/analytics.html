@@ -43,15 +43,22 @@ body {
 .num { font-variant-numeric: tabular-nums; }
 .sub { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
 
+/* 3-column grid (title | centered nav | controls) so the nav lands in the same spot on every
+   page - a flex space-between layout shifts it sideways whenever sibling content's width differs. */
 header {
   position: sticky; top: 0; z-index: 10;
   margin: 0 0 20px; padding: 14px 0;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
   background: rgba(6,8,16,.86);
   backdrop-filter: blur(10px) saturate(1.2);
   -webkit-backdrop-filter: blur(10px) saturate(1.2);
   border-bottom: 1px solid var(--line);
   box-shadow: 0 10px 24px -18px rgba(0,0,0,.7);
+}
+.header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-self: end; }
+@media (max-width: 860px) {
+  header { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-bottom: 10px; }
+  .header-right { justify-self: center; }
 }
 h1 {
   margin: 0; font-size: 16px; font-weight: 700;
@@ -114,13 +121,28 @@ section h2 {
 .chart-wrap svg { width: 100%; height: 100%; display: block; }
 .chart-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 4px; }
 
+/* Themed dropdown for every <select> on the page (e.g. the generation filter above the
+   Fitness Component Contribution chart), not just ones inside a .ctl group. */
+select {
+  appearance: none; cursor: pointer; font: inherit;
+  border: 1px solid var(--line-strong); background: var(--surface-3); color: var(--text);
+  border-radius: 6px; padding: 5px 26px 5px 10px; font-size: 11px; font-weight: 600;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238791a0'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center;
+  transition: border-color .15s var(--ease);
+}
+select:hover { border-color: var(--blue); }
+select:focus { outline: none; border-color: var(--blue); }
+
 .ctl { display: flex; gap: 4px; flex-wrap: wrap; }
-.ctl button, .ctl select {
+.ctl button {
   appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
   color: var(--muted); border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 10px;
   font-weight: 650; cursor: pointer; transition: background .15s var(--ease), color .15s var(--ease);
 }
-.ctl button:hover, .ctl select:hover { background: var(--surface-2); color: var(--text); }
+.ctl select { padding: 3px 24px 3px 8px; font-size: 10px; font-weight: 650; color: var(--muted); }
+.ctl button:hover { background: var(--surface-2); color: var(--text); }
+.ctl select:hover { color: var(--text); }
 .ctl button.active { background: var(--blue); color: #05070c; border-color: var(--blue); }
 
 .table-scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
@@ -161,8 +183,8 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 <div class="wrap">
   <header>
     <h1 id="title">Trading Lab <span id="mode-title">loading...</span></h1>
-    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <nav class="page-nav"><a href="/">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics" class="active">Analytics</a></nav>
+    <nav class="page-nav"><a href="/">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics" class="active">Analytics</a></nav>
+    <div class="header-right">
       <div class="badges" id="badges"></div>
     </div>
   </header>

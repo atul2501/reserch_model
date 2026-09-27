@@ -43,15 +43,24 @@ body {
 .num { font-variant-numeric: tabular-nums; }
 .sub { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
 
+/* 3-column grid (title | centered nav | controls) so the nav sits in the exact same spot on
+   every page, regardless of how much content is in the title or the right-hand controls - a
+   flex space-between layout shifts the nav sideways whenever its sibling content's width
+   differs from page to page. */
 header {
   position: sticky; top: 0; z-index: 10;
   margin: 0 0 20px; padding: 14px 0;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
   background: rgba(6,8,16,.86);
   backdrop-filter: blur(10px) saturate(1.2);
   -webkit-backdrop-filter: blur(10px) saturate(1.2);
   border-bottom: 1px solid var(--line);
   box-shadow: 0 10px 24px -18px rgba(0,0,0,.7);
+}
+.header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-self: end; }
+@media (max-width: 860px) {
+  header { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-bottom: 10px; }
+  .header-right { justify-self: center; }
 }
 h1 {
   margin: 0; font-size: 16px; font-weight: 700;
@@ -174,8 +183,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
 <div class="wrap">
   <header>
     <h1 id="title">Trading Lab <span id="market-title">loading...</span></h1>
-    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <nav class="page-nav"><a href="/" class="active">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics">Analytics</a></nav>
+    <nav class="page-nav"><a href="/" class="active">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics">Analytics</a></nav>
+    <div class="header-right">
       <div class="badges" id="badges"></div>
       <button id="export-report" type="button" title="Download every dashboard table as one Excel file">Export report</button>
     </div>
@@ -609,20 +618,17 @@ document.getElementById("leaderboard-load-more").addEventListener("click", () =>
   refresh();
 });
 
-function healthBadge(ok, label) {
-  const cls = ok === null || ok === undefined ? "grey" : (ok ? "green" : "red");
-  return `<span class="badge"><span class="dot ${cls}"></span>${esc(label)}</span>`;
-}
-
 async function refresh() {
+  // A single at-a-glance summary here, not one badge per subsystem - the System Health
+  // section below already shows Database/Hyperliquid/Ollama/Market individually, in far more
+  // detail (heartbeat age, reconnects, key status...), so repeating them here as bare
+  // ok/not-ok pills was pure duplication of the same signals.
   await section("health", async () => {
     const h = await get("/api/system/health");
+    const allOk = h.database_ok && h.hyperliquid_configured && h.ollama_configured && h.market_data_stale === false;
     document.getElementById("badges").innerHTML =
       `<span class="badge"><span class="dot ${h.trading_mode === 'live' ? 'red' : 'green'}"></span>${esc(String(h.trading_mode).toUpperCase())}</span>` +
-      healthBadge(h.database_ok, "DB") +
-      healthBadge(h.hyperliquid_configured, "Hyperliquid") +
-      healthBadge(h.ollama_configured, "Ollama") +
-      healthBadge(h.market_data_stale === false, h.market_data_stale ? "Market stale" : "Market fresh");
+      `<span class="badge"><span class="dot ${allOk ? 'green' : 'amber'}"></span>${allOk ? "All systems OK" : "Check system health ↓"}</span>`;
   });
 
   await section("market", async () => {
