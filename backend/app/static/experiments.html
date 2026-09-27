@@ -36,6 +36,17 @@ section h2 { margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: b
   font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8; }
 .panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
 .table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+/* Mobile browsers hide scrollbars, so a table wider than the screen just looks cut off with no
+   hint it's swipeable - a background on .table-scroll itself (default background-attachment:
+   scroll ties it to the element's own box, not the content) stays pinned at the visible right
+   edge regardless of scroll position, and works whether .table-scroll is nested inside .panel
+   or combined onto it - no :has() ancestor-matching needed. */
+@media (max-width: 640px) {
+  .table-scroll {
+    background-image: linear-gradient(to right, transparent calc(100% - 22px), var(--surface) 100%);
+    background-repeat: no-repeat; background-size: 100% 100%;
+  }
+}
 table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }

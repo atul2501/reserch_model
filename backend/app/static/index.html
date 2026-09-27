@@ -142,6 +142,17 @@ section h2 {
 .chart-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 4px; }
 
 .table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+/* Mobile browsers hide scrollbars, so a table wider than the screen just looks cut off with no
+   hint it's swipeable - a background on .table-scroll itself (default background-attachment:
+   scroll ties it to the element's own box, not the content) stays pinned at the visible right
+   edge regardless of scroll position, and works whether .table-scroll is nested inside .panel
+   or combined onto it - no :has() ancestor-matching needed. */
+@media (max-width: 640px) {
+  .table-scroll {
+    background-image: linear-gradient(to right, transparent calc(100% - 22px), var(--surface) 100%);
+    background-repeat: no-repeat; background-size: 100% 100%;
+  }
+}
 .btn-load, #leaderboard-load-more {
   appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
   color: var(--text); border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px;

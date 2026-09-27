@@ -146,7 +146,21 @@ select:focus { outline: none; border-color: var(--blue); }
 .ctl button.active { background: var(--blue); color: #05070c; border-color: var(--blue); }
 
 .table-scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+/* Mobile browsers hide scrollbars, so a table wider than the screen just looks cut off with no
+   hint it's swipeable - a background on .table-scroll itself (default background-attachment:
+   scroll ties it to the element's own box, not the content) stays pinned at the visible right
+   edge regardless of scroll position, and works whether .table-scroll is nested inside .panel
+   or combined onto it - no :has() ancestor-matching needed. */
+@media (max-width: 640px) {
+  .table-scroll {
+    background-image: linear-gradient(to right, transparent calc(100% - 22px), var(--surface) 100%);
+    background-repeat: no-repeat; background-size: 100% 100%;
+  }
+  /* The leaderboard has 17 columns - even with the fade hint, that's an unusable amount of
+     swiping on a phone. Keep the columns that actually matter for a quick check, hide the rest
+     (still there on desktop / anything wider than a phone). */
+  #leaderboard-table .col-secondary { display: none; }
+}
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 th.sortable { cursor: pointer; user-select: none; }
@@ -293,12 +307,12 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
     <div class="panel table-scroll">
       <table id="leaderboard-table">
         <thead><tr>
-          <th>Rank</th><th>Agent</th><th>Gen</th><th>Strategy</th><th>Status</th><th>Champion</th>
+          <th>Rank</th><th>Agent</th><th class="col-secondary">Gen</th><th class="col-secondary">Strategy</th><th>Status</th><th>Champion</th>
           <th class="sortable" data-sort="fitness">Fitness</th><th class="sortable" data-sort="pnl">PnL</th>
-          <th class="sortable" data-sort="future_pnl">Future PnL</th><th class="sortable" data-sort="expectancy">Expectancy</th>
-          <th class="sortable" data-sort="profit_factor">Profit Factor</th><th>Win Rate</th>
-          <th class="sortable" data-sort="drawdown">Max DD</th><th>Trades</th>
-          <th class="sortable" data-sort="trades_per_day">Trades/Day</th><th class="sortable" data-sort="oos_score">OOS</th><th>Risk</th>
+          <th class="sortable col-secondary" data-sort="future_pnl">Future PnL</th><th class="sortable col-secondary" data-sort="expectancy">Expectancy</th>
+          <th class="sortable col-secondary" data-sort="profit_factor">Profit Factor</th><th class="col-secondary">Win Rate</th>
+          <th class="sortable col-secondary" data-sort="drawdown">Max DD</th><th class="col-secondary">Trades</th>
+          <th class="sortable col-secondary" data-sort="trades_per_day">Trades/Day</th><th class="sortable col-secondary" data-sort="oos_score">OOS</th><th class="col-secondary">Risk</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -622,14 +636,14 @@ async function refreshRankingStability() {
 function leaderboardRowHtml(a, rank) {
   const champ = a.champion_status === "CHAMPION" ? '<span class="pill tier-champion">CHAMPION</span>' : '<span class="pill tier-none">-</span>';
   return `<tr>
-    <td>${rank}</td><td title="${esc(a.agent_id)}">${esc(a.identifier)}</td><td>${a.generation}</td><td>${esc(a.strategy_family||"-")}</td>
+    <td>${rank}</td><td title="${esc(a.agent_id)}">${esc(a.identifier)}</td><td class="col-secondary">${a.generation}</td><td class="col-secondary">${esc(a.strategy_family||"-")}</td>
     <td>${esc(a.status)}</td><td>${champ}</td>
     <td class="num">${a.fitness==null?"-":fmt(a.fitness,3)}</td><td class="num">${dollar(a.pnl)}</td>
-    <td class="num">${a.future_pnl==null?'<span class="na">waiting</span>':dollar(a.future_pnl)}</td>
-    <td class="num">${a.expectancy==null?"-":fmt(a.expectancy)}</td><td class="num">${a.profit_factor==null?"-":fmt(a.profit_factor)}</td>
-    <td class="num">${a.win_rate==null?"-":pct(a.win_rate)}</td><td class="num">${pct(a.max_drawdown)}</td>
-    <td class="num">${a.trade_count}</td><td class="num">${fmt(a.trades_per_day,2)}</td>
-    <td class="num">${a.oos_score==null?"-":fmt(a.oos_score,3)}</td><td class="num">${a.risk_score==null?"-":fmt(a.risk_score,3)}</td>
+    <td class="num col-secondary">${a.future_pnl==null?'<span class="na">waiting</span>':dollar(a.future_pnl)}</td>
+    <td class="num col-secondary">${a.expectancy==null?"-":fmt(a.expectancy)}</td><td class="num col-secondary">${a.profit_factor==null?"-":fmt(a.profit_factor)}</td>
+    <td class="num col-secondary">${a.win_rate==null?"-":pct(a.win_rate)}</td><td class="num col-secondary">${pct(a.max_drawdown)}</td>
+    <td class="num col-secondary">${a.trade_count}</td><td class="num col-secondary">${fmt(a.trades_per_day,2)}</td>
+    <td class="num col-secondary">${a.oos_score==null?"-":fmt(a.oos_score,3)}</td><td class="num col-secondary">${a.risk_score==null?"-":fmt(a.risk_score,3)}</td>
   </tr>`;
 }
 async function loadLeaderboardPage(reset) {

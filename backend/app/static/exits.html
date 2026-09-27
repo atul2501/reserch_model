@@ -46,6 +46,18 @@ section h2 { margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: b
 .chart-wrap { height: 190px; }
 .chart-wrap svg { width: 100%; height: 100%; display: block; }
 .chart-caption { color: var(--muted); font-size: 10px; margin-top: 6px; }
+.table-scroll { overflow-x: auto; }
+/* Mobile browsers hide scrollbars, so a table wider than the screen just looks cut off with no
+   hint it's swipeable - a background on .table-scroll itself (default background-attachment:
+   scroll ties it to the element's own box, not the content) stays pinned at the visible right
+   edge regardless of scroll position, and works whether .table-scroll is nested inside .panel
+   or combined onto it - no :has() ancestor-matching needed. */
+@media (max-width: 640px) {
+  .table-scroll {
+    background-image: linear-gradient(to right, transparent calc(100% - 22px), var(--surface) 100%);
+    background-repeat: no-repeat; background-size: 100% 100%;
+  }
+}
 table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
