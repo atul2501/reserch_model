@@ -80,9 +80,9 @@ h1 span { -webkit-background-clip: initial; background-clip: initial; margin-lef
 .dot.amber { background: var(--amber); box-shadow: 0 0 6px rgba(226,172,87,.7); }
 .dot.grey { background: var(--muted); }
 
-.grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 22px; }
-@media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
-@media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+/* auto-fit (not a fixed column count) so a row with fewer cards than columns never leaves a
+   lopsided gap of empty grid cells - cards fill the width and wrap only when they must. */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
 
 .card {
   position: relative;
@@ -97,6 +97,8 @@ h1 span { -webkit-background-clip: initial; background-clip: initial; margin-lef
 .card:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
 .card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
 .card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.card .value.small { font-size: 15px; }
+.card .value .sub { font-weight: 600; }
 .pos { color: var(--green); }
 .neg { color: var(--red); }
 
@@ -173,11 +175,6 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>System Health <span class="sub" id="health-sub">live via server-sent events</span></h2>
     <div class="panel"><div class="hgrid" id="health-panel"></div></div>
-  </section>
-
-  <section>
-    <h2>Population <span class="sub">current generation</span></h2>
-    <div class="panel"><div class="hgrid" id="population-panel"></div></div>
   </section>
 
   <section>
@@ -526,12 +523,15 @@ function renderLineChart(svg, points, color) {
   const xAt = i => padL + (i / (points.length - 1)) * plotW;
   const yAt = v => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
 
+  // Adaptive axis-label precision: 0dp reads fine for price/equity, but rounds small series
+  // (e.g. mean pairwise correlation ~0.1-0.9) down to a meaningless repeated "0".
+  const axisDp = Math.max(maxV, -minV) < 10 ? 2 : 0;
   let out = "";
   for (let i = 0; i <= 3; i++) {
     const v = minV + (maxV - minV) * (i / 3);
     const gy = yAt(v);
     out += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#1d232d"/>`;
-    out += `<text x="${padL-6}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#8791a0">${fmt(v,0)}</text>`;
+    out += `<text x="${padL-6}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#8791a0">${fmt(v,axisDp)}</text>`;
   }
   const d = points.map((p,i) => (i===0?"M":"L") + xAt(i).toFixed(1) + "," + yAt(p.v).toFixed(1)).join(" ");
   out += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -637,12 +637,14 @@ async function refresh() {
   await section("population", async () => {
     const p = await get("/api/population");
     document.getElementById("stat-cards").innerHTML = `
-      <div class="card"><div class="label">Generation</div><div class="value num">${p.generation}</div></div>
+      <div class="card"><div class="label">Generation</div><div class="value num">${p.generation} <span class="sub" style="font-size:11px;">of ${p.generations_total} run</span></div></div>
       <div class="card"><div class="label">Active Agents</div><div class="value num">${p.active_count} / ${p.target_size}</div></div>
-      <div class="card"><div class="label">Dead Agents</div><div class="value num">${p.dead_count}</div></div>
+      <div class="card"><div class="label">Dead / Retired</div><div class="value num">${p.dead_count} / ${p.retired_count}</div></div>
       <div class="card"><div class="label">Professional</div><div class="value num">${p.professional_count}</div></div>
       <div class="card"><div class="label">Total Equity</div><div class="value num">$${fmt(p.total_equity)}</div></div>
+      <div class="card"><div class="label">Mean / Best / Worst Equity</div><div class="value num small">$${fmt(p.mean_equity)} <span class="sub" style="font-size:11px;">/ $${fmt(p.best_equity)} / $${fmt(p.worst_equity)}</span></div></div>
       <div class="card"><div class="label">Total Realized PnL</div><div class="value num ${p.total_realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.total_realized_pnl)}</div></div>
+      <div class="card"><div class="label">Fees / Funding Paid</div><div class="value num small">$${fmt(p.total_fees_paid)} / $${fmt(p.total_funding_paid)}</div></div>
       <div class="card"><div class="label">Total Trades (all time)</div><div class="value num">${Number(p.total_trades).toLocaleString()}</div></div>
       <div class="card"><div class="label">Trades (this generation)</div><div class="value num">${Number(p.generation_trades).toLocaleString()}</div></div>
       <div class="card"><div class="label">Open Positions</div><div class="value num">${p.open_positions}</div></div>
@@ -1104,14 +1106,6 @@ async function pollHealth() {   // fallback while the stream is down
 }
 
 async function refreshSlow() {
-  await section("population", async () => {
-    const p = await get("/api/population");
-    const items = [["Generation", p.generation], ["Active", p.active_count], ["Dead", p.dead_count], ["Retired", p.retired_count],
-      ["Professional", p.professional_count], ["Generations run", p.generations_total], ["Total equity", "$" + fmt(p.total_equity)],
-      ["Mean equity", p.mean_equity == null ? "-" : "$" + fmt(p.mean_equity)], ["Best / worst", p.best_equity == null ? "-" : "$" + fmt(p.best_equity) + " / $" + fmt(p.worst_equity)],
-      ["Realized PnL", "$" + fmt(p.total_realized_pnl)], ["Total trades", Number(p.total_trades).toLocaleString()], ["Open positions", String(p.open_positions)], ["Fees / funding", "$" + fmt(p.total_fees_paid) + " / $" + fmt(p.total_funding_paid)]];
-    document.getElementById("population-panel").innerHTML = items.map(([t, v]) => card(t, "ok", String(v), "")).join("");
-  });
   await section("council", async () => {
     let c; try { c = await get("/api/council/latest"); } catch (e) { return; }
     const rows = (c.analysts || []).map(a => `<tr><td>${esc(a.analyst)}</td><td>${esc(a.bias)}</td><td>${fmt(a.confidence)}</td><td>${a.valid ? "ok" : "FAILED"}</td><td>${esc(a.latency_ms)} ms</td><td style="white-space:normal;max-width:520px">${esc(a.reasoning)}</td></tr>`).join("");
