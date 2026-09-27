@@ -1,0 +1,19 @@
+[Unit]
+Description=Trading Lab (run.sh) - starts worker+research+API and survives a reboot
+After=network.target postgresql.service
+
+[Service]
+# oneshot + RemainAfterExit: run.sh's own supervise() backgrounds and disowns worker/research/api
+# as their own restart-on-crash loops, then run.sh start itself returns - systemd just needs to
+# trigger that once at boot and consider the unit "up" afterward, not babysit a single process.
+Type=oneshot
+RemainAfterExit=yes
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/reserch_model
+ExecStart=/home/ec2-user/reserch_model/run.sh start
+ExecStop=/home/ec2-user/reserch_model/run.sh stop
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

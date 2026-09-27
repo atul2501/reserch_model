@@ -5,8 +5,42 @@
 ./run.sh start     # migrations, bootstrap (if empty), then worker + research + API (each restart-on-crash)
 ./run.sh status | logs | stop
 ```
-Production: systemd units in `docs/systemd/` (`trading-worker`, `trading-research`, `trading-api`), secrets in
-`/etc/trading-lab/env`, PostgreSQL via `DATABASE_URL=postgresql+asyncpg://…`, `alembic upgrade head` first.
+Production: PostgreSQL via `DATABASE_URL=postgresql+asyncpg://…`, `alembic upgrade head` first (`run.sh start`
+already does this automatically, same as locally). `run.sh` stays the single command for everything - the only
+production-specific piece is `docs/systemd/trading-lab.service`, a thin wrapper that runs `./run.sh start` once
+at boot so a reboot doesn't leave the system down until someone logs in:
+
+```bash
+sudo cp docs/systemd/trading-lab.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now trading-lab
+```
+That's it - `systemctl` is never touched again day to day. Keep using `./run.sh start|stop|restart|status|logs`
+exactly as locally; `systemctl {status,restart} trading-lab` only reflects whether the *wrapper* ran, not the
+individual worker/research/API processes (use `./run.sh status` for that, as always).
+
+**Stricter alternative (not used by default):** `docs/systemd/trading-{worker,research,api}.service` run each
+process directly under systemd instead of via `run.sh` - per-process sandboxing (`ProtectSystem`,
+`NoNewPrivileges`, ...) and a reduced-secrets `/etc/trading-lab/api.env` for the API process (DATABASE_URL/API_*
+only, no exchange/LLM keys) vs the full `/etc/trading-lab/env` for worker/research, both root-owned `0600`. The
+worker unit's `ExecStartPre=` runs `alembic upgrade head` on every start. If you switch to this, **never run
+`./run.sh start/stop/restart` for these three once systemd owns them** - both managing the same port/DB lease
+at once is exactly the bug this exists to avoid. Day to day becomes `sudo systemctl status|restart
+trading-worker trading-research trading-api` and `sudo journalctl -u trading-worker -f` (logs move to the
+journal, not `backend/logs/*.log`) instead of `run.sh`'s equivalents.
+
+`./run.sh backup` (`pg_dump` to `backend/data/backups/`, prints `BACKUP_PATH=...`) is unaffected either way -
+it isn't one of the supervised processes under either approach. Schedule it and the forward-PnL refresh via cron:
+
+```bash
+crontab -e
+# DB backup every 6h, prune local dumps older than 7 days
+0 */6 * * * cd /home/ec2-user/reserch_model && ./run.sh backup >> backend/logs/backup.log 2>&1 && find backend/data/backups -name "trading_lab_*.dump" -mtime +7 -delete >> backend/logs/backup.log 2>&1
+# forward-PnL refresh every 2h (--only fitness_forward skips the slower, lock-timeout-prone matrix phase)
+0 */2 * * * cd /home/ec2-user/reserch_model/backend && .venv/bin/python -m scripts.refresh_analytics --only fitness_forward >> logs/refresh_analytics.log 2>&1
+```
+`backend/data/backups/` is local-disk-only retention, not off-instance - pull dumps to another machine
+(`scp`) or wire up S3 separately if you need a copy that survives the instance itself being lost.
 
 ## PostgreSQL
 ```bash

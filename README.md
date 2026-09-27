@@ -55,7 +55,23 @@ uvicorn app.main:app                        # API + dashboard (127.0.0.1:8000)
 ```
 
 **Production** uses PostgreSQL: `DATABASE_URL=postgresql+asyncpg://…` then `alembic upgrade head`
-(SQLite remains the default for local development and tests). systemd units are in `docs/systemd/`.
+(SQLite remains the default for local development and tests).
+
+`run.sh` stays the one command for everything, in production and locally alike — `start | stop |
+restart | status | logs | backup`. The only production-specific addition is
+`docs/systemd/trading-lab.service`, a thin wrapper whose only job is running `./run.sh start` once
+at boot, so a reboot doesn't leave the system down until someone SSHes in:
+
+```bash
+sudo cp docs/systemd/trading-lab.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now trading-lab   # starts it now AND on every future boot
+```
+Day to day, keep using `./run.sh restart|status|logs|backup` exactly as before — systemd never
+touches the individual worker/research/API processes, it only triggers `run.sh start` once at
+boot. (`docs/systemd/trading-{worker,research,api}.service` are a stricter, more manual
+alternative — per-process sandboxing and a reduced-secrets file for the API — not used by default;
+see `docs/runbook.md` if you want that instead.)
 
 ## Configuration highlights
 
