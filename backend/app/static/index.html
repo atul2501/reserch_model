@@ -133,12 +133,13 @@ section h2 {
 .chart-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 4px; }
 
 .table-scroll { overflow-x: auto; max-height: 420px; overflow-y: auto; }
-#leaderboard-load-more {
+.btn-load, #leaderboard-load-more {
   appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
   color: var(--text); border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px;
-  font-weight: 650; cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease);
+  font-weight: 650; cursor: pointer; flex: 0 0 auto; white-space: nowrap;
+  transition: background .15s var(--ease), border-color .15s var(--ease);
 }
-#leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
+.btn-load:hover, #leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
 table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -207,7 +208,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
         <input id="agent-input" type="text" placeholder="agent UUID (click a leaderboard row)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
-        <button id="agent-load" type="button">Load</button>
+        <button id="agent-load" type="button" class="btn-load">Load</button>
       </div>
       <div id="agent-detail"><div class="empty">select an agent</div></div>
     </div>
@@ -294,8 +295,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Strategy Version Inspector <span class="sub">loads regime validation, reality gap, and adversarial robustness together for one strategy version</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center;">
-        <input id="inspector-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="inspector-load" type="button">Load All</button>
+        <input id="inspector-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="inspector-load" type="button" class="btn-load">Load All</button>
       </div>
       <div style="margin-top:6px; color:var(--muted); font-size:12px;">Fills and loads the three lookup boxes below in one click — each also still works independently.</div>
     </div>
@@ -305,8 +306,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Regime Validation <span class="sub">per-regime breakdown &amp; robustness classification for one strategy version</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="regime-validation-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="regime-validation-load" type="button">Load</button>
+        <input id="regime-validation-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="regime-validation-load" type="button" class="btn-load">Load</button>
         <span id="regime-validation-badge"></span>
       </div>
       <div class="table-scroll">
@@ -325,8 +326,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Reality Gap <span class="sub">stage-by-stage performance degradation for one strategy version</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="reality-gap-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="reality-gap-load" type="button">Load</button>
+        <input id="reality-gap-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="reality-gap-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
         <table id="reality-gap-table">
@@ -345,8 +346,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Adversarial Robustness <span class="sub">stress-test scenario breakdown for one strategy version</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="adversarial-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="adversarial-load" type="button">Load</button>
+        <input id="adversarial-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="adversarial-load" type="button" class="btn-load">Load</button>
         <span id="adversarial-badge"></span>
       </div>
       <div class="table-scroll">
@@ -363,8 +364,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Strategy Correlation <span class="sub">family&times;family correlation &amp; top correlated pairs for one generation</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="correlation-generation-input" type="number" placeholder="generation number" style="width:160px; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="correlation-load" type="button">Load</button>
+        <input id="correlation-generation-input" type="number" placeholder="generation number" style="width:160px; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="correlation-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
         <table id="correlation-family-table">
@@ -395,8 +396,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <h2>Challengers &amp; Promotion History <span class="sub">pipeline stage per strategy version, and every promote/reject decision</span></h2>
     <div class="panel">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="challengers-input" type="text" placeholder="strategy_id (UUID, from Champions table)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:4px; font-family:inherit;">
-        <button id="challengers-load" type="button">Load</button>
+        <input id="challengers-input" type="text" placeholder="strategy_id (UUID, from Champions table)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+        <button id="challengers-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
         <table id="challengers-table">
@@ -727,7 +728,7 @@ async function refresh() {
     const sum = k => rows.reduce((a, r) => a + r[k], 0);
     const totTrades = sum("trade_count"), totWins = sum("win_count"), totPnl = sum("total_pnl");
     const total = `
-      <tr style="font-weight:650; border-top:2px solid var(--border);">
+      <tr style="font-weight:650; border-top:2px solid var(--line);">
         <td>All strategies</td>
         <td class="num">${sum("agent_count")}</td>
         <td class="num">${totTrades}</td>
