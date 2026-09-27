@@ -34,6 +34,7 @@ from app.backtesting.regime_validation_engine import run_and_persist_regime_vali
 from app.backtesting.reality_gap_engine import compute_full_reality_gap_chain, persist_reality_gap_report
 from app.backtesting.stage_metrics_service import compute_live_stage_metrics
 from app.core.config import get_settings
+from app.core.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.evolution.adversarial_service import run_and_persist_adversarial_suite
 from app.evolution.breeding import NoValidCandidatesError
@@ -188,6 +189,11 @@ async def run_research_cycle(
                     "adversarial_top_k": s.research_adversarial_top_k, "forced": force},
     )
     await db.commit()
+    # Captured as plain locals so the except branch below never has to touch attributes on
+    # `exp` (an expired ORM instance on a possibly-dead connection after a failure) - reading
+    # an expired attribute triggers a lazy-load query, which raises MissingGreenlet if the
+    # connection that broke is the one that's expired.
+    exp_id, exp_business_id = exp.id, exp.experiment_id
 
     try:
         report = await _run(db, s, exp, epoch, generation, candles, market_service, now)
@@ -195,12 +201,21 @@ async def run_research_cycle(
         await db.commit()
         return report
     except Exception as exc:
-        await db.rollback()
-        exp = await db.get(Experiment, exp.id) or exp
-        await finish_experiment(db, exp, status="FAILED", result={"error": f"{type(exc).__name__}: {exc}"})
-        await db.commit()
         logger.exception("research.failed")
-        return ResearchReport("FAILED", reason=str(exc), experiment_id=exp.experiment_id, epoch_id=epoch.epoch_id,
+        try:
+            await db.rollback()
+        except Exception:
+            pass  # connection may already be gone (e.g. a cancelled statement) - best effort
+        try:
+            async with AsyncSessionLocal() as fresh_db:
+                fresh_exp = await fresh_db.get(Experiment, exp_id)
+                if fresh_exp is not None:
+                    await finish_experiment(fresh_db, fresh_exp, status="FAILED",
+                                            result={"error": f"{type(exc).__name__}: {exc}"})
+                    await fresh_db.commit()
+        except Exception:
+            logger.exception("research.failed_to_record_failure")
+        return ResearchReport("FAILED", reason=str(exc), experiment_id=exp_business_id, epoch_id=epoch.epoch_id,
                               generation_from=generation.number)
 
 

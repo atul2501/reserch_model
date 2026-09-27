@@ -285,10 +285,18 @@ def _position_overlap_jaccard(df: pd.DataFrame, agent_ids: list[uuid.UUID], buck
     return pd.DataFrame(jaccard, index=wide.columns, columns=wide.columns)
 
 
+_PERSIST_FLUSH_EVERY = 500  # bound each INSERT's row count regardless of population size (O(n^2) pairs)
+
+
 async def persist_generation_correlation(db: AsyncSession, report: GenerationCorrelationReport) -> None:
     """Insert-only — never overwrites a prior generation's rows. Caller
-    commits."""
+    commits.
+
+    Flushes every _PERSIST_FLUSH_EVERY rows (same transaction, not a commit) so a large
+    generation's O(n^2) pair count never lands in a single oversized INSERT statement that
+    can exceed DATABASE_STATEMENT_TIMEOUT_MS."""
     now = datetime.now(timezone.utc)
+    pending = 0
     for p in report.pairs:
         db.add(
             AgentCorrelation(
@@ -309,6 +317,10 @@ async def persist_generation_correlation(db: AsyncSession, report: GenerationCor
                 computed_at=now,
             )
         )
+        pending += 1
+        if pending >= _PERSIST_FLUSH_EVERY:
+            await db.flush()
+            pending = 0
     for (family_a, family_b), (mean_corr, count) in report.family_pair_correlations.items():
         db.add(
             StrategyFamilyCorrelation(
@@ -320,6 +332,10 @@ async def persist_generation_correlation(db: AsyncSession, report: GenerationCor
                 computed_at=now,
             )
         )
+        pending += 1
+        if pending >= _PERSIST_FLUSH_EVERY:
+            await db.flush()
+            pending = 0
 
 
 @dataclass

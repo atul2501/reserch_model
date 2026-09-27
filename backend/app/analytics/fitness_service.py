@@ -69,6 +69,9 @@ def _daily_consistency(trades: list[Trade]) -> float | None:
     return sum(1 for v in by_day.values() if v > 0) / len(by_day)
 
 
+_FITNESS_FLUSH_EVERY = 200  # bound each INSERT's row count regardless of population size
+
+
 async def compute_and_persist_agent_fitness(
     db: AsyncSession,
     *,
@@ -83,7 +86,11 @@ async def compute_and_persist_agent_fitness(
     FitnessScore row and writes the result onto Agent.fitness. Caller commits.
 
     `oos_window_ms` = the sealed OOS holdout's (start, end): any paper trade whose life overlaps it is EXCLUDED, so
-    selection can never be influenced by performance during the protected period."""
+    selection can never be influenced by performance during the protected period.
+
+    Flushes every _FITNESS_FLUSH_EVERY agents (same transaction, not a commit) so a large
+    generation never lands in a single oversized INSERT that can exceed
+    DATABASE_STATEMENT_TIMEOUT_MS."""
     weights = weights or FitnessWeights.from_settings()
     agents = (await db.execute(select(Agent).where(Agent.generation == generation))).scalars().all()
     if not agents:
@@ -107,7 +114,7 @@ async def compute_and_persist_agent_fitness(
 
     as_of = datetime.now(timezone.utc)
     fitness_values: list[float] = []
-    for agent in agents:
+    for i, agent in enumerate(agents):
         trades = trades_by_agent.get(agent.id, [])
         metric = await compute_and_persist_agent_performance_metric(db, agent, as_of=as_of, trades=trades)
         stats = compute_trade_stats([t.net_pnl for t in trades], [t.holding_seconds for t in trades])
@@ -153,6 +160,8 @@ async def compute_and_persist_agent_fitness(
         )
         agent.fitness = result.fitness
         fitness_values.append(result.fitness)
+        if (i + 1) % _FITNESS_FLUSH_EVERY == 0:
+            await db.flush()
 
     return FitnessSummary(
         generation=generation, agent_count=len(agents),
