@@ -12,6 +12,10 @@
 #   ./run.sh restart    stop, then start
 #   ./run.sh status     show whether each service is running
 #   ./run.sh logs       tail -f both log files
+#   ./run.sh backup     pg_dump the database to backend/data/backups/, prints
+#                       the resulting file's path (last line: BACKUP_PATH=...)
+#                       so it's easy to scp off the machine, e.g.:
+#                         scp -i key.pem ec2-user@host:"$(ssh -i key.pem ec2-user@host './run.sh backup' | tail -1 | cut -d= -f2)" .
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +23,7 @@ BACKEND_DIR="$ROOT_DIR/backend"
 VENV_DIR="$BACKEND_DIR/.venv"
 PID_DIR="$BACKEND_DIR/.run"
 LOG_DIR="$BACKEND_DIR/logs"
+BACKUP_DIR="$BACKEND_DIR/data/backups"
 SERVICES=(worker research api)
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
@@ -26,6 +31,12 @@ mkdir -p "$PID_DIR" "$LOG_DIR"
 is_running() {
   local pid_file="$PID_DIR/$1.pid"
   [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null
+}
+
+# Reads KEY=value out of backend/.env (last match wins, quotes/whitespace stripped).
+# Shared by cmd_start (API_HOST/API_PORT) and cmd_backup (DATABASE_URL_SYNC).
+env_value() {
+  grep -E "^$1=" "$BACKEND_DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d "\"' \r"
 }
 
 # Runs "$@" in a restart-on-crash loop (systemd's Restart=always + RestartSec),
@@ -123,9 +134,6 @@ cmd_start() {
   echo "==> Starting API + frontend (restart-on-crash, logging to $LOG_DIR/api.log)"
   # uvicorn's CLI does not read backend/.env, so pick API_HOST / API_PORT up from it here
   # (an already-exported environment variable wins). Default stays loopback.
-  env_value() {
-    grep -E "^$1=" "$BACKEND_DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d "\"' \r"
-  }
   API_HOST="${API_HOST:-$(env_value API_HOST)}"; API_HOST="${API_HOST:-127.0.0.1}"
   API_PORT="${API_PORT:-$(env_value API_PORT)}"; API_PORT="${API_PORT:-8000}"
   echo "==> API will listen on ${API_HOST}:${API_PORT}"
@@ -169,14 +177,39 @@ cmd_logs() {
   tail -f "$LOG_DIR"/*.log
 }
 
+cmd_backup() {
+  if ! command -v pg_dump >/dev/null 2>&1; then
+    echo "pg_dump not found on PATH - install the postgresql client package for this box's Postgres version." >&2
+    exit 1
+  fi
+  local db_url
+  db_url="$(env_value DATABASE_URL_SYNC)"
+  if [ -z "$db_url" ]; then
+    echo "DATABASE_URL_SYNC not set in $BACKEND_DIR/.env" >&2
+    exit 1
+  fi
+  mkdir -p "$BACKUP_DIR"
+  local stamp readable_time backup_path
+  stamp="$(date -u +%Y%m%d_%H%M%S)"
+  readable_time="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+  backup_path="$BACKUP_DIR/trading_lab_${stamp}.dump"
+  echo "==> Backing up database (started $readable_time) to $backup_path" >&2
+  pg_dump "$db_url" -Fc -f "$backup_path"
+  echo "==> Done at $(date -u +"%Y-%m-%d %H:%M:%S UTC") ($(du -h "$backup_path" | cut -f1))" >&2
+  # Last line, unadorned by the >&2 lines above, so a caller can grab it with
+  # `./run.sh backup | tail -1 | cut -d= -f2` (e.g. to feed an scp command).
+  echo "BACKUP_PATH=$backup_path"
+}
+
 case "${1:-start}" in
   start)   cmd_start ;;
   stop)    cmd_stop ;;
   restart) cmd_stop; sleep 1; cmd_start ;;
   status)  cmd_status ;;
   logs)    cmd_logs ;;
+  backup)  cmd_backup ;;
   *)
-    echo "Usage: $0 {start|stop|restart|status|logs}" >&2
+    echo "Usage: $0 {start|stop|restart|status|logs|backup}" >&2
     exit 1
     ;;
 esac
