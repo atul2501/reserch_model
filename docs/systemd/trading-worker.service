@@ -25,6 +25,12 @@ LockPersonality=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 ReadWritePaths=/home/ec2-user/reserch_model/backend/data /home/ec2-user/reserch_model/backend/logs
+# run.sh's cmd_start always ran `alembic upgrade head` before starting anything - systemd
+# doesn't do that implicitly, so it's made explicit here (idempotent, runs on every start/
+# restart) rather than relying on whoever deploys to remember it. Only on the worker unit
+# (not research/api too) so a normal restart of all three doesn't race three concurrent
+# `alembic upgrade head` invocations against each other.
+ExecStartPre=/home/ec2-user/reserch_model/backend/.venv/bin/alembic -c /home/ec2-user/reserch_model/backend/alembic.ini upgrade head
 ExecStart=/home/ec2-user/reserch_model/backend/.venv/bin/python -m scripts.run_cycle
 Restart=always
 RestartSec=5
