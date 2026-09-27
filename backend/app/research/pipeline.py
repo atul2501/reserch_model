@@ -47,6 +47,7 @@ from app.evolution.correlation_service import (
 from app.execution import accounting
 from app.market.feature_engine import InsufficientDataError
 from app.models.agent import Agent
+from app.models.champion_challenger import ChallengerEvaluation
 from app.models.enums import AgentStatus, StrategyStage
 from app.models.research import Experiment
 from app.models.strategy import Generation, StrategyVersion
@@ -189,11 +190,14 @@ async def run_research_cycle(
                     "adversarial_top_k": s.research_adversarial_top_k, "forced": force},
     )
     await db.commit()
-    # Captured as plain locals so the except branch below never has to touch attributes on
-    # `exp` (an expired ORM instance on a possibly-dead connection after a failure) - reading
-    # an expired attribute triggers a lazy-load query, which raises MissingGreenlet if the
-    # connection that broke is the one that's expired.
+    # Captured as plain locals so the except branch below never has to touch attributes on an
+    # ORM instance that may be expired (by db.rollback()) on a possibly-dead connection after a
+    # failure - reading an expired attribute triggers a lazy-load query, which raises
+    # MissingGreenlet if the connection that broke is the one that's expired. `epoch.epoch_id`/
+    # `generation.number` are read here too, not just `exp`'s fields, since the except branch's
+    # return statement touches all three.
     exp_id, exp_business_id = exp.id, exp.experiment_id
+    epoch_id_for_report, generation_number_for_report = epoch.epoch_id, generation.number
 
     try:
         report = await _run(db, s, exp, epoch, generation, candles, market_service, now)
@@ -215,8 +219,8 @@ async def run_research_cycle(
                     await fresh_db.commit()
         except Exception:
             logger.exception("research.failed_to_record_failure")
-        return ResearchReport("FAILED", reason=str(exc), experiment_id=exp_business_id, epoch_id=epoch.epoch_id,
-                              generation_from=generation.number)
+        return ResearchReport("FAILED", reason=str(exc), experiment_id=exp_business_id, epoch_id=epoch_id_for_report,
+                              generation_from=generation_number_for_report)
 
 
 async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> ResearchReport:
@@ -324,6 +328,41 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
         await db.commit()
     counts["oos_consumed"] = oos_consumed
     counts["pipeline_advances"] = advanced
+
+    # ---- 4b. re-walk ORPHANED mid-pipeline candidates from PAST generations ---------------- #
+    # `nominees` above is scoped to this generation's current top-K, so a candidate that reached
+    # challenger/observation stage in an earlier (now-superseded) generation was never looked at
+    # again once that generation ended - advance_pipeline_stage is designed to be called
+    # repeatedly over time (e.g. to notice once the observation-window wait is over), but nothing
+    # was re-calling it for old candidates. This closes that gap: find every StrategyVersion
+    # whose latest ChallengerEvaluation isn't yet terminal (promoted/rejected) and give it the
+    # same chance to advance, without re-running this cycle's OOS/live-stage-metrics evaluation
+    # (that only makes sense for THIS cycle's fresh nominees, not stale historical candidates).
+    latest_ce = (
+        select(ChallengerEvaluation.strategy_version_id, func.max(ChallengerEvaluation.computed_at).label("max_computed_at"))
+        .group_by(ChallengerEvaluation.strategy_version_id)
+        .subquery()
+    )
+    non_terminal_ids = (
+        await db.execute(
+            select(ChallengerEvaluation.strategy_version_id)
+            .join(latest_ce, (ChallengerEvaluation.strategy_version_id == latest_ce.c.strategy_version_id)
+                  & (ChallengerEvaluation.computed_at == latest_ce.c.max_computed_at))
+            .where(ChallengerEvaluation.pipeline_stage.notin_(("promoted", "rejected")))
+        )
+    ).scalars().all()
+    orphaned = [vid for vid in non_terminal_ids if vid not in nominees]
+    orphan_advanced = 0
+    for vid in orphaned:
+        for _ in range(6):
+            row = await advance_pipeline_stage(db, vid, promotion_stage=StrategyStage.PAPER)
+            await db.flush()
+            if row.blocking_reasons or row.pipeline_stage in ("promoted", "rejected"):
+                break
+            orphan_advanced += 1
+        await db.commit()
+    counts["orphaned_candidates_revisited"] = len(orphaned)
+    counts["orphaned_pipeline_advances"] = orphan_advanced
 
     # ---- 5. selection -> mutation/crossover -> candidate validation -> new generation -- #
     alive = [a for a in agents if a.status != AgentStatus.DEAD]

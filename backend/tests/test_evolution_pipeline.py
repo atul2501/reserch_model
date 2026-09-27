@@ -207,6 +207,64 @@ async def test_extinct_population_restarts_from_fresh_founders_never_reviving_th
     assert all(a.status == AgentStatus.DEAD for a in old)      # still dead
 
 
+async def test_orphaned_mid_pipeline_candidates_are_revisited_every_cycle(db_session, cfg):
+    """A StrategyVersion stuck mid-pipeline (e.g. waiting out its observation window) but not
+    tied to this cycle's current-generation top-K nominees - the situation every candidate from
+    a superseded generation is in - must still get re-walked, not orphaned forever the moment
+    its own generation stops being "current". Regression test for the bug where 0 champions
+    were ever promoted across 3 real generations despite candidates having cleared every stage
+    up to observation, because nothing ever re-checked them once their generation moved on."""
+    from app.evolution.champion_challenger_service import latest_challenger_evaluation
+    from app.models.champion_challenger import ChallengerEvaluation
+    from app.models.enums import StrategyFamily
+    from app.schemas.strategy_dna import Condition, RuleSet, StrategyDNA
+
+    await _seed_candles(db_session)
+    await _seed_population(db_session)
+
+    # A candidate that already cleared candidate/validation/challenger and is sitting in
+    # "observation" past its minimum window - fully eligible to advance - but has no live
+    # Agent in the current generation, so it can never appear in this cycle's `nominees`.
+    orphan_strategy = Strategy(code=f"STRAT-ORPHAN-{uuid.uuid4().hex[:8]}", family=StrategyFamily.MOMENTUM, name="orphan")
+    db_session.add(orphan_strategy)
+    await db_session.flush()
+    dna = StrategyDNA(
+        strategy_family=StrategyFamily.MOMENTUM,
+        indicators=[{"name": "rsi", "params": {"period": 14}}],
+        entry_rules=RuleSet(conditions=[Condition(feature="rsi_14", operator="gt", value=60)]),
+        exit_rules=RuleSet(conditions=[Condition(feature="rsi_14", operator="lt", value=40)]),
+    )
+    orphan_version = StrategyVersion(
+        strategy_id=orphan_strategy.id, version=1, generation=1,
+        dna=dna.model_dump(mode="json"), stage=StrategyStage.PAPER,
+        created_at=datetime.now(timezone.utc) - timedelta(days=30),
+    )
+    db_session.add(orphan_version)
+    await db_session.flush()
+    min_days = get_settings().champion_min_observation_days
+    db_session.add(ChallengerEvaluation(
+        strategy_version_id=orphan_version.id, pipeline_stage="observation",
+        entered_stage_at=datetime.now(timezone.utc) - timedelta(days=min_days + 1),
+        metrics_snapshot={}, blocking_reasons=[], computed_at=datetime.now(timezone.utc),
+    ))
+    await db_session.commit()
+
+    report = await run_research_cycle(db_session)
+    assert report.status == "COMPLETED", report.reason
+    assert report.counts.get("orphaned_candidates_revisited", 0) >= 1
+
+    # The orphan should have been walked all the way from "observation" through
+    # "champion_comparison" to an actual promotion decision - it lands on "rejected" here
+    # (not "promoted") only because this test deliberately doesn't seed the full promotion
+    # evidence (adversarial/regime/OOS reports); the meaningful assertion is that it was
+    # revisited and reached a real decision at all, proving it's no longer orphaned.
+    latest = await latest_challenger_evaluation(db_session, orphan_version.id)
+    assert latest.pipeline_stage == "rejected", (
+        f"orphaned candidate should have been walked to a real promotion decision, got {latest.pipeline_stage!r}"
+    )
+    assert "promotion_decision" in latest.metrics_snapshot, "should have actually reached champion_comparison and called evaluate_and_promote"
+
+
 async def test_a_failed_cycle_is_recorded_and_leaves_the_population_intact(db_session, cfg, monkeypatch):
     await _seed_candles(db_session)
     await _seed_population(db_session)
