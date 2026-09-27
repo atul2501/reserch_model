@@ -80,6 +80,18 @@ h1 span { -webkit-background-clip: initial; background-clip: initial; margin-lef
 .dot.amber { background: var(--amber); box-shadow: 0 0 6px rgba(226,172,87,.7); }
 .dot.grey { background: var(--muted); }
 
+#export-report {
+  appearance: none; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 7px;
+  border: 1px solid rgba(110,168,255,.35); background: rgba(110,168,255,.1);
+  color: var(--blue); font-size: 11px; font-weight: 650; letter-spacing: .02em;
+  transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease);
+}
+#export-report::before { content: "↓"; font-weight: 700; }
+#export-report:hover:not(:disabled) { background: rgba(110,168,255,.18); border-color: var(--blue); }
+#export-report:disabled { cursor: default; opacity: .6; }
+
 /* auto-fit (not a fixed column count) so a row with fewer cards than columns never leaves a
    lopsided gap of empty grid cells - cards fill the width and wrap only when they must. */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
