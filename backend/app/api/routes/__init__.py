@@ -13,6 +13,7 @@ from app.api.routes.positions import router as positions_router
 from app.api.routes.reality_gap import router as reality_gap_router
 from app.api.routes.regime_validation import router as regime_validation_router
 from app.api.routes.council import router as council_router
+from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.evolution import router as evolution_router
 from app.api.routes.exit_analytics import router as exit_analytics_router
 from app.api.routes.export import router as export_router
@@ -35,6 +36,7 @@ api_router.include_router(positions_router, dependencies=[viewer_required])
 api_router.include_router(reality_gap_router, dependencies=[viewer_required])
 api_router.include_router(regime_validation_router, dependencies=[viewer_required])
 api_router.include_router(council_router, dependencies=[viewer_required])
+api_router.include_router(dashboard_router, dependencies=[viewer_required])
 api_router.include_router(evolution_router, dependencies=[viewer_required])
 api_router.include_router(exit_analytics_router, dependencies=[viewer_required])
 api_router.include_router(shadow_router, dependencies=[viewer_required])

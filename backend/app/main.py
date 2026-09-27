@@ -99,6 +99,10 @@ def create_app() -> FastAPI:
     async def experiments_page():
         return FileResponse(STATIC_DIR / "experiments.html")
 
+    @app.get("/analytics")
+    async def analytics_page():
+        return FileResponse(STATIC_DIR / "analytics.html")
+
     return app
 
 

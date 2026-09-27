@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import statistics
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,9 +24,24 @@ async def generations(db: AsyncSession = Depends(get_db), limit: int = Query(def
         rows = (await db.execute(select(Agent.status, func.count(), func.coalesce(func.sum(Agent.equity), 0.0))
                                  .where(Agent.generation == g.number).group_by(Agent.status))).all()
         by = {s.value: {"count": n, "equity": float(e)} for s, n, e in rows}
+        deaths = by.get(AgentStatus.DEAD.value, {}).get("count", 0)
+
+        # PnL/fitness aggregates for the dashboard's Generation Performance panel - additive,
+        # read-only, computed from realized_pnl/fitness that already live on Agent.
+        pnl_rows = (await db.execute(select(Agent.realized_pnl).where(Agent.generation == g.number))).scalars().all()
+        fitness_rows = [f for f in (await db.execute(
+            select(Agent.fitness).where(Agent.generation == g.number)
+        )).scalars().all() if f is not None]
+        population = len(pnl_rows)
+
         out.append({"number": g.number, "population": g.population_created, "triggered_by": g.triggered_by,
-                    "created_at": g.created_at.isoformat(), "by_status": by,
-                    "deaths": by.get(AgentStatus.DEAD.value, {}).get("count", 0)})
+                    "created_at": g.created_at.isoformat(), "by_status": by, "deaths": deaths,
+                    "avg_pnl": statistics.fmean(pnl_rows) if pnl_rows else None,
+                    "median_pnl": statistics.median(pnl_rows) if pnl_rows else None,
+                    "best_pnl": max(pnl_rows) if pnl_rows else None,
+                    "avg_fitness": statistics.fmean(fitness_rows) if fitness_rows else None,
+                    "best_fitness": max(fitness_rows) if fitness_rows else None,
+                    "survival_rate": ((population - deaths) / population) if population else None})
     return out
 
 

@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Lab Analytics</title>
+<style>
+:root {
+  --bg: #060810;
+  --surface: #0b0e15;
+  --surface-2: #10141c;
+  --surface-3: #151a24;
+  --line: #1d232d;
+  --line-strong: #2b3340;
+  --text: #e6e9ee;
+  --text-strong: #f8f9fb;
+  --muted: #8791a0;
+  --blue: #6ea8ff;
+  --green: #3fd096;
+  --red: #f16b7c;
+  --amber: #e2ac57;
+  --purple: #b494ef;
+  --radius: 10px;
+  --shadow: 0 6px 20px -8px rgba(0,0,0,.5);
+  --ease: cubic-bezier(.4,0,.2,1);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0 0 40px;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% -10%, rgba(110,168,255,.06), transparent 50%),
+    radial-gradient(circle at 90% 0%, rgba(63,208,150,.05), transparent 45%);
+  background-repeat: no-repeat;
+  color: var(--text);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { width: min(1400px, calc(100% - 32px)); margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+.sub { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+header {
+  position: sticky; top: 0; z-index: 10;
+  margin: 0 0 20px; padding: 14px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: rgba(6,8,16,.86);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 24px -18px rgba(0,0,0,.7);
+}
+h1 {
+  margin: 0; font-size: 16px; font-weight: 700;
+  background: linear-gradient(95deg, var(--text-strong) 40%, var(--blue) 140%);
+  -webkit-background-clip: text; background-clip: text; color: var(--text-strong);
+}
+h1 span { -webkit-background-clip: initial; background-clip: initial; margin-left: 9px; color: var(--muted); font-size: 11px; font-weight: 500; }
+
+.page-nav { display: flex; gap: 4px; margin-right: 4px; }
+.page-nav a { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 650; letter-spacing: .03em;
+  padding: 6px 10px; border-radius: 6px; transition: background .15s var(--ease), color .15s var(--ease); }
+.page-nav a:hover { color: var(--text); background: var(--surface-2); }
+.page-nav a.active { color: var(--text-strong); background: var(--surface-3); }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface-2);
+  font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+  color: #aeb6c1;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+.grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 22px; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+.card {
+  position: relative;
+  padding: 14px 15px 14px 17px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), border-color .15s var(--ease);
+}
+.card::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--blue); opacity: .75;
+}
+.card:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
+.card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.card .value.small { font-size: 15px; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.na { color: var(--muted); font-size: 13px; }
+
+section { margin-bottom: 20px; }
+section h2 {
+  margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8;
+}
+.row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+
+.panel {
+  position: relative;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.chart-wrap { height: 220px; }
+.chart-wrap svg { width: 100%; height: 100%; display: block; }
+.chart-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 4px; }
+
+.ctl { display: flex; gap: 4px; flex-wrap: wrap; }
+.ctl button, .ctl select {
+  appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
+  color: var(--muted); border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 10px;
+  font-weight: 650; cursor: pointer; transition: background .15s var(--ease), color .15s var(--ease);
+}
+.ctl button:hover, .ctl select:hover { background: var(--surface-2); color: var(--text); }
+.ctl button.active { background: var(--blue); color: #05070c; border-color: var(--blue); }
+
+.table-scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sort-active { color: var(--blue); }
+td { color: #bcc3cc; }
+tbody tr { transition: background .12s var(--ease); }
+tbody tr:hover { background: var(--surface-2); }
+
+.pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 650; }
+.tier-champion { color: var(--purple); background: rgba(180,148,239,.13); }
+.tier-none { color: var(--muted); background: var(--surface-3); }
+
+.empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+.warn-text { color: var(--amber); font-size: 10.5px; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .03em; }
+
+.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.hcard { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.hcard .t { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
+.hcard .v { font-size: 13px; font-weight: 650; }
+.hcard .d { color: var(--muted); font-size: 10.5px; margin-top: 4px; line-height: 1.5; word-break: break-word; }
+.st-ok { color: var(--green); } .st-degraded { color: #e0b341; } .st-down { color: var(--red); } .st-unknown { color: var(--muted); }
+
+#leaderboard-load-more {
+  appearance: none; border: 1px solid var(--line-strong); background: var(--surface-3);
+  color: var(--text); border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px;
+  font-weight: 650; cursor: pointer; margin-top: 10px;
+}
+#leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Trading Lab <span id="mode-title">loading...</span></h1>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <nav class="page-nav"><a href="/">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics" class="active">Analytics</a></nav>
+      <div class="badges" id="badges"></div>
+    </div>
+  </header>
+
+  <!-- Row 1: KPI header -->
+  <div class="grid" id="kpi-cards"></div>
+
+  <!-- Row 2: Equity curve / Population by generation -->
+  <div class="row-2">
+    <section>
+      <h2>System Equity Curve <span class="sub" id="equity-sub"></span>
+        <span class="ctl" id="equity-range-ctl" style="margin-left:auto;"></span>
+      </h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="equity-chart"></svg></div>
+        <div class="chart-label"><span id="equity-label-left"></span><span id="equity-label-right"></span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Agent Population <span class="sub">active / dead / retired, by generation</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="population-chart"></svg></div></div>
+    </section>
+  </div>
+
+  <!-- Row 3: Generation performance / Fitness component contribution -->
+  <div class="row-2">
+    <section>
+      <h2>Generation Performance
+        <span class="ctl" id="genperf-metric-ctl" style="margin-left:auto;"></span>
+      </h2>
+      <div class="panel">
+        <div class="chart-wrap"><svg id="genperf-chart"></svg></div>
+        <div class="chart-label"><span id="genperf-label-left"></span><span id="genperf-label-right"></span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Fitness Component Contribution <span class="sub">actual weighted contribution, not just configured weight</span>
+        <select id="fc-gen-select" style="margin-left:auto;"></select>
+      </h2>
+      <div class="panel"><div id="fc-panel"></div></div>
+    </section>
+  </div>
+
+  <!-- Row 4: Fitness vs Future PnL / Fitness vs PnL -->
+  <div class="row-2">
+    <section>
+      <h2>Fitness vs Future PnL <span class="sub">does higher fitness predict better FUTURE profitability?</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="fut-pnl-chart"></svg></div></div>
+    </section>
+    <section>
+      <h2>Fitness vs PnL <span class="sub">current/historical profitability</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="cur-pnl-chart"></svg></div></div>
+    </section>
+  </div>
+
+  <!-- Row 5: Trade frequency scatters -->
+  <div class="row-2">
+    <section>
+      <h2>Trade Frequency vs Fitness <span class="sub">does the scoring system reward activity over edge?</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="freq-fitness-chart"></svg></div></div>
+    </section>
+    <section>
+      <h2>Trade Frequency vs Profitability <span class="sub">do more trades actually correspond to better PnL?</span></h2>
+      <div class="panel"><div class="chart-wrap"><svg id="freq-pnl-chart"></svg></div></div>
+    </section>
+  </div>
+
+  <!-- Row 6: Timeframe / Champions -->
+  <div class="row-2">
+    <section>
+      <h2>Performance by Timeframe <span class="sub" id="tf-sub">backtest experiments, not live agents (this system trades one live timeframe)</span></h2>
+      <div class="panel table-scroll">
+        <table id="tf-table"><thead><tr><th>Timeframe</th><th>Experiments</th><th>Avg PnL</th><th>Avg Expectancy</th><th>Avg Profit Factor</th><th>Avg Win Rate</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+    <section>
+      <h2>Champion / Professional Analysis</h2>
+      <div class="panel"><div class="hgrid" id="champions-panel"></div></div>
+    </section>
+  </div>
+
+  <!-- Row 7: Generation evolution / Ranking stability -->
+  <div class="row-2">
+    <section>
+      <h2>Generational Evolution</h2>
+      <div class="panel table-scroll">
+        <table id="genevo-table"><thead><tr><th>Gen</th><th>Population</th><th>Avg PnL</th><th>Median PnL</th><th>Best PnL</th><th>Avg Fitness</th><th>Best Fitness</th><th>Survival</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+    <section>
+      <h2>Fitness Ranking Stability <span class="sub">Spearman + top-N overlap between windows, no look-ahead</span></h2>
+      <div class="panel table-scroll">
+        <table id="stability-table"><thead><tr><th>Window</th><th>Spearman</th><th>Top-10 Overlap</th><th>Top-20 Overlap</th><th>Agents Compared</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Row 8: Agent leaderboard -->
+  <section>
+    <h2>Agent Leaderboard <span class="sub">click a column to sort - fitness rank and PnL rank are not assumed to agree</span>
+      <span class="ctl" style="margin-left:auto;">
+        <select id="lb-generation"><option value="">All generations</option></select>
+        <select id="lb-status"><option value="">All statuses</option><option value="ACTIVE">Active</option><option value="DEAD">Dead</option><option value="PAUSED">Paused</option><option value="RETIRED">Retired</option></select>
+      </span>
+    </h2>
+    <div class="panel table-scroll">
+      <table id="leaderboard-table">
+        <thead><tr>
+          <th>Rank</th><th>Agent</th><th>Gen</th><th>Strategy</th><th>Status</th><th>Champion</th>
+          <th class="sortable" data-sort="fitness">Fitness</th><th class="sortable" data-sort="pnl">PnL</th>
+          <th class="sortable" data-sort="future_pnl">Future PnL</th><th class="sortable" data-sort="expectancy">Expectancy</th>
+          <th class="sortable" data-sort="profit_factor">Profit Factor</th><th>Win Rate</th>
+          <th class="sortable" data-sort="drawdown">Max DD</th><th>Trades</th>
+          <th class="sortable" data-sort="trades_per_day">Trades/Day</th><th class="sortable" data-sort="oos_score">OOS</th><th>Risk</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button id="leaderboard-load-more" type="button">Load more</button>
+  </section>
+
+  <!-- Row 9: System health / data freshness -->
+  <section>
+    <h2>System Health <span class="sub" id="health-sub"></span></h2>
+    <div class="panel"><div class="hgrid" id="health-panel"></div></div>
+  </section>
+
+  <footer>Auto-refresh every 15s &middot; <span id="refresh-status">connecting...</span></footer>
+</div>
+
+<script>
+const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
+const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
+const secs = v => (v === null || v === undefined) ? "-" : (v < 90 ? v.toFixed(0) + "s" : (v / 60).toFixed(1) + "m");
+const card = (t, status, main, detail) =>
+  `<div class="hcard"><div class="t">${esc(t)}</div><div class="v st-${esc(status)}">${esc(main)}</div><div class="d">${detail}</div></div>`;
+
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+function promptForApiKey() {
+  const k = window.prompt("API key (viewer role or higher):", "");
+  if (k) { try { sessionStorage.setItem("apiKey", k.trim()); } catch (e) {} }
+  return !!k;
+}
+let keyPromptShown = false;
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) {
+    try { sessionStorage.removeItem("apiKey"); } catch (e) {}
+    if (!keyPromptShown) { keyPromptShown = true; if (promptForApiKey()) return await get(path); }
+    throw new Error(path + " -> HTTP " + res.status + " (API key missing or insufficient)");
+  }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+async function section(name, fn) {
+  try { await fn(); } catch (e) { console.error(`section "${esc(name)}" failed:`, e); }
+}
+
+// ---- chart renderers (dependency-free inline SVG, matching the Home/Exit Research convention) ---- //
+
+function noData(svg, msg) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">${esc(msg)}</text>`;
+}
+
+function renderLineChart(svg, points, color) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 46, padR = 8, padT = 8, padB = 10;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (points.length < 2) { noData(svg, "Insufficient historical data"); return; }
+  const vals = points.map(p => p.v);
+  const allNonNegative = vals.every(v => v >= 0);
+  let minV = Math.min(...vals), maxV = Math.max(...vals);
+  if (minV === maxV) { minV -= 1; maxV += 1; }
+  const pad = (maxV - minV) * 0.1;
+  minV -= pad; maxV += pad;
+  if (allNonNegative && minV < 0) minV = 0;
+  const xAt = i => padL + (i / (points.length - 1)) * plotW;
+  const yAt = v => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
+  // Adaptive axis-label precision: 0dp reads fine for equity ($49,405), but rounds small
+  // per-generation PnL/fitness averages (e.g. -0.27) to a meaningless "-0".
+  const axisDp = Math.max(maxV, -minV) < 10 ? 2 : 0;
+  let out = "";
+  for (let i = 0; i <= 3; i++) {
+    const v = minV + (maxV - minV) * (i / 3);
+    const gy = yAt(v);
+    out += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#1d232d"/>`;
+    out += `<text x="${padL-6}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#8791a0">${fmt(v,axisDp)}</text>`;
+  }
+  const d = points.map((p,i) => (i===0?"M":"L") + xAt(i).toFixed(1) + "," + yAt(p.v).toFixed(1)).join(" ");
+  out += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  svg.innerHTML = out;
+}
+
+function renderScatterChart(svg, points, xLabel, yLabel, colorFn) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 44, padR = 10, padT = 8, padB = 24;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  const pts = points.filter(p => p.x !== null && p.x !== undefined && p.y !== null && p.y !== undefined && !isNaN(p.x) && !isNaN(p.y));
+  if (pts.length < 2) { noData(svg, pts.length === 0 && points.length === 0 ? "Waiting for future observations" : "Insufficient data"); return; }
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  let minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
+  if (minX===maxX) { minX-=1; maxX+=1; }
+  if (minY===maxY) { minY-=1; maxY+=1; }
+  const padX=(maxX-minX)*0.08, padY=(maxY-minY)*0.08;
+  minX-=padX; maxX+=padX; minY-=padY; maxY+=padY;
+  const xAt = x => padL + ((x-minX)/(maxX-minX))*plotW;
+  const yAt = y => padT + plotH - ((y-minY)/(maxY-minY))*plotH;
+  let out = "";
+  if (minY < 0 && maxY > 0) { const zy = yAt(0); out += `<line x1="${padL}" y1="${zy.toFixed(1)}" x2="${w-padR}" y2="${zy.toFixed(1)}" stroke="#2b3340" stroke-dasharray="3,3"/>`; }
+  if (minX < 0 && maxX > 0) { const zx = xAt(0); out += `<line x1="${zx.toFixed(1)}" y1="${padT}" x2="${zx.toFixed(1)}" y2="${(padT+plotH).toFixed(1)}" stroke="#2b3340" stroke-dasharray="3,3"/>`; }
+  pts.forEach(p => {
+    const cx = xAt(p.x).toFixed(1), cy = yAt(p.y).toFixed(1);
+    out += `<circle cx="${cx}" cy="${cy}" r="3" fill="${colorFn ? colorFn(p) : '#6ea8ff'}" fill-opacity="0.8"><title>${esc(p.label||'')}\nx=${fmt(p.x)} y=${fmt(p.y)}</title></circle>`;
+  });
+  out += `<text x="${(padL+plotW/2).toFixed(1)}" y="${h-3}" text-anchor="middle" font-size="9" fill="#8791a0">${esc(xLabel)}</text>`;
+  out += `<text x="9" y="${(padT+plotH/2).toFixed(1)}" text-anchor="middle" font-size="9" fill="#8791a0" transform="rotate(-90 9 ${(padT+plotH/2).toFixed(1)})">${esc(yLabel)}</text>`;
+  svg.innerHTML = out;
+}
+
+function renderStackedBarChart(svg, categories, colors) {
+  // categories: [{label, values: [n1, n2, ...]}] - values order matches colors order
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 30, padR = 8, padT = 8, padB = 20;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!categories.length) { noData(svg, "Insufficient historical data"); return; }
+  const totals = categories.map(c => c.values.reduce((a,b)=>a+b,0));
+  const maxTotal = Math.max(1, ...totals);
+  const gap = plotW / categories.length, bw = gap * 0.62;
+  let out = "";
+  categories.forEach((c, ci) => {
+    let y = padT + plotH;
+    const x = padL + ci * gap + (gap - bw) / 2;
+    c.values.forEach((v, vi) => {
+      if (!v) return;
+      const segH = (v / maxTotal) * plotH;
+      y -= segH;
+      out += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${segH.toFixed(1)}" fill="${colors[vi]}"><title>${esc(c.label)}: ${v}</title></rect>`;
+    });
+    out += `<text x="${(x+bw/2).toFixed(1)}" y="${(padT+plotH+13).toFixed(1)}" text-anchor="middle" font-size="9" fill="#8791a0">${esc(c.label)}</text>`;
+  });
+  svg.innerHTML = out;
+}
+
+// ---- data + state ---- //
+let genCache = [];          // /api/evolution/generations, newest first
+let agentMetricsCache = []; // /api/dashboard/agents/metrics rows (large batch, drives the 4 scatters + low-activity diagnostic)
+let equityRange = "ALL";
+let genPerfMetric = "avg_pnl";
+let lbSort = "fitness", lbDir = "desc", lbOffset = 0;
+const LB_PAGE = 50;
+
+// ---- Row 1: KPI header ---- //
+async function refreshOverview() {
+  const o = await get("/api/dashboard/overview");
+  document.getElementById("mode-title").textContent = (o.trading_mode || "").toUpperCase();
+  const cardHtml = (label, value, cls="") => `<div class="card"><div class="label">${esc(label)}</div><div class="value ${cls}">${value}</div></div>`;
+  document.getElementById("kpi-cards").innerHTML = [
+    cardHtml("Total PnL", o.total_trades ? dollar(o.total_pnl) : '<span class="na">N/A</span>', o.total_pnl >= 0 ? "pos" : "neg"),
+    cardHtml("Current Equity", o.current_equity == null ? '<span class="na">N/A</span>' : "$" + fmt(o.current_equity)),
+    cardHtml("Starting Equity", o.starting_equity == null ? '<span class="na">N/A</span>' : "$" + fmt(o.starting_equity)),
+    cardHtml("Max Drawdown", o.max_drawdown_pct == null ? '<span class="na">Insufficient data</span>' : pct(o.max_drawdown_pct)),
+    cardHtml("Win Rate", o.win_rate == null ? '<span class="na">N/A</span>' : pct(o.win_rate)),
+    cardHtml("Total Trades", o.total_trades ?? 0),
+    cardHtml("Active Agents", o.active_agents ?? 0),
+    cardHtml("Dead Agents", o.dead_agents ?? 0),
+    cardHtml("Generation", o.current_generation == null ? '<span class="na">N/A</span>' : "#" + o.current_generation),
+    cardHtml("Champions", o.champion_count ?? 0),
+  ].join("");
+}
+
+// ---- Row 2: Equity curve ---- //
+async function refreshEquity() {
+  const r = await get("/api/dashboard/equity?range=" + encodeURIComponent(equityRange));
+  const svg = document.getElementById("equity-chart");
+  if (r.insufficient_data) { noData(svg, "Insufficient historical data"); document.getElementById("equity-sub").textContent = ""; }
+  else {
+    renderLineChart(svg, r.points.map(p => ({v: p.equity})), "#6ea8ff");
+    document.getElementById("equity-sub").textContent = `${dollar(r.current_equity - r.starting_equity)} · peak DD ${pct(r.max_drawdown_pct)}`;
+    document.getElementById("equity-label-left").textContent = new Date(r.points[0].t).toLocaleString();
+    document.getElementById("equity-label-right").textContent = new Date(r.points[r.points.length-1].t).toLocaleString();
+  }
+}
+function buildEquityRangeCtl() {
+  const ranges = ["1H","6H","24H","3D","7D","30D","ALL"];
+  document.getElementById("equity-range-ctl").innerHTML = ranges.map(r =>
+    `<button data-range="${r}" class="${r===equityRange?'active':''}">${r}</button>`).join("");
+  document.querySelectorAll("#equity-range-ctl button").forEach(btn => btn.addEventListener("click", () => {
+    equityRange = btn.dataset.range;
+    document.querySelectorAll("#equity-range-ctl button").forEach(b => b.classList.toggle("active", b === btn));
+    section("equity", refreshEquity);
+  }));
+}
+
+// ---- Row 2: Population by generation (stacked) ---- //
+function refreshPopulationChart() {
+  const svg = document.getElementById("population-chart");
+  const gens = [...genCache].sort((a,b) => a.number - b.number).slice(-12);
+  const categories = gens.map(g => ({
+    label: "G" + g.number,
+    values: ["ACTIVE","DEAD","RETIRED","PAUSED"].map(s => (g.by_status[s] || {}).count || 0),
+  }));
+  renderStackedBarChart(svg, categories, ["#3fd096", "#f16b7c", "#8791a0", "#e2ac57"]);
+}
+
+// ---- Row 3: Generation performance ---- //
+function buildGenPerfCtl() {
+  const metrics = [["avg_pnl","Avg PnL"],["best_pnl","Best PnL"],["avg_fitness","Avg Fitness"],["best_fitness","Best Fitness"]];
+  document.getElementById("genperf-metric-ctl").innerHTML = metrics.map(([k,l]) =>
+    `<button data-metric="${k}" class="${k===genPerfMetric?'active':''}">${esc(l)}</button>`).join("");
+  document.querySelectorAll("#genperf-metric-ctl button").forEach(btn => btn.addEventListener("click", () => {
+    genPerfMetric = btn.dataset.metric;
+    document.querySelectorAll("#genperf-metric-ctl button").forEach(b => b.classList.toggle("active", b === btn));
+    refreshGenPerfChart();
+  }));
+}
+function refreshGenPerfChart() {
+  const svg = document.getElementById("genperf-chart");
+  const gens = [...genCache].sort((a,b) => a.number - b.number);
+  const points = gens.filter(g => g[genPerfMetric] != null).map(g => ({v: g[genPerfMetric]}));
+  if (points.length < 2) { noData(svg, "Insufficient data across generations"); return; }
+  renderLineChart(svg, points, "#b494ef");
+  document.getElementById("genperf-label-left").textContent = "G" + gens[0].number;
+  document.getElementById("genperf-label-right").textContent = "G" + gens[gens.length-1].number;
+}
+
+// ---- Row 3: Fitness component contribution ---- //
+async function refreshFitnessComponents() {
+  const gen = document.getElementById("fc-gen-select").value;
+  const r = await get("/api/dashboard/fitness/components" + (gen ? "?generation=" + encodeURIComponent(gen) : ""));
+  const panel = document.getElementById("fc-panel");
+  if (r.insufficient_data) { panel.innerHTML = '<div class="empty">Insufficient data</div>'; return; }
+  const maxAbs = Math.max(1e-9, ...r.components.map(c => Math.abs(c.mean_actual_contribution)));
+  panel.innerHTML = `<div class="sub" style="margin-bottom:8px;">n=${r.agent_count} agents &middot; mean fitness ${fmt(r.mean_fitness)}</div>` +
+    r.components.map(c => {
+      const w = Math.max(2, Math.abs(c.mean_actual_contribution) / maxAbs * 100);
+      const pos = c.mean_actual_contribution >= 0;
+      return `<div style="margin-bottom:7px;">
+        <div style="display:flex; justify-content:space-between; font-size:10.5px; margin-bottom:2px;">
+          <span>${esc(c.component)}</span>
+          <span class="${pos?'pos':'neg'}">${fmt(c.mean_actual_contribution,3)} (${fmt(c.contribution_pct,1)}%) &middot; weight ${c.configured_weight == null ? "-" : fmt(c.configured_weight,2)}</span>
+        </div>
+        <div style="background:var(--surface-3); border-radius:4px; height:6px; overflow:hidden;">
+          <div style="width:${w.toFixed(1)}%; height:100%; background:${pos?'var(--green)':'var(--red)'};"></div>
+        </div>
+      </div>`;
+    }).join("");
+}
+async function populateGenSelect() {
+  const sel = document.getElementById("fc-gen-select");
+  sel.innerHTML = '<option value="">All generations</option>' + genCache.map(g => `<option value="${g.number}">Gen ${g.number}</option>`).join("");
+  sel.addEventListener("change", () => section("fitness-components", refreshFitnessComponents));
+  const lbGen = document.getElementById("lb-generation");
+  lbGen.innerHTML = '<option value="">All generations</option>' + genCache.map(g => `<option value="${g.number}">Gen ${g.number}</option>`).join("");
+}
+
+// ---- Rows 4-5: scatter charts + Row 8 leaderboard + Row 14 (low-activity, folded into leaderboard sort) share one payload ---- //
+async function refreshAgentMetrics() {
+  const r = await get("/api/dashboard/agents/metrics?limit=500&sort_by=fitness&sort_dir=desc");
+  agentMetricsCache = r.rows;
+  const label = row => row.identifier;
+
+  renderScatterChart(document.getElementById("fut-pnl-chart"),
+    agentMetricsCache.map(a => ({x: a.fitness, y: a.future_pnl, label: label(a)})), "Fitness", "Future PnL ($)");
+  renderScatterChart(document.getElementById("cur-pnl-chart"),
+    agentMetricsCache.map(a => ({x: a.fitness, y: a.pnl, label: label(a)})), "Fitness", "PnL ($)",
+    p => p.x > 0.3 && p.y < 0 ? "#f16b7c" : (p.x < 0 && p.y > 0 ? "#3fd096" : "#6ea8ff"));
+  renderScatterChart(document.getElementById("freq-fitness-chart"),
+    agentMetricsCache.map(a => ({x: a.trades_per_day, y: a.fitness, label: label(a)})), "Trades / Day", "Fitness");
+  renderScatterChart(document.getElementById("freq-pnl-chart"),
+    agentMetricsCache.map(a => ({x: a.trades_per_day, y: a.pnl, label: label(a)})), "Trades / Day", "PnL ($)");
+}
+
+// ---- Row 6: Timeframe performance (backtest experiments) ---- //
+async function refreshTimeframes() {
+  const r = await get("/api/dashboard/timeframes");
+  const tb = document.querySelector("#tf-table tbody");
+  if (r.insufficient_data || !r.timeframes.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">Insufficient data</td></tr>'; return; }
+  tb.innerHTML = r.timeframes.map(t => `<tr>
+    <td>${esc(t.timeframe)}</td><td>${t.experiment_count}</td><td>${t.avg_pnl==null?"-":dollar(t.avg_pnl)}</td>
+    <td>${t.avg_expectancy==null?"-":fmt(t.avg_expectancy)}</td><td>${t.avg_profit_factor==null?"-":fmt(t.avg_profit_factor)}</td>
+    <td>${t.avg_win_rate==null?"-":pct(t.avg_win_rate)}</td>
+  </tr>`).join("");
+}
+
+// ---- Row 6: Champion analysis ---- //
+async function refreshChampions() {
+  const r = await get("/api/dashboard/champions/analysis");
+  const s = r.champion_stats;
+  document.getElementById("champions-panel").innerHTML = [
+    card("Champions", "ok", r.champion_count, `avg trades/day ${s.avg_trades_per_day==null?"-":fmt(s.avg_trades_per_day,2)}<br>avg PnL ${s.avg_pnl==null?"-":dollar(s.avg_pnl)}<br>avg fitness ${s.avg_fitness==null?"-":fmt(s.avg_fitness)}<br>avg drawdown ${s.avg_drawdown==null?"-":pct(s.avg_drawdown)}`),
+    card("Profitable, Not Champion", r.profitable_not_champion_count > 0 ? "degraded" : "ok", r.profitable_not_champion_count,
+      "agents with positive lifetime PnL whose strategy version was never promoted"),
+    card("Champion, Not Profitable", r.champion_not_profitable_count > 0 ? "down" : "ok", r.champion_not_profitable_count,
+      "promoted strategies whose agents have non-positive lifetime PnL"),
+    card("Promotion Gate", "unknown", `${r.promotion_criteria.min_paper_trade_count} trades / ${r.promotion_criteria.min_observation_days}d`,
+      "minimum paper evidence required before promotion eligibility"),
+  ].join("");
+}
+
+// ---- Row 7: Generation evolution table ---- //
+function refreshGenEvoTable() {
+  const tb = document.querySelector("#genevo-table tbody");
+  if (!genCache.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">Insufficient data</td></tr>'; return; }
+  tb.innerHTML = genCache.map(g => `<tr>
+    <td>${g.number}</td><td>${g.population}</td><td>${g.avg_pnl==null?"-":dollar(g.avg_pnl)}</td>
+    <td>${g.median_pnl==null?"-":dollar(g.median_pnl)}</td><td>${g.best_pnl==null?"-":dollar(g.best_pnl)}</td>
+    <td>${g.avg_fitness==null?"-":fmt(g.avg_fitness)}</td><td>${g.best_fitness==null?"-":fmt(g.best_fitness)}</td>
+    <td>${g.survival_rate==null?"-":pct(g.survival_rate)}</td>
+  </tr>`).join("");
+}
+
+// ---- Row 7: Ranking stability ---- //
+async function refreshRankingStability() {
+  const r = await get("/api/dashboard/ranking-stability");
+  const tb = document.querySelector("#stability-table tbody");
+  tb.innerHTML = r.windows.map(w => {
+    if (w.insufficient_history) return `<tr><td>${esc(w.from)} → ${esc(w.to)}</td><td colspan="4" class="empty">Insufficient history for ranking stability analysis</td></tr>`;
+    return `<tr><td>${esc(w.from)} → ${esc(w.to)}</td><td>${w.spearman==null?"-":fmt(w.spearman,3)}</td>
+      <td>${pct(w.top10_overlap)}</td><td>${pct(w.top20_overlap)}</td><td>${w.agents_compared}</td></tr>`;
+  }).join("");
+}
+
+// ---- Row 8: Agent leaderboard ---- //
+function leaderboardRowHtml(a, rank) {
+  const champ = a.champion_status === "CHAMPION" ? '<span class="pill tier-champion">CHAMPION</span>' : '<span class="pill tier-none">-</span>';
+  return `<tr>
+    <td>${rank}</td><td title="${esc(a.agent_id)}">${esc(a.identifier)}</td><td>${a.generation}</td><td>${esc(a.strategy_family||"-")}</td>
+    <td>${esc(a.status)}</td><td>${champ}</td>
+    <td class="num">${a.fitness==null?"-":fmt(a.fitness,3)}</td><td class="num">${dollar(a.pnl)}</td>
+    <td class="num">${a.future_pnl==null?'<span class="na">waiting</span>':dollar(a.future_pnl)}</td>
+    <td class="num">${a.expectancy==null?"-":fmt(a.expectancy)}</td><td class="num">${a.profit_factor==null?"-":fmt(a.profit_factor)}</td>
+    <td class="num">${a.win_rate==null?"-":pct(a.win_rate)}</td><td class="num">${pct(a.max_drawdown)}</td>
+    <td class="num">${a.trade_count}</td><td class="num">${fmt(a.trades_per_day,2)}</td>
+    <td class="num">${a.oos_score==null?"-":fmt(a.oos_score,3)}</td><td class="num">${a.risk_score==null?"-":fmt(a.risk_score,3)}</td>
+  </tr>`;
+}
+async function loadLeaderboardPage(reset) {
+  if (reset) { lbOffset = 0; document.querySelector("#leaderboard-table tbody").innerHTML = ""; }
+  const gen = document.getElementById("lb-generation").value;
+  const status = document.getElementById("lb-status").value;
+  const params = new URLSearchParams({sort_by: lbSort, sort_dir: lbDir, limit: LB_PAGE, offset: lbOffset});
+  if (gen) params.set("generation", gen);
+  if (status) params.set("status", status);
+  const r = await get("/api/dashboard/agents/metrics?" + params.toString());
+  const tb = document.querySelector("#leaderboard-table tbody");
+  if (reset && !r.rows.length) { tb.innerHTML = '<tr><td colspan="16" class="empty">No agents match these filters</td></tr>'; }
+  else r.rows.forEach((a, i) => tb.insertAdjacentHTML("beforeend", leaderboardRowHtml(a, lbOffset + i + 1)));
+  lbOffset += r.rows.length;
+  document.getElementById("leaderboard-load-more").style.display = (lbOffset < r.total) ? "" : "none";
+}
+function setupLeaderboardControls() {
+  document.querySelectorAll("#leaderboard-table th.sortable").forEach(th => th.addEventListener("click", () => {
+    const field = th.dataset.sort;
+    if (lbSort === field) lbDir = (lbDir === "desc" ? "asc" : "desc"); else { lbSort = field; lbDir = "desc"; }
+    document.querySelectorAll("#leaderboard-table th.sortable").forEach(t => t.classList.toggle("sort-active", t === th));
+    section("leaderboard", () => loadLeaderboardPage(true));
+  }));
+  document.getElementById("leaderboard-load-more").addEventListener("click", () => section("leaderboard", () => loadLeaderboardPage(false)));
+  document.getElementById("lb-generation").addEventListener("change", () => section("leaderboard", () => loadLeaderboardPage(true)));
+  document.getElementById("lb-status").addEventListener("change", () => section("leaderboard", () => loadLeaderboardPage(true)));
+}
+
+// ---- Row 9: System health (reuses /api/system/status, same shape as Home) ---- //
+function renderHealth(st) {
+  if (!st || !st.database) return;
+  const w = st.worker || {}, m = st.market_data || {}, h = st.hyperliquid || {}, o = st.ollama || {}, c = st.council || {};
+  const lc = w.last_cycle || {};
+  document.getElementById("health-panel").innerHTML = [
+    card("Worker", w.status || "unknown", (w.status || "unknown").toUpperCase(), `heartbeat ${secs(w.heartbeat_age_seconds)} ago<br>last cycle ${esc(lc.status||"-")} &middot; ${secs(lc.completed_age_seconds)} ago`),
+    card("Database", st.database.status, (st.database.dialect||"").toUpperCase()+" "+st.database.status.toUpperCase(), st.database.error?esc(st.database.error):"reachable"),
+    card("Market data", m.status||"unknown", (m.status||"unknown").toUpperCase(), `${esc(m.symbol||"")} ${esc(m.timeframe||"")}<br>freshness ${secs(m.freshness_seconds)}`),
+    card("Hyperliquid", h.status||"unknown", (h.status||"unknown").toUpperCase(), h.websocket ? `ws ${h.websocket.connected?"connected":"disconnected"}` : "no data"),
+    card("Ollama", o.status||"unknown", (o.status||"unknown").toUpperCase(), (o.keys||[]).length + " key(s)"),
+    card("Council", (c.status==="COMPLETE"?"ok":(c.status==="INCOMPLETE"?"degraded":"unknown")), c.status||"no data", "runs every Nth candle"),
+  ].join("");
+  document.getElementById("health-sub").textContent = "last updated " + new Date().toLocaleTimeString();
+  document.getElementById("badges").innerHTML = `<span class="badge">${esc((st.trading_mode||"").toUpperCase())}</span>`;
+}
+async function pollHealth() {
+  try { renderHealth(await get("/api/system/status")); document.getElementById("refresh-status").textContent = "connected"; }
+  catch (e) { document.getElementById("refresh-status").textContent = "disconnected: " + e.message; }
+}
+
+// ---- orchestration ---- //
+async function refreshGenerations() {
+  genCache = await get("/api/evolution/generations?limit=50");
+  refreshPopulationChart();
+  refreshGenPerfChart();
+  refreshGenEvoTable();
+  await populateGenSelect();
+}
+
+async function initialLoad() {
+  buildEquityRangeCtl();
+  buildGenPerfCtl();
+  setupLeaderboardControls();
+  await section("generations", refreshGenerations);
+  await Promise.all([
+    section("overview", refreshOverview),
+    section("equity", refreshEquity),
+    section("fitness-components", refreshFitnessComponents),
+    section("agent-metrics", refreshAgentMetrics),
+    section("timeframes", refreshTimeframes),
+    section("champions", refreshChampions),
+    section("ranking-stability", refreshRankingStability),
+    section("leaderboard", () => loadLeaderboardPage(true)),
+    section("health", pollHealth),
+  ]);
+}
+
+initialLoad();
+setInterval(() => section("overview", refreshOverview), 15000);
+setInterval(() => section("equity", refreshEquity), 15000);
+setInterval(() => section("health", pollHealth), 5000);
+</script>
+</body>
+</html>
