@@ -24,7 +24,7 @@ VENV_DIR="$BACKEND_DIR/.venv"
 PID_DIR="$BACKEND_DIR/.run"
 LOG_DIR="$BACKEND_DIR/logs"
 BACKUP_DIR="$BACKEND_DIR/data/backups"
-SERVICES=(worker research api)
+SERVICES=(worker research api analytics)
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
@@ -139,6 +139,9 @@ cmd_start() {
   echo "==> API will listen on ${API_HOST}:${API_PORT}"
   supervise api "$VENV_DIR/bin/uvicorn" app.main:app --host "$API_HOST" --port "$API_PORT"
 
+  echo "==> Starting hourly exit-analytics refresh (trade_analytics/matrix/fitness_forward; runs once immediately, then every hour; logging to $LOG_DIR/analytics.log)"
+  supervise analytics bash -c "while true; do '$VENV_DIR/bin/python' -m scripts.refresh_analytics; sleep 3600; done"
+
   sleep 1
   cmd_status
   echo ""
@@ -154,11 +157,11 @@ cmd_stop() {
   done
   # The supervisor loop is stopped above, but the python child can survive it (it did on the
   # server, forcing manual pkill). Make sure nothing from THIS project keeps running.
-  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main"; do
+  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main" "$VENV_DIR/bin/.*scripts\.refresh_analytics"; do
     pkill -f "$pattern" 2>/dev/null || true
   done
   sleep 1
-  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main"; do
+  for pattern in "$VENV_DIR/bin/.*scripts\.run_cycle" "$VENV_DIR/bin/.*scripts\.run_research" "$VENV_DIR/bin/.*uvicorn app\.main" "$VENV_DIR/bin/.*scripts\.refresh_analytics"; do
     pkill -9 -f "$pattern" 2>/dev/null || true
   done
 }
