@@ -49,17 +49,21 @@ async def _raw_table_checksums(db) -> dict[str, int]:
 
 
 async def main(phases: list[str], grid_minutes: int) -> None:
+    # Each phase gets its OWN session/connection, opened right before it runs and closed right
+    # after. `refresh_trade_analytics` in particular does heavy per-trade Python computation
+    # (candle replay, crosscheck) with no SQL sent in between; at enough trade volume that run
+    # comfortably takes minutes, and a connection held open (idle from Postgres's point of view)
+    # across that stretch does not reliably survive to the next phase - empirically it keeps
+    # dying with "connection was closed in the middle of operation" right as the next phase's
+    # first query runs, even once each phase commits its own work. A fresh connection per phase
+    # sidesteps this entirely instead of chasing the exact server-side timeout responsible, and
+    # each phase's writes are durably committed before the next phase's connection is even opened.
     async with AsyncSessionLocal() as db:
         before = await _raw_table_checksums(db)
         await db.rollback()
 
-        # Each phase commits on its own: `refresh_trade_analytics` in particular does heavy
-        # per-trade Python computation (candle replay, crosscheck) with no SQL in between, and
-        # at enough trade volume that comfortably exceeds `idle_in_transaction_session_timeout`
-        # (database.py) while sitting inside one open transaction - Postgres then kills the
-        # connection itself and the next phase's first query fails against a dead connection.
-        # Committing per phase also means an earlier phase's work survives a later phase's failure.
-        if "trade_analytics" in phases:
+    if "trade_analytics" in phases:
+        async with AsyncSessionLocal() as db:
             r = await refresh_trade_analytics(db, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.trade_analytics_refreshed",
                         trades_processed=r.trades_processed, trades_updated=r.trades_updated,
@@ -69,21 +73,24 @@ async def main(phases: list[str], grid_minutes: int) -> None:
             for f in r.findings:
                 logger.warning("analytics.data_integrity_finding", finding=f)
             await db.commit()
-        if "matrix" in phases:
+    if "matrix" in phases:
+        async with AsyncSessionLocal() as db:
             r = await refresh_strategy_regime_matrix(db, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.matrix_refreshed", cells=r.matrix_cells)
             await db.commit()
-        if "fitness_forward" in phases:
+    if "fitness_forward" in phases:
+        async with AsyncSessionLocal() as db:
             r = await refresh_fitness_forward(db, grid_minutes=grid_minutes, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.fitness_forward_refreshed", inserted=r.ffp_inserted, existing=r.ffp_existing)
             await db.commit()
 
+    async with AsyncSessionLocal() as db:
         after = await _raw_table_checksums(db)
         await db.rollback()
-        changed = {t: (before[t], after[t]) for t in before if before[t] != after[t]}
-        if changed:
-            raise RuntimeError(f"RAW TABLE MUTATION DETECTED (refresh must be read-only on raw tables): {changed}")
-        logger.info("analytics.refresh_complete", raw_tables_verified_unchanged=len(before))
+    changed = {t: (before[t], after[t]) for t in before if before[t] != after[t]}
+    if changed:
+        raise RuntimeError(f"RAW TABLE MUTATION DETECTED (refresh must be read-only on raw tables): {changed}")
+    logger.info("analytics.refresh_complete", raw_tables_verified_unchanged=len(before))
     await engine.dispose()
 
 
