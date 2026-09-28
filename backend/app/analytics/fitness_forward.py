@@ -30,7 +30,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.analytics.fitness_engine import FitnessInputs, FitnessWeights, compute_fitness
+from app.analytics.fitness_engine import MIN_TRADES_FOR_FULL_CONFIDENCE, FitnessInputs, FitnessWeights, compute_fitness
 from app.analytics.performance_metrics_engine import compute_trade_stats
 from app.models.enums import AgentStatus
 
@@ -105,6 +105,18 @@ def _daily_consistency(trades: list[TradePoint]) -> float | None:
     return sum(1 for v in by_day.values() if v > 0) / len(by_day)
 
 
+def _overlaps_oos_window(trade: TradePoint, oos_window_ms: tuple[int, int]) -> bool:
+    """Same semantics as fitness_service._overlaps, applied to a TradePoint instead of a Trade
+    row: a trade "belongs to OOS" if its lifetime [opened_at, closed_at] intersects the sealed
+    holdout window at all - not just its close time. This is a DIFFERENT reason for exclusion
+    than "not yet closed by as_of" (see reconstruct_fitness_at's oos_window_ms docstring) and
+    must never be conflated with it."""
+    lo, hi = oos_window_ms
+    opened_ms = int(trade.opened_at.timestamp() * 1000)
+    closed_ms = int(trade.closed_at.timestamp() * 1000)
+    return closed_ms >= lo and opened_ms <= hi
+
+
 def reconstruct_fitness_at(
     facts: AgentFacts,
     trades_upto_t: list[TradePoint],
@@ -112,14 +124,34 @@ def reconstruct_fitness_at(
     as_of: datetime,
     weights: FitnessWeights,
     stage_evidence: dict | None = None,
+    oos_window_ms: tuple[int, int] | None = None,
+    return_transform=None,
 ) -> ReconstructedFitness:
     """The production fitness an agent WOULD have had at T, from closed trades only.
 
     `stage_evidence` carries the optional component inputs (oos_score,
     walk_forward_consistency, regime_robustness, adversarial_robustness,
     mean_pairwise_correlation) already filtered to computed_at <= T by the caller.
+
+    `oos_window_ms`, when given, additionally excludes any trade whose lifetime overlaps the
+    sealed OOS holdout window - mirroring fitness_service.compute_and_persist_agent_fitness's
+    own protection exactly (same overlap semantics), so this function can reproduce production's
+    real behavior instead of just "everything closed by as_of". Two DIFFERENT reasons a trade can
+    be absent from the resulting fitness: (a) it overlaps the sealed OOS window (this parameter -
+    protects the lockbox, must never be silently dropped by a caller that wants production-
+    equivalent behavior) vs (b) trade.closed_at > as_of (the unconditional filter below - ordinary
+    temporal availability). Callers MUST NOT conflate the two. Default None preserves this
+    function's original behavior exactly (no OOS awareness) for existing callers
+    (refresh_fitness_forward).
+
+    `return_transform`, when given, is applied to net_return_pct in place of the hard clip inside
+    compute_fitness's return_score (fitness_engine.py is never modified for this - the return_score
+    term of the final weighted sum is recomputed here using the same sample_confidence multiplier
+    and the same weight, so the rest of the formula is untouched).
     """
-    trades = [t for t in trades_upto_t if t.closed_at <= as_of]   # defensive double filter
+    trades = [t for t in trades_upto_t if t.closed_at <= as_of]   # unconditional: never see the future
+    if oos_window_ms is not None:
+        trades = [t for t in trades if not _overlaps_oos_window(t, oos_window_ms)]
     stats = compute_trade_stats([t.net_pnl for t in trades], [0 for _ in trades])
     equity_t = facts.starting_balance + sum(t.net_pnl for t in trades)
     roi = (equity_t - facts.starting_balance) / facts.starting_balance if facts.starting_balance else 0.0
@@ -156,8 +188,18 @@ def reconstruct_fitness_at(
         dead=dead,
     )
     result = compute_fitness(inputs, weights)
+    final_fitness = result.fitness
+    return_score = result.return_score
+    if return_transform is not None:
+        # Patch only the return_score term of the weighted sum (fitness_engine.py's hard clip is
+        # untouched): same sample_confidence multiplier and weight, different pre-multiplier
+        # transform of net_return_pct.
+        sample_confidence = min(1.0, len(trades) / MIN_TRADES_FOR_FULL_CONFIDENCE)
+        new_return_score = return_transform(roi) * sample_confidence
+        final_fitness = final_fitness - weights.return_weight * return_score + weights.return_weight * new_return_score
+        return_score = new_return_score
     components = {
-        "return_score": result.return_score, "risk_score": result.risk_score,
+        "return_score": return_score, "risk_score": result.risk_score,
         "consistency_score": result.consistency_score, "robustness_score": result.robustness_score,
         "oos_score": result.oos_score, "drawdown_penalty": result.drawdown_penalty,
         "instability_penalty": result.instability_penalty, "correlation_penalty": result.correlation_penalty,
@@ -166,7 +208,7 @@ def reconstruct_fitness_at(
         "death_penalty": result.death_penalty, "trade_count": len(trades), "equity_at_t": equity_t,
         "survival_days": survival_seconds / 86400.0, "realized_drawdown_pct": dd_pct,
     }
-    return ReconstructedFitness(fitness=result.fitness, components=components)
+    return ReconstructedFitness(fitness=final_fitness, components=components)
 
 
 def weights_from_recorded(weights_used: dict | None) -> FitnessWeights:
