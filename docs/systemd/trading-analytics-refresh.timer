@@ -1,0 +1,10 @@
+[Unit]
+Description=Run trading-analytics-refresh.service hourly (keeps the Exit Research dashboard current)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
