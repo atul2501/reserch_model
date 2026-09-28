@@ -285,7 +285,7 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
     <section>
       <h2>Generational Evolution</h2>
       <div class="panel table-scroll">
-        <table id="genevo-table"><thead><tr><th>Gen</th><th>Population</th><th>Avg PnL</th><th>Median PnL</th><th>Best PnL</th><th>Avg Fitness</th><th>Best Fitness</th><th>Survival</th></tr></thead><tbody></tbody></table>
+        <table id="genevo-table"><thead><tr><th>Gen</th><th>Population</th><th>Avg PnL</th><th>Median PnL</th><th>Best PnL</th><th>Avg Fitness</th><th>Best Fitness</th><th>Total Trades</th><th>Win %</th><th>Survival</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
     <section>
@@ -516,7 +516,8 @@ function refreshPopulationChart() {
 
 // ---- Row 3: Generation performance ---- //
 function buildGenPerfCtl() {
-  const metrics = [["avg_pnl","Avg PnL"],["best_pnl","Best PnL"],["avg_fitness","Avg Fitness"],["best_fitness","Best Fitness"]];
+  const metrics = [["avg_pnl","Avg PnL"],["best_pnl","Best PnL"],["avg_fitness","Avg Fitness"],["best_fitness","Best Fitness"],
+                    ["total_trades","Total Trades"],["trade_win_rate","Win %"]];
   document.getElementById("genperf-metric-ctl").innerHTML = metrics.map(([k,l]) =>
     `<button data-metric="${k}" class="${k===genPerfMetric?'active':''}">${esc(l)}</button>`).join("");
   document.querySelectorAll("#genperf-metric-ctl button").forEach(btn => btn.addEventListener("click", () => {
@@ -528,7 +529,10 @@ function buildGenPerfCtl() {
 function refreshGenPerfChart() {
   const svg = document.getElementById("genperf-chart");
   const gens = [...genCache].sort((a,b) => a.number - b.number);
-  const points = gens.filter(g => g[genPerfMetric] != null).map(g => ({v: g[genPerfMetric]}));
+  // trade_win_rate is a 0-1 fraction; plot it as percentage points (0-100) so the axis reads
+  // as "Win %" like the button label says, consistent with the other metrics' raw units.
+  const scale = genPerfMetric === "trade_win_rate" ? 100 : 1;
+  const points = gens.filter(g => g[genPerfMetric] != null).map(g => ({v: g[genPerfMetric] * scale}));
   if (points.length < 2) { noData(svg, "Insufficient data across generations"); return; }
   renderLineChart(svg, points, "#b494ef");
   document.getElementById("genperf-label-left").textContent = "G" + gens[0].number;
@@ -612,11 +616,12 @@ async function refreshChampions() {
 // ---- Row 7: Generation evolution table ---- //
 function refreshGenEvoTable() {
   const tb = document.querySelector("#genevo-table tbody");
-  if (!genCache.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">Insufficient data</td></tr>'; return; }
+  if (!genCache.length) { tb.innerHTML = '<tr><td colspan="10" class="empty">Insufficient data</td></tr>'; return; }
   tb.innerHTML = genCache.map(g => `<tr>
     <td>${g.number}</td><td>${g.population}</td><td>${g.avg_pnl==null?"-":dollar(g.avg_pnl)}</td>
     <td>${g.median_pnl==null?"-":dollar(g.median_pnl)}</td><td>${g.best_pnl==null?"-":dollar(g.best_pnl)}</td>
     <td>${g.avg_fitness==null?"-":fmt(g.avg_fitness)}</td><td>${g.best_fitness==null?"-":fmt(g.best_fitness)}</td>
+    <td>${g.total_trades==null?"-":g.total_trades}</td><td>${g.trade_win_rate==null?"-":pct(g.trade_win_rate)}</td>
     <td>${g.survival_rate==null?"-":pct(g.survival_rate)}</td>
   </tr>`).join("");
 }
