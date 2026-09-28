@@ -34,14 +34,17 @@ async def generations(db: AsyncSession = Depends(get_db), limit: int = Query(def
             select(Agent.fitness).where(Agent.generation == g.number)
         )).scalars().all() if f is not None]
         population = len(pnl_rows)
-        total_trades = (await db.execute(
-            select(func.count()).select_from(Trade).join(Agent, Agent.id == Trade.agent_id)
+        # win = net_pnl > 0, same convention as strategy_regime.py's win_count.
+        total_trades, total_wins = (await db.execute(
+            select(func.count(), func.count().filter(Trade.net_pnl > 0))
+            .select_from(Trade).join(Agent, Agent.id == Trade.agent_id)
             .where(Agent.generation == g.number)
-        )).scalar_one()
+        )).one()
 
         out.append({"number": g.number, "population": g.population_created, "triggered_by": g.triggered_by,
                     "created_at": g.created_at.isoformat(), "by_status": by, "deaths": deaths,
-                    "total_trades": total_trades,
+                    "total_trades": total_trades, "total_wins": total_wins,
+                    "trade_win_rate": (total_wins / total_trades) if total_trades else None,
                     "avg_pnl": statistics.fmean(pnl_rows) if pnl_rows else None,
                     "median_pnl": statistics.median(pnl_rows) if pnl_rows else None,
                     "best_pnl": max(pnl_rows) if pnl_rows else None,
