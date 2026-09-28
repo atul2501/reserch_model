@@ -53,6 +53,12 @@ async def main(phases: list[str], grid_minutes: int) -> None:
         before = await _raw_table_checksums(db)
         await db.rollback()
 
+        # Each phase commits on its own: `refresh_trade_analytics` in particular does heavy
+        # per-trade Python computation (candle replay, crosscheck) with no SQL in between, and
+        # at enough trade volume that comfortably exceeds `idle_in_transaction_session_timeout`
+        # (database.py) while sitting inside one open transaction - Postgres then kills the
+        # connection itself and the next phase's first query fails against a dead connection.
+        # Committing per phase also means an earlier phase's work survives a later phase's failure.
         if "trade_analytics" in phases:
             r = await refresh_trade_analytics(db, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.trade_analytics_refreshed",
@@ -62,14 +68,15 @@ async def main(phases: list[str], grid_minutes: int) -> None:
                         regime_mismatches=r.regime_mismatches)
             for f in r.findings:
                 logger.warning("analytics.data_integrity_finding", finding=f)
+            await db.commit()
         if "matrix" in phases:
             r = await refresh_strategy_regime_matrix(db, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.matrix_refreshed", cells=r.matrix_cells)
+            await db.commit()
         if "fitness_forward" in phases:
             r = await refresh_fitness_forward(db, grid_minutes=grid_minutes, computation_version=COMPUTATION_VERSION)
             logger.info("analytics.fitness_forward_refreshed", inserted=r.ffp_inserted, existing=r.ffp_existing)
-
-        await db.commit()
+            await db.commit()
 
         after = await _raw_table_checksums(db)
         await db.rollback()
