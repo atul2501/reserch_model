@@ -1,0 +1,1266 @@
+{
+  "generation": 2,
+  "versions": {
+    "v1": {
+      "version": "v1",
+      "description": "Frozen production formula AND production timing: evaluated only at the as_of production actually used historically, OOS-window trades excluded exactly as compute_and_persist_agent_fitness does. The baseline everything else is measured against.",
+      "evidence_mode": "production",
+      "n_as_of_points": 3,
+      "n_snapshots": 1437,
+      "spearman_fitness_vs_historical_pnl": {
+        "rho": 0.5557606350887841,
+        "n": 1437
+      },
+      "by_horizon": {
+        "60": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.11533157890572869,
+            "n": 290
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 3,
+              "mean_capture_rate": null,
+              "mean_median_future_pnl": null,
+              "mean_win_rate": null,
+              "random_baseline_mean_future_pnl": -0.015327608757986421,
+              "random_baseline_win_rate": 0.4123333333333334,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "10": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.007509935755911346,
+              "mean_median_future_pnl": 0.000906998944207294,
+              "mean_win_rate": 1.0,
+              "random_baseline_mean_future_pnl": -0.016094256200132825,
+              "random_baseline_win_rate": 0.4013333333333333,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "25": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.11411546627066871,
+              "mean_median_future_pnl": 0.013700957039102771,
+              "mean_win_rate": 0.9583333333333334,
+              "random_baseline_mean_future_pnl": -0.01592111010636544,
+              "random_baseline_win_rate": 0.4066000000000001,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "50": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.217399516073868,
+              "mean_median_future_pnl": 0.011106727481241384,
+              "mean_win_rate": 0.9722222222222222,
+              "random_baseline_mean_future_pnl": -0.014624372329980078,
+              "random_baseline_win_rate": 0.4374,
+              "pnl_rank_baseline_mean_future_pnl": 0.015783524043138385,
+              "pnl_rank_baseline_win_rate": 1.0
+            }
+          }
+        },
+        "360": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.11533157890572869,
+            "n": 290
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 3,
+              "mean_capture_rate": null,
+              "mean_median_future_pnl": null,
+              "mean_win_rate": null,
+              "random_baseline_mean_future_pnl": -0.015327608757986421,
+              "random_baseline_win_rate": 0.4123333333333334,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "10": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.007509935755911346,
+              "mean_median_future_pnl": 0.000906998944207294,
+              "mean_win_rate": 1.0,
+              "random_baseline_mean_future_pnl": -0.016094256200132825,
+              "random_baseline_win_rate": 0.4013333333333333,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "25": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.11411546627066871,
+              "mean_median_future_pnl": 0.013700957039102771,
+              "mean_win_rate": 0.9583333333333334,
+              "random_baseline_mean_future_pnl": -0.01592111010636544,
+              "random_baseline_win_rate": 0.4066000000000001,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "50": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.217399516073868,
+              "mean_median_future_pnl": 0.011106727481241384,
+              "mean_win_rate": 0.9722222222222222,
+              "random_baseline_mean_future_pnl": -0.014624372329980078,
+              "random_baseline_win_rate": 0.4374,
+              "pnl_rank_baseline_mean_future_pnl": 0.015783524043138385,
+              "pnl_rank_baseline_win_rate": 1.0
+            }
+          }
+        },
+        "1440": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.11533157890572869,
+            "n": 290
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 3,
+              "mean_capture_rate": null,
+              "mean_median_future_pnl": null,
+              "mean_win_rate": null,
+              "random_baseline_mean_future_pnl": -0.015327608757986421,
+              "random_baseline_win_rate": 0.4123333333333334,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "10": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.007509935755911346,
+              "mean_median_future_pnl": 0.000906998944207294,
+              "mean_win_rate": 1.0,
+              "random_baseline_mean_future_pnl": -0.016094256200132825,
+              "random_baseline_win_rate": 0.4013333333333333,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "25": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.11411546627066871,
+              "mean_median_future_pnl": 0.013700957039102771,
+              "mean_win_rate": 0.9583333333333334,
+              "random_baseline_mean_future_pnl": -0.01592111010636544,
+              "random_baseline_win_rate": 0.4066000000000001,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "50": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.217399516073868,
+              "mean_median_future_pnl": 0.011106727481241384,
+              "mean_win_rate": 0.9722222222222222,
+              "random_baseline_mean_future_pnl": -0.014624372329980078,
+              "random_baseline_win_rate": 0.4374,
+              "pnl_rank_baseline_mean_future_pnl": 0.015783524043138385,
+              "pnl_rank_baseline_win_rate": 1.0
+            }
+          }
+        },
+        "4320": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.11533157890572869,
+            "n": 290
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 3,
+              "mean_capture_rate": null,
+              "mean_median_future_pnl": null,
+              "mean_win_rate": null,
+              "random_baseline_mean_future_pnl": -0.015327608757986421,
+              "random_baseline_win_rate": 0.4123333333333334,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "10": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.007509935755911346,
+              "mean_median_future_pnl": 0.000906998944207294,
+              "mean_win_rate": 1.0,
+              "random_baseline_mean_future_pnl": -0.016094256200132825,
+              "random_baseline_win_rate": 0.4013333333333333,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "25": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.11411546627066871,
+              "mean_median_future_pnl": 0.013700957039102771,
+              "mean_win_rate": 0.9583333333333334,
+              "random_baseline_mean_future_pnl": -0.01592111010636544,
+              "random_baseline_win_rate": 0.4066000000000001,
+              "pnl_rank_baseline_mean_future_pnl": null,
+              "pnl_rank_baseline_win_rate": null
+            },
+            "50": {
+              "n_snapshots": 3,
+              "mean_capture_rate": 0.217399516073868,
+              "mean_median_future_pnl": 0.011106727481241384,
+              "mean_win_rate": 0.9722222222222222,
+              "random_baseline_mean_future_pnl": -0.014624372329980078,
+              "random_baseline_win_rate": 0.4374,
+              "pnl_rank_baseline_mean_future_pnl": 0.015783524043138385,
+              "pnl_rank_baseline_win_rate": 1.0
+            }
+          }
+        }
+      },
+      "trade_count_bias": {
+        "0": {
+          "n": 0
+        },
+        "1-4": {
+          "n": 249,
+          "mean_fitness": -0.3120330811775417,
+          "median_fitness": -0.23422334939958908,
+          "mean_historical_pnl": -0.03660263081891604,
+          "median_historical_pnl": -0.04132791855224127,
+          "mean_future_pnl": -0.019382821999181184
+        },
+        "5-9": {
+          "n": 511,
+          "mean_fitness": -0.35107546854466226,
+          "median_fitness": -0.347455769220766,
+          "mean_historical_pnl": -0.149303254278778,
+          "median_historical_pnl": -0.1374160554020989,
+          "mean_future_pnl": -0.017069478112677713
+        },
+        "10-29": {
+          "n": 649,
+          "mean_fitness": -0.4388974135197801,
+          "median_fitness": -0.4538638257837426,
+          "mean_historical_pnl": -0.3778473174757083,
+          "median_historical_pnl": -0.33267556252467045,
+          "mean_future_pnl": -0.011827085766530685
+        },
+        "30+": {
+          "n": 28,
+          "mean_fitness": -0.8412521412543156,
+          "median_fitness": -0.7850577100382443,
+          "mean_historical_pnl": -1.5382647215302339,
+          "median_historical_pnl": -1.2420790585167367,
+          "mean_future_pnl": -0.024849680403745963
+        }
+      },
+      "return_distribution": {
+        "min": -0.03917808361894956,
+        "p25": -0.0034485052951644946,
+        "median": -0.0018623504315668526,
+        "p75": -0.0008671887353091279,
+        "p90": -0.0001577463521238087,
+        "p95": 0.0002626912354762112,
+        "p99": 0.0007924854344359744,
+        "max": 0.001328064530985813
+      }
+    },
+    "v1_timing_fix": {
+      "version": "v1_timing_fix",
+      "description": "Identical weights and identical OOS-window protection to v1 - the ONLY variable that changes is as_of itself, evaluated later so more non-OOS trades have had time to close. Never removes or bypasses the OOS exclusion.",
+      "evidence_mode": "production_later_asof",
+      "n_as_of_points": 24,
+      "n_snapshots": 10822,
+      "spearman_fitness_vs_historical_pnl": {
+        "rho": 0.7256981201304752,
+        "n": 10822
+      },
+      "by_horizon": {
+        "60": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.09096759614350765,
+            "n": 2599
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.36607471990456625,
+              "mean_median_future_pnl": -0.028976226853383035,
+              "mean_win_rate": 0.18939393939393942,
+              "random_baseline_mean_future_pnl": -0.041461302443358564,
+              "random_baseline_win_rate": 0.198,
+              "pnl_rank_baseline_mean_future_pnl": -0.011101802969934798,
+              "pnl_rank_baseline_win_rate": 0.446969696969697
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.3593998112678002,
+              "mean_median_future_pnl": -0.020723178166177525,
+              "mean_win_rate": 0.27106227106227104,
+              "random_baseline_mean_future_pnl": -0.04087638990577312,
+              "random_baseline_win_rate": 0.20094736842105262,
+              "pnl_rank_baseline_mean_future_pnl": -0.018486365884868045,
+              "pnl_rank_baseline_win_rate": 0.41898148148148145
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6067095274511809,
+              "mean_median_future_pnl": -0.02924084488456996,
+              "mean_win_rate": 0.29071410615528265,
+              "random_baseline_mean_future_pnl": -0.04100381236548046,
+              "random_baseline_win_rate": 0.20065882352941178,
+              "pnl_rank_baseline_mean_future_pnl": -0.016695826418484227,
+              "pnl_rank_baseline_win_rate": 0.33494152046783626
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 1.712172415107267,
+              "mean_median_future_pnl": -0.0246488333427813,
+              "mean_win_rate": 0.31232613461437936,
+              "random_baseline_mean_future_pnl": -0.044327391868222626,
+              "random_baseline_win_rate": 0.17071538461538463,
+              "pnl_rank_baseline_mean_future_pnl": -0.017984691941908475,
+              "pnl_rank_baseline_win_rate": 0.35283623986889906
+            }
+          }
+        },
+        "360": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.0812967905843684,
+            "n": 5555
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6452334106660719,
+              "mean_median_future_pnl": -0.05167809412258277,
+              "mean_win_rate": 0.05317460317460317,
+              "random_baseline_mean_future_pnl": -0.07665034855961116,
+              "random_baseline_win_rate": 0.17737500000000003,
+              "pnl_rank_baseline_mean_future_pnl": -0.0781112266999628,
+              "pnl_rank_baseline_win_rate": 0.25357142857142856
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.0033525205205283,
+              "mean_median_future_pnl": -0.03816288921213685,
+              "mean_win_rate": 0.1759589947089947,
+              "random_baseline_mean_future_pnl": -0.07699441964652497,
+              "random_baseline_win_rate": 0.17889583333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.06402697248845993,
+              "pnl_rank_baseline_win_rate": 0.29007936507936505
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -2.4247251738834,
+              "mean_median_future_pnl": -0.034663914621631396,
+              "mean_win_rate": 0.28391336530487155,
+              "random_baseline_mean_future_pnl": -0.0777974727351586,
+              "random_baseline_win_rate": 0.17838333333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.05671925871099542,
+              "pnl_rank_baseline_win_rate": 0.2838963480128894
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 9.972606374172942,
+              "mean_median_future_pnl": -0.03087876783488924,
+              "mean_win_rate": 0.320244915576189,
+              "random_baseline_mean_future_pnl": -0.07797059127821274,
+              "random_baseline_win_rate": 0.17787083333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.033981330638458575,
+              "pnl_rank_baseline_win_rate": 0.40990982730456227
+            }
+          }
+        },
+        "1440": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.10759177990637687,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.9200733430489962,
+              "mean_median_future_pnl": -0.07078976340530395,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.402645259291491,
+              "mean_median_future_pnl": -0.05115922985817389,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6476251790944152,
+              "mean_median_future_pnl": -0.0487596722870078,
+              "mean_win_rate": 0.2810801453448512,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4440107102027266,
+              "mean_median_future_pnl": -0.04329787695878751,
+              "mean_win_rate": 0.33917349845921274,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        },
+        "4320": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.10759177990637687,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.9200733430489962,
+              "mean_median_future_pnl": -0.07078976340530395,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.402645259291491,
+              "mean_median_future_pnl": -0.05115922985817389,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6476251790944152,
+              "mean_median_future_pnl": -0.0487596722870078,
+              "mean_win_rate": 0.2810801453448512,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4440107102027266,
+              "mean_median_future_pnl": -0.04329787695878751,
+              "mean_win_rate": 0.33917349845921274,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        }
+      },
+      "trade_count_bias": {
+        "0": {
+          "n": 0
+        },
+        "1-4": {
+          "n": 3329,
+          "mean_fitness": -0.4840510075283572,
+          "median_fitness": -0.4544788679630093,
+          "mean_historical_pnl": -0.054463260571259824,
+          "median_historical_pnl": -0.05214858838937175,
+          "mean_future_pnl": -0.035097354464969026
+        },
+        "5-9": {
+          "n": 4044,
+          "mean_fitness": -0.5824013639476767,
+          "median_fitness": -0.5755322774757101,
+          "mean_historical_pnl": -0.15403598506246302,
+          "median_historical_pnl": -0.13602670773056502,
+          "mean_future_pnl": -0.04169566928941245
+        },
+        "10-29": {
+          "n": 3299,
+          "mean_fitness": -0.7418619845913181,
+          "median_fitness": -0.7100740723275795,
+          "mean_historical_pnl": -0.3714179466659132,
+          "median_historical_pnl": -0.3281013288774943,
+          "mean_future_pnl": -0.04377525627898903
+        },
+        "30+": {
+          "n": 150,
+          "mean_fitness": -1.242456173718738,
+          "median_fitness": -1.2088749816094562,
+          "mean_historical_pnl": -1.329373722749312,
+          "median_historical_pnl": -1.2281390253131832,
+          "mean_future_pnl": -0.10205115389171693
+        }
+      },
+      "return_distribution": {
+        "min": -0.03804062655437846,
+        "p25": -0.0028215303310130933,
+        "median": -0.0013979968956570588,
+        "p75": -0.0006122829003524544,
+        "p90": -0.00013629089540131644,
+        "p95": 0.00018694038473341835,
+        "p99": 0.0006694526549290459,
+        "max": 0.002118674163870509
+      }
+    },
+    "v2": {
+      "version": "v2",
+      "description": "v1 + later as_of + modestly reduced OOS dominance (oos_weight 1.5 -> 0.8). Everything else unchanged, OOS-window protection intact.",
+      "evidence_mode": "production_later_asof",
+      "n_as_of_points": 24,
+      "n_snapshots": 10822,
+      "spearman_fitness_vs_historical_pnl": {
+        "rho": 0.7342324661300952,
+        "n": 10822
+      },
+      "by_horizon": {
+        "60": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.09033184524897896,
+            "n": 2599
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.46339921748989965,
+              "mean_median_future_pnl": -0.029660862738654203,
+              "mean_win_rate": 0.25,
+              "random_baseline_mean_future_pnl": -0.041461302443358564,
+              "random_baseline_win_rate": 0.198,
+              "pnl_rank_baseline_mean_future_pnl": -0.011101802969934798,
+              "pnl_rank_baseline_win_rate": 0.446969696969697
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.25886701404901935,
+              "mean_median_future_pnl": -0.022078973609322816,
+              "mean_win_rate": 0.3562925170068027,
+              "random_baseline_mean_future_pnl": -0.04087638990577312,
+              "random_baseline_win_rate": 0.20094736842105262,
+              "pnl_rank_baseline_mean_future_pnl": -0.018486365884868045,
+              "pnl_rank_baseline_win_rate": 0.41898148148148145
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.5428361736267275,
+              "mean_median_future_pnl": -0.02465605196001215,
+              "mean_win_rate": 0.32923351158645275,
+              "random_baseline_mean_future_pnl": -0.04100381236548046,
+              "random_baseline_win_rate": 0.20065882352941178,
+              "pnl_rank_baseline_mean_future_pnl": -0.016695826418484227,
+              "pnl_rank_baseline_win_rate": 0.33494152046783626
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 1.7795049788841784,
+              "mean_median_future_pnl": -0.02245723859276709,
+              "mean_win_rate": 0.3415029188075391,
+              "random_baseline_mean_future_pnl": -0.044327391868222626,
+              "random_baseline_win_rate": 0.17071538461538463,
+              "pnl_rank_baseline_mean_future_pnl": -0.017984691941908475,
+              "pnl_rank_baseline_win_rate": 0.35283623986889906
+            }
+          }
+        },
+        "360": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.08544507553490353,
+            "n": 5555
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.8771154876208793,
+              "mean_median_future_pnl": -0.0701675053909643,
+              "mean_win_rate": 0.07666666666666666,
+              "random_baseline_mean_future_pnl": -0.07665034855961116,
+              "random_baseline_win_rate": 0.17737500000000003,
+              "pnl_rank_baseline_mean_future_pnl": -0.0781112266999628,
+              "pnl_rank_baseline_win_rate": 0.25357142857142856
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.9342357153149522,
+              "mean_median_future_pnl": -0.03619610190451387,
+              "mean_win_rate": 0.3046792328042328,
+              "random_baseline_mean_future_pnl": -0.07699441964652497,
+              "random_baseline_win_rate": 0.17889583333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.06402697248845993,
+              "pnl_rank_baseline_win_rate": 0.29007936507936505
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -2.1996004494456876,
+              "mean_median_future_pnl": -0.03197348036123887,
+              "mean_win_rate": 0.31445403802946875,
+              "random_baseline_mean_future_pnl": -0.0777974727351586,
+              "random_baseline_win_rate": 0.17838333333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.05671925871099542,
+              "pnl_rank_baseline_win_rate": 0.2838963480128894
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 8.34099396809563,
+              "mean_median_future_pnl": -0.030102152399516986,
+              "mean_win_rate": 0.32428965184134356,
+              "random_baseline_mean_future_pnl": -0.07797059127821274,
+              "random_baseline_win_rate": 0.17787083333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.033981330638458575,
+              "pnl_rank_baseline_win_rate": 0.40990982730456227
+            }
+          }
+        },
+        "1440": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.11567511553818138,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.00336103661082,
+              "mean_median_future_pnl": -0.08837906743694975,
+              "mean_win_rate": 0.04,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.3196781836671743,
+              "mean_median_future_pnl": -0.04859066979146803,
+              "mean_win_rate": 0.22974537037037038,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.5668913682776436,
+              "mean_median_future_pnl": -0.048241792342297064,
+              "mean_win_rate": 0.2974439775910364,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.451611704900216,
+              "mean_median_future_pnl": -0.045190458142790886,
+              "mean_win_rate": 0.3116181257856678,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        },
+        "4320": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.11567511553818138,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.00336103661082,
+              "mean_median_future_pnl": -0.08837906743694975,
+              "mean_win_rate": 0.04,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.3196781836671743,
+              "mean_median_future_pnl": -0.04859066979146803,
+              "mean_win_rate": 0.22974537037037038,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.5668913682776436,
+              "mean_median_future_pnl": -0.048241792342297064,
+              "mean_win_rate": 0.2974439775910364,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.451611704900216,
+              "mean_median_future_pnl": -0.045190458142790886,
+              "mean_win_rate": 0.3116181257856678,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        }
+      },
+      "trade_count_bias": {
+        "0": {
+          "n": 0
+        },
+        "1-4": {
+          "n": 3329,
+          "mean_fitness": -0.48989449251761424,
+          "median_fitness": -0.4596799186437771,
+          "mean_historical_pnl": -0.054463260571259824,
+          "median_historical_pnl": -0.05214858838937175,
+          "mean_future_pnl": -0.035097354464969026
+        },
+        "5-9": {
+          "n": 4044,
+          "mean_fitness": -0.5881622024420321,
+          "median_fitness": -0.5856646235432283,
+          "mean_historical_pnl": -0.15403598506246302,
+          "median_historical_pnl": -0.13602670773056502,
+          "mean_future_pnl": -0.04169566928941245
+        },
+        "10-29": {
+          "n": 3299,
+          "mean_fitness": -0.7458339822812237,
+          "median_fitness": -0.7100740723275795,
+          "mean_historical_pnl": -0.3714179466659132,
+          "median_historical_pnl": -0.3281013288774943,
+          "mean_future_pnl": -0.04377525627898903
+        },
+        "30+": {
+          "n": 150,
+          "mean_fitness": -1.242456173718738,
+          "median_fitness": -1.2088749816094562,
+          "mean_historical_pnl": -1.329373722749312,
+          "median_historical_pnl": -1.2281390253131832,
+          "mean_future_pnl": -0.10205115389171693
+        }
+      },
+      "return_distribution": {
+        "min": -0.03804062655437846,
+        "p25": -0.0028215303310130933,
+        "median": -0.0013979968956570588,
+        "p75": -0.0006122829003524544,
+        "p90": -0.00013629089540131644,
+        "p95": 0.00018694038473341835,
+        "p99": 0.0006694526549290459,
+        "max": 0.002118674163870509
+      }
+    },
+    "v3": {
+      "version": "v3",
+      "description": "v1 + later as_of + increased realized-return influence with a controlled drawdown penalty (return_weight 1.0 -> 2.0, expectancy_weight 0.5 -> 1.0, drawdown_penalty_weight 2.0 -> 1.5). OOS-window protection intact.",
+      "evidence_mode": "production_later_asof",
+      "n_as_of_points": 24,
+      "n_snapshots": 10822,
+      "spearman_fitness_vs_historical_pnl": {
+        "rho": 0.7338508248961176,
+        "n": 10822
+      },
+      "by_horizon": {
+        "60": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.09208037296004155,
+            "n": 2599
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.36607471990456625,
+              "mean_median_future_pnl": -0.028976226853383035,
+              "mean_win_rate": 0.18939393939393942,
+              "random_baseline_mean_future_pnl": -0.041461302443358564,
+              "random_baseline_win_rate": 0.198,
+              "pnl_rank_baseline_mean_future_pnl": -0.011101802969934798,
+              "pnl_rank_baseline_win_rate": 0.446969696969697
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.3593998112678002,
+              "mean_median_future_pnl": -0.020723178166177525,
+              "mean_win_rate": 0.27106227106227104,
+              "random_baseline_mean_future_pnl": -0.04087638990577312,
+              "random_baseline_win_rate": 0.20094736842105262,
+              "pnl_rank_baseline_mean_future_pnl": -0.018486365884868045,
+              "pnl_rank_baseline_win_rate": 0.41898148148148145
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6088815538600786,
+              "mean_median_future_pnl": -0.029858107181745523,
+              "mean_win_rate": 0.2874461322990735,
+              "random_baseline_mean_future_pnl": -0.04100381236548046,
+              "random_baseline_win_rate": 0.20065882352941178,
+              "pnl_rank_baseline_mean_future_pnl": -0.016695826418484227,
+              "pnl_rank_baseline_win_rate": 0.33494152046783626
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 1.712172415107267,
+              "mean_median_future_pnl": -0.0246488333427813,
+              "mean_win_rate": 0.31232613461437936,
+              "random_baseline_mean_future_pnl": -0.044327391868222626,
+              "random_baseline_win_rate": 0.17071538461538463,
+              "pnl_rank_baseline_mean_future_pnl": -0.017984691941908475,
+              "pnl_rank_baseline_win_rate": 0.35283623986889906
+            }
+          }
+        },
+        "360": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.0806639423220082,
+            "n": 5555
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6452334106660719,
+              "mean_median_future_pnl": -0.05167809412258277,
+              "mean_win_rate": 0.05317460317460317,
+              "random_baseline_mean_future_pnl": -0.07665034855961116,
+              "random_baseline_win_rate": 0.17737500000000003,
+              "pnl_rank_baseline_mean_future_pnl": -0.0781112266999628,
+              "pnl_rank_baseline_win_rate": 0.25357142857142856
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.0033525205205283,
+              "mean_median_future_pnl": -0.03816288921213685,
+              "mean_win_rate": 0.1759589947089947,
+              "random_baseline_mean_future_pnl": -0.07699441964652497,
+              "random_baseline_win_rate": 0.17889583333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.06402697248845993,
+              "pnl_rank_baseline_win_rate": 0.29007936507936505
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -2.4294701778241885,
+              "mean_median_future_pnl": -0.03445565483811149,
+              "mean_win_rate": 0.2801416740331803,
+              "random_baseline_mean_future_pnl": -0.0777974727351586,
+              "random_baseline_win_rate": 0.17838333333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.05671925871099542,
+              "pnl_rank_baseline_win_rate": 0.2838963480128894
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 9.972606374172942,
+              "mean_median_future_pnl": -0.03087876783488924,
+              "mean_win_rate": 0.320244915576189,
+              "random_baseline_mean_future_pnl": -0.07797059127821274,
+              "random_baseline_win_rate": 0.17787083333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.033981330638458575,
+              "pnl_rank_baseline_win_rate": 0.40990982730456227
+            }
+          }
+        },
+        "1440": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.10669183018031078,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.9200733430489962,
+              "mean_median_future_pnl": -0.07078976340530395,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.402645259291491,
+              "mean_median_future_pnl": -0.05115922985817389,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6455214438678105,
+              "mean_median_future_pnl": -0.04876994458621712,
+              "mean_win_rate": 0.27818411851306585,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4440107102027266,
+              "mean_median_future_pnl": -0.04329787695878751,
+              "mean_win_rate": 0.33917349845921274,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        },
+        "4320": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.10669183018031078,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.9200733430489962,
+              "mean_median_future_pnl": -0.07078976340530395,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.402645259291491,
+              "mean_median_future_pnl": -0.05115922985817389,
+              "mean_win_rate": 0.025000000000000005,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6455214438678105,
+              "mean_median_future_pnl": -0.04876994458621712,
+              "mean_win_rate": 0.27818411851306585,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4440107102027266,
+              "mean_median_future_pnl": -0.04329787695878751,
+              "mean_win_rate": 0.33917349845921274,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        }
+      },
+      "trade_count_bias": {
+        "0": {
+          "n": 0
+        },
+        "1-4": {
+          "n": 3329,
+          "mean_fitness": -0.48557838363824013,
+          "median_fitness": -0.4558232477373337,
+          "mean_historical_pnl": -0.054463260571259824,
+          "median_historical_pnl": -0.05214858838937175,
+          "mean_future_pnl": -0.035097354464969026
+        },
+        "5-9": {
+          "n": 4044,
+          "mean_fitness": -0.5870431205844239,
+          "median_fitness": -0.580666591952252,
+          "mean_historical_pnl": -0.15403598506246302,
+          "median_historical_pnl": -0.13602670773056502,
+          "mean_future_pnl": -0.04169566928941245
+        },
+        "10-29": {
+          "n": 3299,
+          "mean_fitness": -0.7541806338824735,
+          "median_fitness": -0.7233108525314125,
+          "mean_historical_pnl": -0.3714179466659132,
+          "median_historical_pnl": -0.3281013288774943,
+          "mean_future_pnl": -0.04377525627898903
+        },
+        "30+": {
+          "n": 150,
+          "mean_fitness": -1.2744803653834669,
+          "median_fitness": -1.2435347580207279,
+          "mean_historical_pnl": -1.329373722749312,
+          "median_historical_pnl": -1.2281390253131832,
+          "mean_future_pnl": -0.10205115389171693
+        }
+      },
+      "return_distribution": {
+        "min": -0.03804062655437846,
+        "p25": -0.0028215303310130933,
+        "median": -0.0013979968956570588,
+        "p75": -0.0006122829003524544,
+        "p90": -0.00013629089540131644,
+        "p95": 0.00018694038473341835,
+        "p99": 0.0006694526549290459,
+        "max": 0.002118674163870509
+      }
+    },
+    "v4": {
+      "version": "v4",
+      "description": "v1 + later as_of + nonlinear (tanh) return transform instead of the hard clip(-1,1), with controlled OOS influence (oos_weight 1.5 -> 1.0). Tests directly whether the clipping mechanism (confirmed theoretical-only on current data) would matter once returns grow. OOS-window protection intact.",
+      "evidence_mode": "production_later_asof",
+      "n_as_of_points": 24,
+      "n_snapshots": 10822,
+      "spearman_fitness_vs_historical_pnl": {
+        "rho": 0.7322205953497914,
+        "n": 10822
+      },
+      "by_horizon": {
+        "60": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": 0.09046450077721654,
+            "n": 2599
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.4710186619088025,
+              "mean_median_future_pnl": -0.029184098015517974,
+              "mean_win_rate": 0.25,
+              "random_baseline_mean_future_pnl": -0.041461302443358564,
+              "random_baseline_win_rate": 0.198,
+              "pnl_rank_baseline_mean_future_pnl": -0.011101802969934798,
+              "pnl_rank_baseline_win_rate": 0.446969696969697
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.2457105008714478,
+              "mean_median_future_pnl": -0.0208134570549088,
+              "mean_win_rate": 0.28784013605442177,
+              "random_baseline_mean_future_pnl": -0.04087638990577312,
+              "random_baseline_win_rate": 0.20094736842105262,
+              "pnl_rank_baseline_mean_future_pnl": -0.018486365884868045,
+              "pnl_rank_baseline_win_rate": 0.41898148148148145
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.5414822249144671,
+              "mean_median_future_pnl": -0.025141974478780284,
+              "mean_win_rate": 0.32534695696460403,
+              "random_baseline_mean_future_pnl": -0.04100381236548046,
+              "random_baseline_win_rate": 0.20065882352941178,
+              "pnl_rank_baseline_mean_future_pnl": -0.016695826418484227,
+              "pnl_rank_baseline_win_rate": 0.33494152046783626
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 1.7937685456862469,
+              "mean_median_future_pnl": -0.02168240053156852,
+              "mean_win_rate": 0.341940848785111,
+              "random_baseline_mean_future_pnl": -0.044327391868222626,
+              "random_baseline_win_rate": 0.17071538461538463,
+              "pnl_rank_baseline_mean_future_pnl": -0.017984691941908475,
+              "pnl_rank_baseline_win_rate": 0.35283623986889906
+            }
+          }
+        },
+        "360": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.08408088878166041,
+            "n": 5555
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.8987782989678395,
+              "mean_median_future_pnl": -0.06826044649841938,
+              "mean_win_rate": 0.07666666666666666,
+              "random_baseline_mean_future_pnl": -0.07665034855961116,
+              "random_baseline_win_rate": 0.17737500000000003,
+              "pnl_rank_baseline_mean_future_pnl": -0.0781112266999628,
+              "pnl_rank_baseline_win_rate": 0.25357142857142856
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.8924899311374586,
+              "mean_median_future_pnl": -0.039267403160313484,
+              "mean_win_rate": 0.13072089947089946,
+              "random_baseline_mean_future_pnl": -0.07699441964652497,
+              "random_baseline_win_rate": 0.17889583333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.06402697248845993,
+              "pnl_rank_baseline_win_rate": 0.29007936507936505
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -2.2827911919343213,
+              "mean_median_future_pnl": -0.03349008422235366,
+              "mean_win_rate": 0.2977709160831889,
+              "random_baseline_mean_future_pnl": -0.0777974727351586,
+              "random_baseline_win_rate": 0.17838333333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.05671925871099542,
+              "pnl_rank_baseline_win_rate": 0.2838963480128894
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": 8.480113943033349,
+              "mean_median_future_pnl": -0.02969253528366192,
+              "mean_win_rate": 0.32189398234041094,
+              "random_baseline_mean_future_pnl": -0.07797059127821274,
+              "random_baseline_win_rate": 0.17787083333333334,
+              "pnl_rank_baseline_mean_future_pnl": -0.033981330638458575,
+              "pnl_rank_baseline_win_rate": 0.40990982730456227
+            }
+          }
+        },
+        "1440": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.11305589111606144,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.0390392415771847,
+              "mean_median_future_pnl": -0.08575686145970049,
+              "mean_win_rate": 0.04,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.3116621971223157,
+              "mean_median_future_pnl": -0.05183156957205822,
+              "mean_win_rate": 0.05787037037037037,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6116684714297896,
+              "mean_median_future_pnl": -0.04980252671464106,
+              "mean_win_rate": 0.2774909812409812,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4976332650202762,
+              "mean_median_future_pnl": -0.045237359721500676,
+              "mean_win_rate": 0.3073434224832942,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        },
+        "4320": {
+          "spearman_fitness_vs_future_pnl": {
+            "rho": -0.11305589111606144,
+            "n": 7993
+          },
+          "topk": {
+            "5": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.0390392415771847,
+              "mean_median_future_pnl": -0.08575686145970049,
+              "mean_win_rate": 0.04,
+              "random_baseline_mean_future_pnl": -0.08366811253620991,
+              "random_baseline_win_rate": 0.19687500000000002,
+              "pnl_rank_baseline_mean_future_pnl": -0.12249475563255405,
+              "pnl_rank_baseline_win_rate": 0.2785714285714286
+            },
+            "10": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.3116621971223157,
+              "mean_median_future_pnl": -0.05183156957205822,
+              "mean_win_rate": 0.05787037037037037,
+              "random_baseline_mean_future_pnl": -0.08368847202490809,
+              "random_baseline_win_rate": 0.196125,
+              "pnl_rank_baseline_mean_future_pnl": -0.09077561678573316,
+              "pnl_rank_baseline_win_rate": 0.278968253968254
+            },
+            "25": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -0.6116684714297896,
+              "mean_median_future_pnl": -0.04980252671464106,
+              "mean_win_rate": 0.2774909812409812,
+              "random_baseline_mean_future_pnl": -0.08495426888468798,
+              "random_baseline_win_rate": 0.19465833333333335,
+              "pnl_rank_baseline_mean_future_pnl": -0.08609570188806524,
+              "pnl_rank_baseline_win_rate": 0.2742022711587929
+            },
+            "50": {
+              "n_snapshots": 24,
+              "mean_capture_rate": -1.4976332650202762,
+              "mean_median_future_pnl": -0.045237359721500676,
+              "mean_win_rate": 0.3073434224832942,
+              "random_baseline_mean_future_pnl": -0.0855802128284575,
+              "random_baseline_win_rate": 0.1935125,
+              "pnl_rank_baseline_mean_future_pnl": -0.048154591916447186,
+              "pnl_rank_baseline_win_rate": 0.42383428618482966
+            }
+          }
+        }
+      },
+      "trade_count_bias": {
+        "0": {
+          "n": 0
+        },
+        "1-4": {
+          "n": 3329,
+          "mean_fitness": -0.48822492533643186,
+          "median_fitness": -0.4588275673061761,
+          "mean_historical_pnl": -0.054463260571259824,
+          "median_historical_pnl": -0.05214858838937175,
+          "mean_future_pnl": -0.035097354464969026
+        },
+        "5-9": {
+          "n": 4044,
+          "mean_fitness": -0.5865162476369978,
+          "median_fitness": -0.5755322769358273,
+          "mean_historical_pnl": -0.15403598506246302,
+          "median_historical_pnl": -0.13602670773056502,
+          "mean_future_pnl": -0.04169566928941245
+        },
+        "10-29": {
+          "n": 3299,
+          "mean_fitness": -0.7446991048701123,
+          "median_fitness": -0.7100740561865037,
+          "mean_historical_pnl": -0.3714179466659132,
+          "median_historical_pnl": -0.3281013288774943,
+          "mean_future_pnl": -0.04377525627898903
+        },
+        "30+": {
+          "n": 150,
+          "mean_fitness": -1.2424545048196058,
+          "median_fitness": -1.2088743305698504,
+          "mean_historical_pnl": -1.329373722749312,
+          "median_historical_pnl": -1.2281390253131832,
+          "mean_future_pnl": -0.10205115389171693
+        }
+      },
+      "return_distribution": {
+        "min": -0.03804062655437846,
+        "p25": -0.0028215303310130933,
+        "median": -0.0013979968956570588,
+        "p75": -0.0006122829003524544,
+        "p90": -0.00013629089540131644,
+        "p95": 0.00018694038473341835,
+        "p99": 0.0006694526549290459,
+        "max": 0.002118674163870509
+      }
+    }
+  },
+  "generated_at": "2026-09-28T22:20:55.634807+00:00"
+}

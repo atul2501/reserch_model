@@ -1,7 +1,7 @@
 # Graph Report - reserch_model  (2026-09-29)
 
 ## Corpus Check
-- 329 files · ~237,157 words
+- 329 files · ~237,148 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: .service 4, (none) 3, .ini 2)
 

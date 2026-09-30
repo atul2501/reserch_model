@@ -331,7 +331,7 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
     <h2>Evolution <span class="sub">generations, parents, mutations, crossover, deaths, births</span></h2>
     <div class="panel"><div class="hgrid" id="evolution-panel"></div>
       <div class="table-scroll" style="margin-top:10px"><table id="generations-table"><thead><tr>
-        <th>Gen</th><th>Population</th><th>Active</th><th>Retired</th><th>Dead</th><th>Equity (all)</th><th>Triggered by</th><th>Created</th></tr></thead><tbody></tbody></table></div>
+        <th>Gen</th><th>Population</th><th>Active</th><th>Retired</th><th>Dead</th><th>Total Trades</th><th>Total Wins</th><th>Win Rate</th><th>Equity (all)</th><th>Triggered by</th><th>Created</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 
@@ -1278,6 +1278,7 @@ async function refreshSlow() {
     ].join("");
     document.querySelector("#generations-table tbody").innerHTML = gens.map(g => `<tr><td>${esc(g.number)}</td><td>${esc(g.population)}</td>
       <td>${esc((g.by_status.ACTIVE || {}).count || 0)}</td><td>${esc((g.by_status.RETIRED || {}).count || 0)}</td><td>${esc(g.deaths)}</td>
+      <td>${esc(g.total_trades)}</td><td>${esc(g.total_wins)}</td><td>${pct(g.trade_win_rate)}</td>
       <td>$${fmt(Object.values(g.by_status).reduce((a, x) => a + x.equity, 0))}</td><td>${esc(g.triggered_by)}</td><td>${ago(g.created_at)}</td></tr>`).join("");
   });
   await section("shadow", async () => {
