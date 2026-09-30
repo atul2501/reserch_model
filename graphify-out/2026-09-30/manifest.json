@@ -780,10 +780,10 @@
     "semantic_hash": "7b23b53152460d379bfda33ee7b14dc6"
   },
   "backend/app/models/metrics.py": {
-    "mtime": 1790184832.6384974,
-    "seen": 1790424250.395689,
-    "ast_hash": "8262d9ea325e970ba46bc6144db522b2",
-    "semantic_hash": "8262d9ea325e970ba46bc6144db522b2"
+    "mtime": 1790783460.1860354,
+    "seen": 1790784742.232495,
+    "ast_hash": "62b81766b35364ec0a8d0986cdd65595",
+    "semantic_hash": ""
   },
   "backend/app/models/reality_gap.py": {
     "mtime": 1790093891.776304,
@@ -822,10 +822,10 @@
     "semantic_hash": "a3283a064aafcbc278d69da825aab561"
   },
   "backend/app/models/trading.py": {
-    "mtime": 1790217711.1138818,
-    "seen": 1790424250.395693,
-    "ast_hash": "4c24fdbc4499933c5d1f0f0cfd9f4180",
-    "semantic_hash": "4c24fdbc4499933c5d1f0f0cfd9f4180"
+    "mtime": 1790783476.7447877,
+    "seen": 1790784742.2325,
+    "ast_hash": "9183ad91fb822d2ee9d8613833f2a331",
+    "semantic_hash": ""
   },
   "backend/app/research/__init__.py": {
     "mtime": 1790183173.1491709,
@@ -1182,9 +1182,9 @@
     "semantic_hash": "fb2f8f3e78b02b3196fa5b7ba99073ad"
   },
   "backend/tests/test_analytics_migration.py": {
-    "mtime": 1790438995.9443285,
-    "seen": 1790439148.090324,
-    "ast_hash": "3f999e4fdc9a45df7c449a42d6506652",
+    "mtime": 1790784248.5962837,
+    "seen": 1790784742.232547,
+    "ast_hash": "abec8049c4b2387233af51db00e96b29",
     "semantic_hash": ""
   },
   "backend/tests/test_analytics_store.py": {
@@ -2037,6 +2037,12 @@
     "mtime": 1790633228.5705378,
     "seen": 1790781259.528073,
     "ast_hash": "1e2cda32dc107fb8e44162b9758df5fb",
+    "semantic_hash": ""
+  },
+  "backend/alembic/versions/f4669ea054ae_drop_redundant_fitness_scores_indexes.py": {
+    "mtime": 1790783454.9211633,
+    "seen": 1790784742.232414,
+    "ast_hash": "58c0befe8ee5d73b9e1bc96d311b6b63",
     "semantic_hash": ""
   }
 }

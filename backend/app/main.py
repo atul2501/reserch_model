@@ -101,6 +101,10 @@ def create_app() -> FastAPI:
     async def analytics_page():
         return FileResponse(STATIC_DIR / "analytics.html")
 
+    @app.get("/entry-quality")
+    async def entry_quality_page():
+        return FileResponse(STATIC_DIR / "entry_quality.html")
+
     return app
 
 

@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
+<title>Entry Quality — Shadow Audit — Trading Lab</title>
+<style>
+:root {
+  --bg: #060810; --surface: #0b0e15; --surface-2: #10141c; --surface-3: #151a24;
+  --line: #1d232d; --line-strong: #2b3340; --text: #e6e9ee; --text-strong: #f8f9fb; --muted: #8791a0;
+  --blue: #6ea8ff; --green: #3fd096; --red: #f16b7c; --amber: #e2ac57; --purple: #b494ef;
+  --radius: 10px; --shadow: 0 6px 20px -8px rgba(0,0,0,.5); --ease: cubic-bezier(.4,0,.2,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 0 40px; background-color: var(--bg);
+  background-image: radial-gradient(circle at 12% -10%, rgba(110,168,255,.06), transparent 50%), radial-gradient(circle at 90% 0%, rgba(63,208,150,.05), transparent 45%);
+  background-repeat: no-repeat; color: var(--text); font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.wrap { width: min(1400px, calc(100% - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)))); margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+header { position: sticky; top: 0; z-index: 10; margin: 0 0 12px; padding: 14px 0; display: grid;
+  grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; background: rgba(6,8,16,.86); backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); border-bottom: 1px solid var(--line); box-shadow: 0 10px 24px -18px rgba(0,0,0,.7); }
+@media (max-width: 860px) { header { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-bottom: 10px; } }
+h1 { margin: 0; font-size: 16px; font-weight: 700; background: linear-gradient(95deg, var(--text-strong) 40%, var(--blue) 140%);
+  -webkit-background-clip: text; background-clip: text; color: var(--text-strong); }
+.page-nav { display: flex; gap: 4px; }
+.page-nav a { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 650; letter-spacing: .03em;
+  padding: 6px 10px; border-radius: 6px; }
+.page-nav a:hover { color: var(--text); background: var(--surface-2); }
+.page-nav a.active { color: var(--text-strong); background: var(--surface-3); }
+.shadow-banner { margin: 4px 0 20px; padding: 10px 16px; border-radius: var(--radius); background: rgba(226,172,87,.12);
+  border: 1px solid rgba(226,172,87,.4); color: var(--amber); font-weight: 750; font-size: 12px; letter-spacing: .04em;
+  text-align: center; text-transform: uppercase; }
+.grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 22px; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.card { position: relative; padding: 14px 15px 14px 17px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--blue); opacity: .75; }
+.card .label { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.card .value { color: var(--text-strong); font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.pos { color: var(--green); } .neg { color: var(--red); } .warn { color: var(--amber); }
+section { margin-bottom: 22px; }
+section h2 { margin: 0 0 8px; padding-bottom: 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8; }
+section h2 .sub { text-transform: none; font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: 0; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
+.panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.chart-wrap { height: 220px; }
+.chart-wrap svg { width: 100%; height: 100%; display: block; }
+.chart-caption { color: var(--muted); font-size: 10px; margin-top: 6px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { background: #0d1118; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+td { color: #bcc3cc; }
+.empty { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+.insufficient { color: var(--muted); font-style: italic; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.filters select, .filters input { background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 11px; }
+.filters button, .filters a.btn { appearance: none; border: 1px solid var(--blue); background: rgba(110,168,255,.12); color: var(--blue);
+  border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; text-decoration: none;
+  transition: background .15s var(--ease); }
+.filters button:hover, .filters a.btn:hover { background: rgba(110,168,255,.2); }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.pill.ok { background: rgba(63,208,150,.15); color: var(--green); }
+.pill.warn { background: rgba(226,172,87,.15); color: var(--amber); }
+.pill.bad { background: rgba(241,107,124,.15); color: var(--red); }
+.pill.info { background: rgba(110,168,255,.15); color: var(--blue); }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filters select, .filters input { width: 100% !important; }
+  .filters button, .filters a.btn { grid-column: 1 / -1; text-align: center; }
+  table { font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Entry Quality V1</h1>
+    <nav class="page-nav"><a href="/">Home</a><a href="/exits">Exit Research</a><a href="/experiments">Experiments</a><a href="/analytics">Analytics</a><a href="/entry-quality" class="active">Entry Quality</a></nav>
+  </header>
+
+  <div class="shadow-banner">⚠ Shadow — does not affect live trading. Every number below is a hypothetical retrospective grading of signals the strategies already produced.</div>
+
+  <div class="filters">
+    <select id="f-family"><option value="">All strategies</option></select>
+    <select id="f-regime"><option value="">All regimes</option></select>
+    <select id="f-side"><option value="">Long &amp; Short</option><option value="LONG">Long</option><option value="SHORT">Short</option></select>
+    <input id="f-generation" type="number" placeholder="Generation" style="width:110px">
+    <input id="f-since" type="datetime-local" title="Since">
+    <input id="f-until" type="datetime-local" title="Until">
+    <label style="color:var(--muted);font-size:11px">Threshold <input id="f-threshold" type="number" step="0.05" min="0" max="1" value="0.60" style="width:60px"></label>
+    <button id="f-apply" type="button">Apply</button>
+    <a class="btn" id="f-export" href="/api/entry-quality/export.csv">Export CSV</a>
+  </div>
+
+  <section>
+    <h2>Model Status <span class="pill info">SHADOW ONLY</span></h2>
+    <div class="grid" id="status-cards"></div>
+  </section>
+
+  <section>
+    <h2>OOS Validation</h2>
+    <div class="grid" id="oos-cards"></div>
+  </section>
+
+  <section>
+    <h2>Actual vs Hypothetical Shadow Performance <span class="sub">"Shadow Filtered" trades were NOT actually blocked</span></h2>
+    <div class="panel table-scroll"><table id="table-livevsshadow"><thead><tr><th>Metric</th><th>Actual System</th><th>Shadow Filtered</th><th>Difference</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Trade Selection Funnel</h2>
+    <div class="panel" id="funnel-panel"></div>
+  </section>
+
+  <section>
+    <h2>Prediction Quality</h2>
+    <div class="chart-grid">
+      <div class="panel"><div class="chart-wrap"><svg id="chart-prob-dist"></svg></div><div class="chart-caption">P(win | entry context) — does higher probability track higher win rate?</div></div>
+      <div class="panel"><div class="chart-wrap"><svg id="chart-calibration"></svg></div><div class="chart-caption" id="cap-calibration"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Threshold Audit <span class="sub">Exploratory threshold analysis — not production configuration</span></h2>
+    <div class="panel table-scroll"><table id="table-threshold"><thead><tr><th>Threshold</th><th>Shadow Trades</th><th>Shadow No-Trade</th><th>Win Rate</th><th>Expectancy</th><th>Profit Factor</th><th>Net P&amp;L</th><th>STOP_IMMEDIATE %</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>STOP_IMMEDIATE Audit</h2>
+    <div class="panel table-scroll"><table id="table-stopimm"><thead><tr><th></th><th>Count</th><th>% of Trades</th><th>Avg MFE (R)</th><th>Avg MAE (R)</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>MFE / MAE</h2>
+    <div class="panel"><div class="chart-wrap" style="height:320px"><svg id="chart-scatter"></svg></div><div class="chart-caption">X = MAE (R), Y = MFE (R) — winners in green, STOP_IMMEDIATE in red, other losers in grey</div></div>
+  </section>
+
+  <section>
+    <h2>Strategy Breakdown</h2>
+    <div class="panel table-scroll"><table id="table-strategy"><thead><tr><th>Strategy</th><th>Signals</th><th>Shadow Trades</th><th>Shadow No-Trade</th><th>Actual Win %</th><th>Shadow Win %</th><th>Actual Expectancy</th><th>Shadow Expectancy</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Regime Breakdown</h2>
+    <div class="panel table-scroll"><table id="table-regime"><thead><tr><th>Regime</th><th>Signals</th><th>Shadow Trades</th><th>Shadow No-Trade</th><th>Actual Win %</th><th>Shadow Win %</th><th>Actual Expectancy</th><th>Shadow Expectancy</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Strategy × Regime
+      <select id="f-matrix-metric" style="margin-left:8px">
+        <option value="actual_expectancy">Actual Expectancy</option>
+        <option value="shadow_expectancy">Shadow Expectancy</option>
+        <option value="actual_win_rate">Actual Win Rate</option>
+        <option value="shadow_win_rate">Shadow Win Rate</option>
+        <option value="profit_factor">Profit Factor</option>
+        <option value="stop_immediate_pct">STOP_IMMEDIATE %</option>
+      </select>
+    </h2>
+    <div class="panel table-scroll"><table id="table-matrix"><thead><tr><th>Strategy</th><th>Regime</th><th>Trades</th><th>Value</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Long vs Short</h2>
+    <div class="panel table-scroll"><table id="table-longshort"><thead><tr><th>Direction</th><th>Signals</th><th>Shadow Trades</th><th>Win Rate</th><th>Shadow Win Rate</th><th>Expectancy</th><th>Shadow Expectancy</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Hold-Time Audit</h2>
+    <div class="panel table-scroll"><table id="table-holdtime"><thead><tr><th>Bucket</th><th>Trades</th><th>Win Rate</th><th>Expectancy</th><th>Profit Factor</th><th>STOP_IMMEDIATE %</th><th>Shadow Win Rate</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Time Series <span class="sub">HYPOTHETICAL SHADOW is not real account equity</span></h2>
+    <div class="panel"><div class="chart-wrap" style="height:260px"><svg id="chart-timeseries"></svg></div>
+      <div class="chart-caption"><span style="color:var(--blue)">■</span> ACTUAL &nbsp; <span style="color:var(--amber)">■</span> HYPOTHETICAL SHADOW</div></div>
+  </section>
+
+  <section>
+    <h2>Model Health &amp; Drift</h2>
+    <div class="grid" id="health-cards"></div>
+  </section>
+
+  <section>
+    <h2>Feature Importance <span class="sub">model-specific coefficients — not proof of causality; click a header to sort</span></h2>
+    <div class="panel table-scroll"><table id="table-features"><thead><tr><th data-k="feature">Feature</th><th data-k="coefficient">Coefficient</th><th data-k="direction">Direction</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Model Version / Audit Trail</h2>
+    <div class="panel" id="version-panel"></div>
+  </section>
+
+  <footer>Entry Quality Model V1 — shadow audit interface. It never gates a real trade, never changes risk/sizing/exits, and never auto-promotes a threshold.</footer>
+</div>
+
+<script>
+(function () {
+  const a = document.querySelector(".page-nav a.active"), nav = a && a.parentElement;
+  if (nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2;
+})();
+
+const fmt = (n, d=4) => (n === null || n === undefined || isNaN(n) || !isFinite(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) { const k = window.prompt("API key (viewer role or higher):", ""); if (k) { sessionStorage.setItem("apiKey", k.trim()); return await get(path); } throw new Error("auth required"); }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+async function section(name, fn) { try { await fn(); } catch (e) { console.error(`section "${esc(name)}" failed:`, e); } }
+function qs(params) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== "" && v !== null && v !== undefined) p.set(k, v);
+  return p.toString();
+}
+function insufficientOr(v, fmtFn) { return v === null || v === undefined ? '<span class="insufficient">insufficient data</span>' : fmtFn(v); }
+function card(label, value, detail, cls) {
+  return `<div class="card"><div class="label">${esc(label)}</div><div class="value num ${cls||''}">${value}</div><div style="color:var(--muted);font-size:10px;margin-top:4px">${esc(detail||"")}</div></div>`;
+}
+
+function renderBarChart(svg, bins, counts, color, secondLine) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const padL = 30, padR = 8, padT = 8, padB = 18;
+  const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!counts || !counts.length || counts.every(c => c === 0)) {
+    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data</text>`;
+    return;
+  }
+  const maxC = Math.max(...counts);
+  const n = counts.length;
+  const barW = plotW / n;
+  let out = "";
+  for (let i = 0; i <= 3; i++) {
+    const gy = padT + plotH - (plotH * i / 3);
+    out += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#1d232d"/>`;
+    out += `<text x="${padL-4}" y="${(gy+3).toFixed(1)}" text-anchor="end" font-size="8" fill="#8791a0">${Math.round(maxC*i/3)}</text>`;
+  }
+  counts.forEach((c, i) => {
+    const bh = (c / maxC) * plotH;
+    const x = padL + i * barW, y = padT + plotH - bh;
+    out += `<rect x="${(x+1).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,barW-2).toFixed(1)}" height="${bh.toFixed(1)}" fill="${color}" opacity="0.85"/>`;
+  });
+  if (secondLine && secondLine.length === n) {
+    const maxL = Math.max(...secondLine.filter(v => v != null), 0.001);
+    const pts = secondLine.map((v, i) => v == null ? null : [padL + (i+0.5)*barW, padT + plotH - (v/maxL)*plotH]).filter(Boolean);
+    out += `<polyline points="${pts.map(p=>p.map(x=>x.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="var(--amber, #e2ac57)" stroke-width="1.5"/>`;
+    pts.forEach(p => out += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2" fill="#e2ac57"/>`);
+  }
+  out += `<line x1="${padL}" y1="${(padT+plotH).toFixed(1)}" x2="${w-padR}" y2="${(padT+plotH).toFixed(1)}" stroke="#2b3340"/>`;
+  out += `<text x="${padL}" y="${h-4}" font-size="8" fill="#8791a0">${bins[0]}</text>`;
+  out += `<text x="${w-padR}" y="${h-4}" text-anchor="end" font-size="8" fill="#8791a0">${bins[bins.length-1]}</text>`;
+  svg.innerHTML = out;
+}
+
+function renderCalibration(svg, points) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
+  const pad = 24;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!points || !points.length) { svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data</text>`; return; }
+  const plot = Math.min(w, h) - 2*pad;
+  const X = v => pad + v*plot, Y = v => pad + plot - v*plot;
+  let out = `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(1)}" stroke="#2b3340" stroke-dasharray="3,3"/>`;
+  out += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(0)}" stroke="#2b3340"/>`;
+  out += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(1)}" stroke="#2b3340"/>`;
+  points.forEach(p => {
+    const r = p.sufficient_sample ? 3.5 : 2;
+    const color = p.sufficient_sample ? "#6ea8ff" : "#8791a0";
+    out += `<circle cx="${X(p.predicted_mean).toFixed(1)}" cy="${Y(p.actual_win_rate).toFixed(1)}" r="${r}" fill="${color}"/>`;
+  });
+  const pts = points.map(p => `${X(p.predicted_mean).toFixed(1)},${Y(p.actual_win_rate).toFixed(1)}`).join(" ");
+  out += `<polyline points="${pts}" fill="none" stroke="#6ea8ff" stroke-width="1"/>`;
+  out += `<text x="${pad}" y="${h-4}" font-size="8" fill="#8791a0">predicted →</text>`;
+  svg.innerHTML = out;
+}
+
+function renderScatter(svg, points) {
+  const w = svg.clientWidth || 400, h = svg.clientHeight || 300;
+  const padL = 34, padR = 10, padT = 10, padB = 24;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!points || !points.length) { svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data</text>`; return; }
+  const xs = points.map(p=>p.mae_r), ys = points.map(p=>p.mfe_r);
+  const xMin = Math.min(...xs, 0), xMax = Math.max(...xs, 0.1);
+  const yMin = Math.min(...ys, 0), yMax = Math.max(...ys, 0.1);
+  const X = v => padL + (v-xMin)/(xMax-xMin) * (w-padL-padR);
+  const Y = v => padT + (1 - (v-yMin)/(yMax-yMin)) * (h-padT-padB);
+  let out = `<line x1="${padL}" y1="${Y(0).toFixed(1)}" x2="${w-padR}" y2="${Y(0).toFixed(1)}" stroke="#1d232d"/>`;
+  out += `<line x1="${X(0).toFixed(1)}" y1="${padT}" x2="${X(0).toFixed(1)}" y2="${h-padB}" stroke="#1d232d"/>`;
+  points.forEach(p => {
+    const color = p.quality_class === "STOP_IMMEDIATE" ? "#f16b7c" : p.is_win ? "#3fd096" : "#8791a0";
+    out += `<circle cx="${X(p.mae_r).toFixed(1)}" cy="${Y(p.mfe_r).toFixed(1)}" r="2" fill="${color}" opacity="0.55"/>`;
+  });
+  out += `<text x="${padL}" y="${h-6}" font-size="8" fill="#8791a0">MAE (R)</text>`;
+  out += `<text x="4" y="${padT+8}" font-size="8" fill="#8791a0">MFE</text>`;
+  svg.innerHTML = out;
+}
+
+function renderTimeSeries(svg, actual, shadow) {
+  const w = svg.clientWidth || 600, h = svg.clientHeight || 240;
+  const padL = 40, padR = 10, padT = 10, padB = 20;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!actual || !actual.length) { svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">No data</text>`; return; }
+  const allV = actual.map(p=>p.v).concat(shadow.map(p=>p.v));
+  const vMin = Math.min(...allV, 0), vMax = Math.max(...allV, 0);
+  const n = actual.length;
+  const X = i => padL + (i/(n-1||1)) * (w-padL-padR);
+  const Y = v => padT + (1 - (v-vMin)/((vMax-vMin)||1)) * (h-padT-padB);
+  let out = `<line x1="${padL}" y1="${Y(0).toFixed(1)}" x2="${w-padR}" y2="${Y(0).toFixed(1)}" stroke="#1d232d"/>`;
+  const line = (series, color) => `<polyline points="${series.map((p,i)=>`${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  out += line(actual, "#6ea8ff");
+  out += line(shadow, "#e2ac57");
+  svg.innerHTML = out;
+}
+
+function tableRows(tbody, rows) { tbody.innerHTML = rows.map(r => `<tr>${r.join("")}</tr>`).join("") || '<tr><td colspan="10" class="empty">No data</td></tr>'; }
+
+async function load() {
+  const params = {
+    family: document.getElementById("f-family").value, side: document.getElementById("f-side").value,
+    regime: document.getElementById("f-regime").value, generation: document.getElementById("f-generation").value,
+    since: document.getElementById("f-since").value ? new Date(document.getElementById("f-since").value).toISOString() : "",
+    until: document.getElementById("f-until").value ? new Date(document.getElementById("f-until").value).toISOString() : "",
+    threshold: document.getElementById("f-threshold").value,
+    matrix_metric: document.getElementById("f-matrix-metric").value,
+  };
+  document.getElementById("f-export").href = "/api/entry-quality/export.csv?" + qs(params);
+
+  await section("entry-quality-audit", async () => {
+    const d = await get("/api/entry-quality/audit?" + qs(params));
+
+    document.getElementById("status-cards").innerHTML = [
+      card("Status", d.model_status.status, d.model_status.model_version),
+      card("Model", d.model_status.model_type, `${d.model_status.n_features} features`),
+      card("Train / Val / OOS n", `${d.model_status.train_samples} / ${d.model_status.validation_samples} / ${d.model_status.oos_samples}`, ""),
+      card("Train / Val / OOS AUC", `${fmt(d.model_status.train_auc,3)} / ${fmt(d.model_status.validation_auc,3)} / ${fmt(d.model_status.oos_auc,3)}`, ""),
+      card("Last Trained", new Date(d.model_status.trained_at).toLocaleString(), d.model_status.feature_version),
+    ].join("");
+
+    const oosStatusCls = d.oos_card.status === "PROMISING" ? "pos" : d.oos_card.status === "FAILED" ? "neg" : "";
+    document.getElementById("oos-cards").innerHTML = [
+      card("OOS AUC", fmt(d.oos_card.oos_auc,3), ""),
+      card("OOS Trades", d.oos_card.oos_trades, ""),
+      card("OOS Win Rate", pct(d.oos_card.oos_win_rate), ""),
+      card("Status", d.oos_card.status, "objective rule, not a subjective label", oosStatusCls),
+    ].join("");
+
+    const lv = d.live_vs_shadow;
+    const diffRow = (label, key, isPct) => {
+      const a = lv.actual[key], s = lv.shadow_filtered[key];
+      const diff = (a!=null && s!=null) ? s-a : null;
+      const f = isPct ? pct : (v)=>fmt(v,4);
+      const cls = diff == null ? "" : diff > 0 ? "pos" : diff < 0 ? "neg" : "";
+      return `<tr><td>${label}</td><td class="num">${f(a)}</td><td class="num">${f(s)}</td><td class="num ${cls}">${diff==null?"-":(diff>0?"+":"")+f(diff)}</td></tr>`;
+    };
+    document.querySelector("#table-livevsshadow tbody").innerHTML =
+      `<tr><td>Trades</td><td class="num">${lv.actual.trades}</td><td class="num">${lv.shadow_filtered.trades}</td><td class="num">${lv.shadow_filtered.trades-lv.actual.trades}</td></tr>` +
+      diffRow("Win Rate", "win_rate", true) +
+      diffRow("Net P&L", "net_pnl", false) +
+      diffRow("Expectancy", "expectancy", false) +
+      diffRow("Profit Factor", "profit_factor", false) +
+      diffRow("Avg Win", "avg_win", false) +
+      diffRow("Avg Loss", "avg_loss", false) +
+      diffRow("Avg Hold (s)", "avg_hold_seconds", false);
+
+    const f = d.funnel;
+    document.getElementById("funnel-panel").innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px">
+        <div><b>${f.strategy_signals}</b> signals</div>→
+        <div><b>${f.scored}</b> scored <span style="color:var(--muted)">(${f.unscorable} unscorable)</span></div>→
+        <div><b class="pos">${f.shadow_trade}</b> shadow trade</div>
+        <div><b class="neg">${f.shadow_no_trade}</b> shadow no-trade</div>→
+        <div><b>${f.actual_trades}</b> actual trades <span style="color:var(--muted)">(unchanged)</span></div>
+      </div>`;
+
+    const pd = d.probability_distribution;
+    renderBarChart(document.getElementById("chart-prob-dist"), pd.map(b=>b.bucket.split("-")[0]), pd.map(b=>b.n),
+      "#6ea8ff", pd.map(b=>b.actual_win_rate));
+    renderCalibration(document.getElementById("chart-calibration"), d.calibration.points);
+    document.getElementById("cap-calibration").textContent =
+      `Brier score ${fmt(d.calibration.brier_score,4)} · Log loss ${fmt(d.calibration.log_loss,4)} · n=${d.calibration.n} (dashed line = perfect calibration)`;
+
+    tableRows(document.querySelector("#table-threshold tbody"), d.threshold_audit.rows.map(r => [
+      `<td>${r.threshold}</td>`, `<td class="num">${r.shadow_trades}</td>`, `<td class="num">${r.shadow_no_trade}</td>`,
+      `<td class="num">${pct(r.win_rate)}</td>`, `<td class="num">${fmt(r.expectancy)}</td>`, `<td class="num">${fmt(r.profit_factor,2)}</td>`,
+      `<td class="num">${fmt(r.net_pnl,2)}</td>`, `<td class="num">${r.sufficient_sample ? pct(r.stop_immediate_pct) : '<span class="insufficient">insufficient</span>'}</td>`,
+    ]));
+
+    const si = d.stop_immediate_audit;
+    tableRows(document.querySelector("#table-stopimm tbody"), [
+      ["<td>Actual</td>", `<td class="num">${si.actual.count}</td>`, `<td class="num">${pct(si.actual.pct_of_trades)}</td>`, `<td class="num">${fmt(si.actual.avg_mfe_r,3)}</td>`, `<td class="num">${fmt(si.actual.avg_mae_r,3)}</td>`],
+      ["<td>Shadow-filtered</td>", `<td class="num">${si.shadow_filtered.count}</td>`, `<td class="num">${pct(si.shadow_filtered.pct_of_trades)}</td>`, `<td class="num">${fmt(si.shadow_filtered.avg_mfe_r,3)}</td>`, `<td class="num">${fmt(si.shadow_filtered.avg_mae_r,3)}</td>`],
+      ["<td><b>Reduction</b></td>", "<td></td>", `<td class="num ${si.sufficient_sample ? (si.reduction_pct>0?'pos':'neg') : ''}">${si.sufficient_sample ? pct(si.reduction_pct) : '<span class="insufficient">insufficient data</span>'}</td>`, "<td></td>", "<td></td>"],
+    ]);
+
+    renderScatter(document.getElementById("chart-scatter"), d.mfe_mae_scatter);
+
+    const groupRow = (r, key) => [
+      `<td>${esc(r[key])}</td>`, `<td class="num">${r.signals}</td>`, `<td class="num">${r.shadow_trades}</td>`, `<td class="num">${r.shadow_no_trade}</td>`,
+      `<td class="num">${pct(r.actual_win_rate)}</td>`, `<td class="num">${r.sufficient_sample ? pct(r.shadow_win_rate) : '<span class="insufficient">insufficient</span>'}</td>`,
+      `<td class="num">${fmt(r.actual_expectancy)}</td>`, `<td class="num">${r.sufficient_sample ? fmt(r.shadow_expectancy) : '<span class="insufficient">insufficient</span>'}</td>`,
+    ];
+    tableRows(document.querySelector("#table-strategy tbody"), d.strategy_breakdown.map(r => groupRow(r, "family")));
+    tableRows(document.querySelector("#table-regime tbody"), d.regime_breakdown.map(r => groupRow(r, "regime")));
+    tableRows(document.querySelector("#table-longshort tbody"), d.long_short.map(r => [
+      `<td>${esc(r.side)}</td>`, `<td class="num">${r.signals}</td>`, `<td class="num">${r.shadow_trades}</td>`,
+      `<td class="num">${pct(r.actual_win_rate)}</td>`, `<td class="num">${r.sufficient_sample ? pct(r.shadow_win_rate) : '<span class="insufficient">insufficient</span>'}</td>`,
+      `<td class="num">${fmt(r.actual_expectancy)}</td>`, `<td class="num">${r.sufficient_sample ? fmt(r.shadow_expectancy) : '<span class="insufficient">insufficient</span>'}</td>`,
+    ]));
+
+    tableRows(document.querySelector("#table-matrix tbody"), d.strategy_regime_matrix.cells.map(c => [
+      `<td>${esc(c.family)}</td>`, `<td>${esc(c.regime)}</td>`, `<td class="num">${c.trade_count}</td>`,
+      `<td class="num">${c.sufficient_sample ? fmt(c.value, 4) : '<span class="insufficient">INSUFFICIENT DATA</span>'}</td>`,
+    ]));
+
+    tableRows(document.querySelector("#table-holdtime tbody"), d.hold_time_audit.map(r => [
+      `<td>${esc(r.bucket)}</td>`, `<td class="num">${r.trades}</td>`, `<td class="num">${pct(r.win_rate)}</td>`,
+      `<td class="num">${fmt(r.expectancy)}</td>`, `<td class="num">${fmt(r.profit_factor,2)}</td>`, `<td class="num">${pct(r.stop_immediate_pct)}</td>`,
+      `<td class="num">${r.sufficient_sample ? pct(r.shadow_win_rate) : '<span class="insufficient">insufficient</span>'}</td>`,
+    ]));
+
+    renderTimeSeries(document.getElementById("chart-timeseries"), d.time_series.actual_cumulative_pnl, d.time_series.hypothetical_shadow_cumulative_pnl);
+
+    const drift = d.drift, health = d.model_health;
+    const driftPill = (v) => v === "WARNING" ? '<span class="pill warn">WARNING</span>' : v === "NORMAL" ? '<span class="pill ok">NORMAL</span>' : '<span class="pill info">N/A</span>';
+    document.getElementById("health-cards").innerHTML = [
+      card("Model Loaded", health.model_loaded ? "YES" : "NO", ""),
+      card("Coverage", pct(health.coverage_pct), `${health.shadow_predictions} scored, ${health.unscorable_signals} unscorable`),
+      card("Feature Drift", driftPill(drift.feature_drift), drift.thresholds_documented || ""),
+      card("Prediction Drift", driftPill(drift.prediction_drift), `recent ${fmt(drift.recent_predicted_mean,3)} vs baseline ${fmt(drift.baseline_predicted_mean,3)}`),
+      card("Outcome Drift", driftPill(drift.outcome_drift), `recent win rate ${pct(drift.recent_win_rate)}`),
+    ].join("");
+
+    const featTbody = document.querySelector("#table-features tbody");
+    let featRows = d.feature_importance;
+    const renderFeat = () => tableRows(featTbody, featRows.map(f => [`<td>${esc(f.feature)}</td>`, `<td class="num">${fmt(f.coefficient,4)}</td>`, `<td>${esc(f.direction)}</td>`]));
+    renderFeat();
+    document.querySelectorAll("#table-features th").forEach(th => th.onclick = () => {
+      const k = th.dataset.k;
+      featRows = [...featRows].sort((a,b) => k === "coefficient" ? Math.abs(b[k])-Math.abs(a[k]) : String(a[k]).localeCompare(String(b[k])));
+      renderFeat();
+    });
+
+    const mv = d.model_version_info, fr = d.data_freshness;
+    document.getElementById("version-panel").innerHTML = `
+      <table><tbody>
+        <tr><td>Model version</td><td class="num">${esc(mv.model_version)}</td></tr>
+        <tr><td>Feature count</td><td class="num">${mv.n_features}</td></tr>
+        <tr><td>Training rows</td><td class="num">${mv.n_training_rows}</td></tr>
+        <tr><td>Training window</td><td class="num">${new Date(mv.training_window_start).toLocaleString()} → ${new Date(mv.training_window_end).toLocaleString()}</td></tr>
+        <tr><td>Latest trade closed</td><td class="num">${fr.latest_trade_closed_at ? new Date(fr.latest_trade_closed_at).toLocaleString() : "-"}</td></tr>
+        <tr><td>Model trained at</td><td class="num">${new Date(fr.model_trained_at).toLocaleString()}</td></tr>
+      </tbody></table>`;
+  });
+}
+
+function populateSelect(id, values) {
+  const el = document.getElementById(id);
+  const current = el.value;
+  values.forEach(v => { if (![...el.options].some(o => o.value === v)) el.add(new Option(v, v)); });
+  el.value = current;
+}
+
+document.getElementById("f-apply").addEventListener("click", load);
+document.getElementById("f-matrix-metric").addEventListener("change", load);
+load().then(() => section("filter-options", async () => {
+  const d = await get("/api/entry-quality/audit");
+  populateSelect("f-family", d.strategy_breakdown.map(r => r.family));
+  populateSelect("f-regime", d.regime_breakdown.map(r => r.regime));
+}));
+</script>
+</body>
+</html>
