@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
 <title>Trading Lab Analytics</title>
 <style>
 :root {
@@ -110,7 +111,7 @@ section h2 {
   border-bottom: 1px solid var(--line);
   font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8;
 }
-.row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+.row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 16px; }
 
 .panel {
   position: relative;
@@ -178,7 +179,7 @@ tbody tr:hover { background: var(--surface-2); }
 .warn-text { color: var(--amber); font-size: 10.5px; }
 footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .03em; }
 
-.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 10px; }
 .hcard { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .hcard .t { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
 .hcard .v { font-size: 13px; font-weight: 650; }
@@ -191,6 +192,94 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
   font-weight: 650; cursor: pointer; margin-top: 10px;
 }
 #leaderboard-load-more:hover { background: var(--surface-2); border-color: var(--blue); }
+
+/* ---- responsive layer (identical on every dashboard page) ----
+   Appended last so it overrides the desktop rules above at equal specificity. Every grid uses
+   minmax(min(Npx, 100%), 1fr) so a column minimum can never exceed a narrow viewport. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.wrap { width: min(1400px, calc(100% - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)))); }
+section h2 { flex-wrap: wrap; row-gap: 2px; }
+.grid > *, .hgrid > *, .chart-grid > *, .row-2 > * { min-width: 0; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+/* Hover lifts stick after a tap on touch screens - only animate where a real pointer hovers. */
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: none; border-color: var(--line); }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 14px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* Header: static (a sticky 3-row header ate a third of a phone screen), left-aligned title and
+     controls, nav as a full-width swipeable segmented strip. */
+  header {
+    position: static; grid-template-columns: minmax(0, 1fr); justify-items: stretch; text-align: left;
+    gap: 10px; padding: 14px 0 12px; margin-bottom: 16px;
+  }
+  header h1 { order: 1; font-size: 17px; line-height: 1.35; }
+  header h1 span { display: inline-block; margin-left: 6px; font-size: 12px; }
+  header .header-right { order: 2; justify-self: start; gap: 8px; }
+  header .page-nav { order: 3; }
+  .page-nav {
+    display: flex; gap: 2px; margin: 0; padding: 3px; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  }
+  .page-nav::-webkit-scrollbar { display: none; }
+  .page-nav a { flex: 1 0 auto; text-align: center; white-space: nowrap; scroll-snap-align: center;
+    padding: 9px 12px; font-size: 12.5px; border-radius: 7px; }
+  .badge { font-size: 10.5px; padding: 5px 10px; }
+
+  /* KPI cards: a tidy two-up grid. */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .card { padding: 12px 12px 12px 15px; }
+  .card .label { font-size: 10px; letter-spacing: .06em; margin-bottom: 6px; }
+  .card .value { font-size: 19px; overflow-wrap: anywhere; }
+  .card .value.small { font-size: 14px; }
+
+  section { margin-bottom: 22px; }
+  section h2 { font-size: 11.5px; letter-spacing: .07em; }
+  section h2 > .sub, section h2 > .hint { flex-basis: 100%; font-size: 11.5px; line-height: 1.45; }
+  /* Inline margin-left:auto pushes header controls into the title; put them on their own row. */
+  section h2 > .ctl, section h2 > select { margin-left: 0 !important; margin-top: 6px; }
+  .panel { padding: 10px; }
+  .chart-wrap { height: 200px; }
+  .chart-label, .chart-caption { font-size: 10.5px; }
+
+  .hcard .t { font-size: 10px; }
+  .hcard .v { font-size: 14px; overflow-wrap: anywhere; }
+  .hcard .d { font-size: 11.5px; }
+
+  /* Tables: readable text, the page (not a small inner box) does most of the vertical scrolling,
+     and the first column stays pinned while swiping sideways so every row stays identifiable. */
+  table { font-size: 12.5px; }
+  th { font-size: 10px; }
+  th, td { padding: 9px 10px; }
+  .table-scroll { max-height: 70vh; }
+  .table-scroll th { z-index: 2; }
+  .table-scroll th:first-child, .table-scroll td:first-child:not([colspan]) {
+    position: sticky; left: 0; z-index: 1; background-color: var(--surface); box-shadow: 1px 0 0 var(--line);
+  }
+  .table-scroll th:first-child { z-index: 3; background-color: #0d1118; }
+  .col-secondary { display: none; }
+
+  /* Touch targets >= 40px; 16px inputs stop iOS Safari zooming the page on focus. */
+  button { min-height: 40px; }
+  input:not([type="checkbox"]):not([type="radio"]), select { font-size: 16px; min-height: 42px; }
+  .ctl button { min-height: 34px; padding: 6px 12px; font-size: 11.5px; }
+  .empty { font-size: 12.5px; }
+  footer { font-size: 11px; line-height: 1.6; }
+
+  /* analytics-only */
+  .row-2 { gap: 0; }
+  #leaderboard-load-more { width: 100%; }
+  .ctl { gap: 6px; }
+  .ctl select { font-size: 16px; }
+}
+@media (max-width: 360px) {
+  .grid { gap: 6px; }
+  .card .value { font-size: 17px; }
+}
 </style>
 </head>
 <body>
@@ -330,6 +419,12 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 </div>
 
 <script>
+// Phones show the nav as a swipeable strip - make sure the current page's tab is in view.
+(function () {
+  const a = document.querySelector(".page-nav a.active"), nav = a && a.parentElement;
+  if (nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2;
+})();
+
 const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
 const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
@@ -366,12 +461,14 @@ async function section(name, fn) {
 // ---- chart renderers (dependency-free inline SVG, matching the Home/Exit Research convention) ---- //
 
 function noData(svg, msg) {
+  svg._redraw = () => noData(svg, msg);
   const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="#8791a0" font-size="12">${esc(msg)}</text>`;
 }
 
 function renderLineChart(svg, points, color) {
+  svg._redraw = () => renderLineChart(svg, points, color);
   const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
   const padL = 46, padR = 8, padT = 8, padB = 10;
   const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
@@ -402,6 +499,7 @@ function renderLineChart(svg, points, color) {
 }
 
 function renderScatterChart(svg, points, xLabel, yLabel, colorFn) {
+  svg._redraw = () => renderScatterChart(svg, points, xLabel, yLabel, colorFn);
   const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
   const padL = 44, padR = 10, padT = 8, padB = 24;
   const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
@@ -429,6 +527,7 @@ function renderScatterChart(svg, points, xLabel, yLabel, colorFn) {
 }
 
 function renderStackedBarChart(svg, categories, colors) {
+  svg._redraw = () => renderStackedBarChart(svg, categories, colors);
   // categories: [{label, values: [n1, n2, ...]}] - values order matches colors order
   const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
   const padL = 30, padR = 8, padT = 8, padB = 20;
@@ -438,6 +537,7 @@ function renderStackedBarChart(svg, categories, colors) {
   const totals = categories.map(c => c.values.reduce((a,b)=>a+b,0));
   const maxTotal = Math.max(1, ...totals);
   const gap = plotW / categories.length, bw = gap * 0.62;
+  const labelEvery = Math.max(1, Math.ceil(26 / gap));
   let out = "";
   categories.forEach((c, ci) => {
     let y = padT + plotH;
@@ -448,7 +548,7 @@ function renderStackedBarChart(svg, categories, colors) {
       y -= segH;
       out += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${segH.toFixed(1)}" fill="${colors[vi]}"><title>${esc(c.label)}: ${v}</title></rect>`;
     });
-    out += `<text x="${(x+bw/2).toFixed(1)}" y="${(padT+plotH+13).toFixed(1)}" text-anchor="middle" font-size="9" fill="#8791a0">${esc(c.label)}</text>`;
+    if (ci % labelEvery === 0) out += `<text x="${(x+bw/2).toFixed(1)}" y="${(padT+plotH+13).toFixed(1)}" text-anchor="middle" font-size="9" fill="#8791a0">${esc(c.label)}</text>`;
   });
   svg.innerHTML = out;
 }
@@ -724,6 +824,18 @@ initialLoad();
 setInterval(() => section("overview", refreshOverview), 15000);
 setInterval(() => section("equity", refreshEquity), 15000);
 setInterval(() => section("health", pollHealth), 5000);
+
+// Charts are drawn at the SVG's pixel width; redraw them when the width changes (phone rotation,
+// window resize). Height-only resizes (mobile URL bar showing/hiding) are ignored.
+let lastChartWidth = window.innerWidth, chartResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(() => {
+    if (window.innerWidth === lastChartWidth) return;
+    lastChartWidth = window.innerWidth;
+    document.querySelectorAll("svg").forEach(s => { if (typeof s._redraw === "function") s._redraw(); });
+  }, 150);
+});
 </script>
 </body>
 </html>

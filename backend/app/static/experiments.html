@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
 <title>Experiments — Trading Lab</title>
 <style>
 :root {
@@ -72,6 +73,95 @@ tbody tr.selected { background: rgba(110,168,255,.1); }
 .filters select:focus { outline: none; border-color: var(--blue); }
 .hint { color: var(--muted); font-size: 10.5px; }
 footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+
+/* ---- responsive layer (identical on every dashboard page) ----
+   Appended last so it overrides the desktop rules above at equal specificity. Every grid uses
+   minmax(min(Npx, 100%), 1fr) so a column minimum can never exceed a narrow viewport. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.wrap { width: min(1400px, calc(100% - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)))); }
+section h2 { flex-wrap: wrap; row-gap: 2px; }
+.grid > *, .hgrid > *, .chart-grid > *, .row-2 > * { min-width: 0; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+/* Hover lifts stick after a tap on touch screens - only animate where a real pointer hovers. */
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: none; border-color: var(--line); }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 14px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* Header: static (a sticky 3-row header ate a third of a phone screen), left-aligned title and
+     controls, nav as a full-width swipeable segmented strip. */
+  header {
+    position: static; grid-template-columns: minmax(0, 1fr); justify-items: stretch; text-align: left;
+    gap: 10px; padding: 14px 0 12px; margin-bottom: 16px;
+  }
+  header h1 { order: 1; font-size: 17px; line-height: 1.35; }
+  header h1 span { display: inline-block; margin-left: 6px; font-size: 12px; }
+  header .header-right { order: 2; justify-self: start; gap: 8px; }
+  header .page-nav { order: 3; }
+  .page-nav {
+    display: flex; gap: 2px; margin: 0; padding: 3px; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  }
+  .page-nav::-webkit-scrollbar { display: none; }
+  .page-nav a { flex: 1 0 auto; text-align: center; white-space: nowrap; scroll-snap-align: center;
+    padding: 9px 12px; font-size: 12.5px; border-radius: 7px; }
+  .badge { font-size: 10.5px; padding: 5px 10px; }
+
+  /* KPI cards: a tidy two-up grid. */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .card { padding: 12px 12px 12px 15px; }
+  .card .label { font-size: 10px; letter-spacing: .06em; margin-bottom: 6px; }
+  .card .value { font-size: 19px; overflow-wrap: anywhere; }
+  .card .value.small { font-size: 14px; }
+
+  section { margin-bottom: 22px; }
+  section h2 { font-size: 11.5px; letter-spacing: .07em; }
+  section h2 > .sub, section h2 > .hint { flex-basis: 100%; font-size: 11.5px; line-height: 1.45; }
+  /* Inline margin-left:auto pushes header controls into the title; put them on their own row. */
+  section h2 > .ctl, section h2 > select { margin-left: 0 !important; margin-top: 6px; }
+  .panel { padding: 10px; }
+  .chart-wrap { height: 200px; }
+  .chart-label, .chart-caption { font-size: 10.5px; }
+
+  .hcard .t { font-size: 10px; }
+  .hcard .v { font-size: 14px; overflow-wrap: anywhere; }
+  .hcard .d { font-size: 11.5px; }
+
+  /* Tables: readable text, the page (not a small inner box) does most of the vertical scrolling,
+     and the first column stays pinned while swiping sideways so every row stays identifiable. */
+  table { font-size: 12.5px; }
+  th { font-size: 10px; }
+  th, td { padding: 9px 10px; }
+  .table-scroll { max-height: 70vh; }
+  .table-scroll th { z-index: 2; }
+  .table-scroll th:first-child, .table-scroll td:first-child:not([colspan]) {
+    position: sticky; left: 0; z-index: 1; background-color: var(--surface); box-shadow: 1px 0 0 var(--line);
+  }
+  .table-scroll th:first-child { z-index: 3; background-color: #0d1118; }
+  .col-secondary { display: none; }
+
+  /* Touch targets >= 40px; 16px inputs stop iOS Safari zooming the page on focus. */
+  button { min-height: 40px; }
+  input:not([type="checkbox"]):not([type="radio"]), select { font-size: 16px; min-height: 42px; }
+  .ctl button { min-height: 34px; padding: 6px 12px; font-size: 11.5px; }
+  .empty { font-size: 12.5px; }
+  footer { font-size: 11px; line-height: 1.6; }
+
+  /* experiments-only */
+  .filters { flex-direction: column; align-items: stretch; }
+  .filters select { width: 100%; }
+  .hint { font-size: 11.5px; }
+  td input[type="checkbox"] { width: 18px; height: 18px; }
+  tbody tr.selected td:first-child { background-color: #0f1726; }
+}
+@media (max-width: 360px) {
+  .grid { gap: 6px; }
+  .card .value { font-size: 17px; }
+}
 </style>
 </head>
 <body>
@@ -90,7 +180,7 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
     <h2>Experiment Log <span class="hint" id="count-hint"></span></h2>
     <div class="panel table-scroll">
       <table id="table-experiments">
-        <thead><tr><th></th><th>Experiment ID</th><th>Kind</th><th>Status</th><th>Name / Role</th><th>Trades</th><th>Net P&amp;L</th><th>Sample</th><th>Created</th></tr></thead>
+        <thead><tr><th></th><th>Experiment ID</th><th>Kind</th><th>Status</th><th>Name / Role</th><th>Trades</th><th>Net P&amp;L</th><th class="col-secondary">Sample</th><th class="col-secondary">Created</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -107,6 +197,12 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 </div>
 
 <script>
+// Phones show the nav as a swipeable strip - make sure the current page's tab is in view.
+(function () {
+  const a = document.querySelector(".page-nav a.active"), nav = a && a.parentElement;
+  if (nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2;
+})();
+
 const fmt = (n, d=4) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
@@ -146,8 +242,8 @@ function renderTable() {
       <td>${esc(p.name || "-")}${p.role ? " / " + esc(p.role) : ""}</td>
       <td class="num">${r.trade_count ?? "-"}</td>
       <td class="num ${r.net_pnl > 0 ? 'pos' : (r.net_pnl < 0 ? 'neg' : '')}">${r.net_pnl != null ? fmt(r.net_pnl,2) : "-"}</td>
-      <td>${esc(r.sample_label || "-")}</td>
-      <td>${new Date(e.created_at).toLocaleString()}</td>
+      <td class="col-secondary">${esc(r.sample_label || "-")}</td>
+      <td class="col-secondary">${new Date(e.created_at).toLocaleString()}</td>
     </tr>`;
   }).join("");
   tbody.querySelectorAll("tr[data-id]").forEach(tr => tr.addEventListener("click", () => rowClickHandler(tr.dataset.id)));
