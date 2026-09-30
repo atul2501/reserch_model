@@ -117,6 +117,7 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
   .card .label { font-size: 10px; letter-spacing: .06em; margin-bottom: 6px; }
   .card .value { font-size: 19px; overflow-wrap: anywhere; }
   .card .value.small { font-size: 14px; }
+  .grid > .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
   section { margin-bottom: 22px; }
   section h2 { font-size: 11.5px; letter-spacing: .07em; }
@@ -139,14 +140,23 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
   .table-scroll { max-height: 70vh; }
   .table-scroll th { z-index: 2; }
   .table-scroll th:first-child, .table-scroll td:first-child:not([colspan]) {
-    position: sticky; left: 0; z-index: 1; background-color: var(--surface); box-shadow: 1px 0 0 var(--line);
+    position: sticky; left: 0; z-index: 1; background-color: var(--surface);
+  }
+  /* box-shadow isn't painted on border-collapse cells, so pseudo-elements draw the divider and
+     cover the panel's padding strip (otherwise scrolled cells peek out left of the pinned one). */
+  .table-scroll th:first-child::before, .table-scroll td:first-child:not([colspan])::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 12px; background: var(--surface);
+  }
+  .table-scroll th:first-child::after, .table-scroll td:first-child:not([colspan])::after {
+    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 1px; background: var(--line);
   }
   .table-scroll th:first-child { z-index: 3; background-color: #0d1118; }
   .col-secondary { display: none; }
 
   /* Touch targets >= 40px; 16px inputs stop iOS Safari zooming the page on focus. */
   button { min-height: 40px; }
-  input:not([type="checkbox"]):not([type="radio"]), select { font-size: 16px; min-height: 42px; }
+  /* :not() raises specificity above page rules like `.filters select` / `.ctl select`. */
+  input:not([type="checkbox"]):not([type="radio"]), select:not([multiple]) { font-size: 16px; min-height: 42px; }
   .ctl button { min-height: 34px; padding: 6px 12px; font-size: 11.5px; }
   .empty { font-size: 12.5px; }
   footer { font-size: 11px; line-height: 1.6; }
@@ -156,7 +166,11 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
   .filters select { width: 100%; }
   .hint { font-size: 11.5px; }
   td input[type="checkbox"] { width: 18px; height: 18px; }
-  tbody tr.selected td:first-child { background-color: #0f1726; }
+  /* the first column is just the selection checkbox - pinning it adds nothing and hides the row tint */
+  #table-experiments th:first-child, #table-experiments td:first-child { position: static; background-color: transparent; box-shadow: none; }
+  #table-experiments th:first-child { background-color: #0d1118; }
+  #table-experiments th:first-child::before, #table-experiments th:first-child::after,
+  #table-experiments td:first-child::before, #table-experiments td:first-child::after { content: none; }
 }
 @media (max-width: 360px) {
   .grid { gap: 6px; }
