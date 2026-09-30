@@ -390,8 +390,13 @@ async def _run(db, s, exp, epoch, generation, candles, market_service, now) -> R
     for agent in ranked[: s.research_adversarial_top_k * 2]:
         await create_agent_snapshot(db, agent, versions[agent.strategy_version_id], experiment_id=exp.experiment_id,
                                     dataset_fingerprint=epoch.dataset_fingerprint)
-    last_close = float(candles["close"].iloc[-1])
-    counts["retired"] = await retire_generation(db, gen_no, mark_price=last_close, at=now, fee_rate=s.paper_fee_rate,
+    # Mark open paper positions at the LIVE market, not the sealed epoch's last close (the epoch is frozen and can be
+    # days old), and at the moment of the rollover: the paper worker keeps trading while this cycle backtests, so
+    # `now` (captured at cycle start) can predate positions opened since.
+    live = await ds.load_confirmed_candles(db, epoch.symbol, epoch.timeframe, limit=1)
+    mark_price = float(live["close"].iloc[-1]) if len(live) else float(candles["close"].iloc[-1])
+    retire_at = max(now, datetime.now(timezone.utc))
+    counts["retired"] = await retire_generation(db, gen_no, mark_price=mark_price, at=retire_at, fee_rate=s.paper_fee_rate,
                                                  settle_close=accounting.settle_close)
     new_gen = await create_generation(
         db, generation_number=gen_no + 1, strategy_version_ids=new_ids, starting_balance=s.agent_starting_balance,

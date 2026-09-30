@@ -212,8 +212,9 @@ async def retire_generation(
             entry_fee=pos.entry_fee, exit_fee=exit_fee, funding_paid=pos.funding_accrued,
         )
         settlement = settle_close(agent.balance, pnl.gross_pnl, exit_fee)   # bad debt recorded, not hidden
+        closed_at = max(at, pos.opened_at)   # never record a close that precedes its own open
         pos.is_open = False
-        pos.closed_at = at
+        pos.closed_at = closed_at
         pos.unrealized_pnl = 0.0
         pos.pending_exit_reason = None
         pos.pending_exit_signal_time = None
@@ -222,7 +223,7 @@ async def retire_generation(
             quantity=pos.quantity, entry_price=pos.entry_price, exit_price=mark_price, gross_pnl=pnl.gross_pnl,
             fees=pnl.fees, funding=pnl.funding, slippage_cost=pos.entry_slippage_cost, net_pnl=pnl.net_pnl,
             bad_debt=settlement.bad_debt,
-            opened_at=pos.opened_at, closed_at=at, holding_seconds=max(0, int((at - pos.opened_at).total_seconds())),
+            opened_at=pos.opened_at, closed_at=closed_at, holding_seconds=int((closed_at - pos.opened_at).total_seconds()),
             entry_regime=pos.entry_regime, exit_reason="generation_rollover", stage=stage_by_version.get(agent.strategy_version_id),
         ))
         agent.balance = settlement.new_balance

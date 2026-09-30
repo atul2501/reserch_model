@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.models.research import Experiment, ResearchEpoch
 from app.research import dataset as ds
-from app.research.registry import code_version, register_experiment, schema_version
+from app.research.registry import code_version, fail_abandoned_experiments, finish_experiment, register_experiment, schema_version
 
 
 def frame(n=1000, seed=0):
@@ -80,3 +80,21 @@ async def test_confirmed_only_loader_never_returns_open_bars(db_session):
     df = await ds.load_confirmed_candles(db_session, "SOL", "1m")
     assert len(df) == 9 and int(df["open_time"].iloc[-1]) == 8 * 60_000
     assert await ds.count_confirmed_candles(db_session, "SOL", "1m") == 9
+
+
+async def test_abandoned_running_evolution_experiments_are_marked_failed(db_session):
+    """A research process killed mid-cycle (OOM, host restart) never reaches its except-branch; three such runs sat
+    RUNNING forever in production. The next lease holder closes them out."""
+    dead = await register_experiment(db_session, kind="evolution", seed=1, parameters={})
+    done = await register_experiment(db_session, kind="evolution", seed=2, parameters={})
+    await finish_experiment(db_session, done, status="COMPLETED", result={})
+    other = await register_experiment(db_session, kind="oos", seed=3, parameters={})
+    await db_session.commit()
+
+    assert await fail_abandoned_experiments(db_session) == 1
+    await db_session.commit()
+    for exp in (dead, done, other):
+        await db_session.refresh(exp)
+    assert dead.status == "FAILED" and dead.finished_at is not None and "abandoned" in dead.result["error"]
+    assert done.status == "COMPLETED" and other.status == "RUNNING"   # other kinds are not this lease's to judge
+    assert await fail_abandoned_experiments(db_session) == 0

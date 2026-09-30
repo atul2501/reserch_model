@@ -128,6 +128,26 @@ async def test_retire_generation_closes_positions_freezes_results_and_never_touc
     assert (await db_session.execute(select(Position).where(Position.is_open.is_(True)))).first() is None
 
 
+async def test_retire_generation_never_closes_a_position_before_it_opened(db_session, monkeypatch):
+    """The research cycle captures `now` when it starts and backtests for minutes while the paper worker keeps
+    opening positions; a rollover close must not be timestamped before those opens (189 such trades were recorded
+    with holding_seconds clamped to 0)."""
+    from datetime import timedelta
+
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "paper_latency_ms", 0)
+    monkeypatch.setattr(get_settings(), "paper_latency_jitter_ms", 0)
+    await make_agents(db_session, [make_dna()])
+    await cycle(db_session, PaperExecutionAdapter(), make_context(1, 100.0, rsi=65.0))
+    pos = (await db_session.execute(select(Position).where(Position.is_open.is_(True)))).scalar_one()
+    stale = pos.opened_at - timedelta(minutes=10)
+    await retire_generation(db_session, 100, mark_price=101.0, at=stale, fee_rate=0.00045,
+                            settle_close=accounting.settle_close)
+    await db_session.commit()
+    (trade,) = (await db_session.execute(select(Trade))).scalars().all()
+    assert trade.closed_at >= trade.opened_at and trade.holding_seconds >= 0
+
+
 async def test_dead_agent_death_record_is_complete_and_permanent(db_session):
     from app.agents.lifecycle import AgentAlreadyDeadError, mark_dead, update_equity
     (agent,) = await make_agents(db_session, [make_dna()])

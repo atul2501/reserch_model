@@ -7,10 +7,8 @@ execution -> fitness -> evolution) runs as a separate background worker
 this is deliberate, not an oversight; see docs/architecture.md.
 """
 from __future__ import annotations
-
 from contextlib import asynccontextmanager
 from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse

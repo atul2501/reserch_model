@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
 <title>Trading Lab Dashboard</title>
 <style>
 :root {
@@ -103,7 +104,7 @@ h1 span { -webkit-background-clip: initial; background-clip: initial; margin-lef
 
 /* auto-fit (not a fixed column count) so a row with fewer cards than columns never leaves a
    lopsided gap of empty grid cells - cards fill the width and wrap only when they must. */
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 22px; }
 
 .card {
   position: relative;
@@ -129,7 +130,7 @@ section h2 {
   border-bottom: 1px solid var(--line);
   font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a4adb8;
 }
-.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
 @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
 
 .panel {
@@ -180,7 +181,7 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 #alert-banner { display:none; margin: 0 0 14px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--red);
   background: rgba(241,107,124,.12); color: #ffd7dc; font-weight: 650; font-size: 13px; letter-spacing: .02em; }
 #alert-banner.warn { border-color: #e0b341; background: rgba(224,179,65,.12); color: #ffeab0; }
-.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.hgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 10px; }
 .hcard { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .hcard .t { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
 .hcard .v { font-size: 13px; font-weight: 650; }
@@ -188,6 +189,127 @@ footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line);
 .st-ok { color: var(--green); } .st-degraded { color: #e0b341; } .st-down { color: var(--red); } .st-unknown { color: var(--muted); }
 pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 10.5px; overflow: auto; max-height: 320px; }
 .agent-row { cursor: pointer; }
+
+/* Lookup rows (input + Load button + optional result badge): wrap instead of squeezing. */
+.lookup-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.lookup-input {
+  flex: 1 1 240px; min-width: 0; padding: 7px 10px; font: inherit;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line-strong); border-radius: 6px;
+  transition: border-color .15s var(--ease);
+}
+.lookup-input::placeholder { color: #5d6674; }
+.lookup-input:hover { border-color: #3a4454; }
+.lookup-input:focus { outline: none; border-color: var(--blue); }
+#correlation-generation-input { flex: 0 1 180px; }
+.lookup-hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.market-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .market-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.mk-l { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+.mk-v { color: var(--text-strong); font-weight: 600; overflow-wrap: anywhere; }
+.wrap-cell { white-space: normal; min-width: 260px; max-width: 520px; }
+
+/* ---- responsive layer (identical on every dashboard page) ----
+   Appended last so it overrides the desktop rules above at equal specificity. Every grid uses
+   minmax(min(Npx, 100%), 1fr) so a column minimum can never exceed a narrow viewport. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.wrap { width: min(1400px, calc(100% - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)))); }
+section h2 { flex-wrap: wrap; row-gap: 2px; }
+.grid > *, .hgrid > *, .chart-grid > *, .row-2 > * { min-width: 0; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+/* Hover lifts stick after a tap on touch screens - only animate where a real pointer hovers. */
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: none; border-color: var(--line); }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 14px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* Header: static (a sticky 3-row header ate a third of a phone screen), left-aligned title and
+     controls, nav as a full-width swipeable segmented strip. */
+  header {
+    position: static; grid-template-columns: minmax(0, 1fr); justify-items: stretch; text-align: left;
+    gap: 10px; padding: 14px 0 12px; margin-bottom: 16px;
+  }
+  header h1 { order: 1; font-size: 17px; line-height: 1.35; }
+  header h1 span { display: inline-block; margin-left: 6px; font-size: 12px; }
+  header .header-right { order: 2; justify-self: start; gap: 8px; }
+  header .page-nav { order: 3; }
+  .page-nav {
+    display: flex; gap: 2px; margin: 0; padding: 3px; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  }
+  .page-nav::-webkit-scrollbar { display: none; }
+  .page-nav a { flex: 1 0 auto; text-align: center; white-space: nowrap; scroll-snap-align: center;
+    padding: 9px 12px; font-size: 12.5px; border-radius: 7px; }
+  .badge { font-size: 10.5px; padding: 5px 10px; }
+
+  /* KPI cards: a tidy two-up grid. */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .card { padding: 12px 12px 12px 15px; }
+  .card .label { font-size: 10px; letter-spacing: .06em; margin-bottom: 6px; }
+  .card .value { font-size: 19px; overflow-wrap: anywhere; }
+  .card .value.small { font-size: 14px; }
+  .grid > .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  section { margin-bottom: 22px; }
+  section h2 { font-size: 11.5px; letter-spacing: .07em; }
+  section h2 > .sub, section h2 > .hint { flex-basis: 100%; font-size: 11.5px; line-height: 1.45; }
+  /* Inline margin-left:auto pushes header controls into the title; put them on their own row. */
+  section h2 > .ctl, section h2 > select { margin-left: 0 !important; margin-top: 6px; }
+  .panel { padding: 10px; }
+  .chart-wrap { height: 200px; }
+  .chart-label, .chart-caption { font-size: 10.5px; }
+
+  .hcard .t { font-size: 10px; }
+  .hcard .v { font-size: 14px; overflow-wrap: anywhere; }
+  .hcard .d { font-size: 11.5px; }
+
+  /* Tables: readable text, the page (not a small inner box) does most of the vertical scrolling,
+     and the first column stays pinned while swiping sideways so every row stays identifiable. */
+  table { font-size: 12.5px; }
+  th { font-size: 10px; }
+  th, td { padding: 9px 10px; }
+  .table-scroll { max-height: 70vh; }
+  .table-scroll th { z-index: 2; }
+  .table-scroll th:first-child, .table-scroll td:first-child:not([colspan]) {
+    position: sticky; left: 0; z-index: 1; background-color: var(--surface);
+  }
+  /* box-shadow isn't painted on border-collapse cells, so pseudo-elements draw the divider and
+     cover the panel's padding strip (otherwise scrolled cells peek out left of the pinned one). */
+  .table-scroll th:first-child::before, .table-scroll td:first-child:not([colspan])::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 12px; background: var(--surface);
+  }
+  .table-scroll th:first-child::after, .table-scroll td:first-child:not([colspan])::after {
+    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 1px; background: var(--line);
+  }
+  .table-scroll th:first-child { z-index: 3; background-color: #0d1118; }
+  .col-secondary { display: none; }
+
+  /* Touch targets >= 40px; 16px inputs stop iOS Safari zooming the page on focus. */
+  button { min-height: 40px; }
+  /* :not() raises specificity above page rules like `.filters select` / `.ctl select`. */
+  input:not([type="checkbox"]):not([type="radio"]), select:not([multiple]) { font-size: 16px; min-height: 42px; }
+  .ctl button { min-height: 34px; padding: 6px 12px; font-size: 11.5px; }
+  .empty { font-size: 12.5px; }
+  footer { font-size: 11px; line-height: 1.6; }
+
+  /* index-only */
+  .market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
+  .mk-l { font-size: 10px; }
+  .lookup-row .btn-load { flex: 0 0 auto; font-size: 13px; padding: 6px 18px; }
+  #correlation-generation-input { flex: 1 1 140px; }
+  .lookup-row > span:empty { display: none; }
+  .lookup-row > span { flex-basis: 100%; font-weight: 650; }
+  .wrap-cell { min-width: 260px; max-width: 82vw; }
+  #leaderboard-load-more { width: 100%; }
+  #export-report { min-height: 34px; }
+}
+@media (max-width: 360px) {
+  .grid { gap: 6px; }
+  .card .value { font-size: 17px; }
+}
 </style>
 </head>
 <body>
@@ -226,8 +348,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Agent Detail <span class="sub">click a leaderboard row (or enter an agent id): DNA, versions, equity curve, fitness, regime performance</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="agent-input" type="text" placeholder="agent UUID (click a leaderboard row)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="agent-input" type="text" placeholder="agent UUID (click a leaderboard row)" class="lookup-input">
         <button id="agent-load" type="button" class="btn-load">Load</button>
       </div>
       <div id="agent-detail"><div class="empty">select an agent</div></div>
@@ -292,7 +414,7 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="strategy-table">
         <thead><tr>
-          <th>Strategy</th><th>Agents</th><th>Trades</th><th>Trade Share</th><th>Wins</th><th>Win Share</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th>Fees</th>
+          <th>Strategy</th><th class="col-secondary">Agents</th><th>Trades</th><th class="col-secondary">Trade Share</th><th>Wins</th><th class="col-secondary">Win Share</th><th>Win Rate</th><th>Total PnL</th><th>Avg PnL / Trade</th><th class="col-secondary">Fees</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -314,19 +436,19 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Strategy Version Inspector <span class="sub">loads regime validation, reality gap, and adversarial robustness together for one strategy version</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center;">
-        <input id="inspector-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row" style="margin-bottom:0">
+        <input id="inspector-input" type="text" placeholder="strategy_version_id (UUID)" class="lookup-input">
         <button id="inspector-load" type="button" class="btn-load">Load All</button>
       </div>
-      <div style="margin-top:6px; color:var(--muted); font-size:12px;">Fills and loads the three lookup boxes below in one click — each also still works independently.</div>
+      <div class="lookup-hint">Fills and loads the three lookup boxes below in one click — each also still works independently.</div>
     </div>
   </section>
 
   <section>
     <h2>Regime Validation <span class="sub">per-regime breakdown &amp; robustness classification for one strategy version</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="regime-validation-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="regime-validation-input" type="text" placeholder="strategy_version_id (UUID)" class="lookup-input">
         <button id="regime-validation-load" type="button" class="btn-load">Load</button>
         <span id="regime-validation-badge"></span>
       </div>
@@ -345,8 +467,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Reality Gap <span class="sub">stage-by-stage performance degradation for one strategy version</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="reality-gap-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="reality-gap-input" type="text" placeholder="strategy_version_id (UUID)" class="lookup-input">
         <button id="reality-gap-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
@@ -365,8 +487,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Adversarial Robustness <span class="sub">stress-test scenario breakdown for one strategy version</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="adversarial-input" type="text" placeholder="strategy_version_id (UUID)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="adversarial-input" type="text" placeholder="strategy_version_id (UUID)" class="lookup-input">
         <button id="adversarial-load" type="button" class="btn-load">Load</button>
         <span id="adversarial-badge"></span>
       </div>
@@ -383,8 +505,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Strategy Correlation <span class="sub">family&times;family correlation &amp; top correlated pairs for one generation</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="correlation-generation-input" type="number" placeholder="generation number" style="width:160px; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="correlation-generation-input" type="number" placeholder="generation number" class="lookup-input">
         <button id="correlation-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
@@ -415,8 +537,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
   <section>
     <h2>Challengers &amp; Promotion History <span class="sub">pipeline stage per strategy version, and every promote/reject decision</span></h2>
     <div class="panel">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input id="challengers-input" type="text" placeholder="strategy_id (UUID, from Champions table)" style="flex:1; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; font-family:inherit;">
+      <div class="lookup-row">
+        <input id="challengers-input" type="text" placeholder="strategy_id (UUID, from Champions table)" class="lookup-input">
         <button id="challengers-load" type="button" class="btn-load">Load</button>
       </div>
       <div class="table-scroll">
@@ -439,8 +561,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="positions-table">
         <thead><tr>
-          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Current Price</th><th>Qty</th><th>Amount</th><th>Leverage</th>
-          <th>Unrealized PnL</th><th>Stop Loss Rule</th><th>Take Profit Rule</th><th>Opened</th>
+          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Current Price</th><th class="col-secondary">Qty</th><th class="col-secondary">Amount</th><th class="col-secondary">Leverage</th>
+          <th>Unrealized PnL</th><th class="col-secondary">Stop Loss Rule</th><th class="col-secondary">Take Profit Rule</th><th class="col-secondary">Opened</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -453,8 +575,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
       <div class="table-scroll">
         <table id="leaderboard-table">
           <thead><tr>
-            <th>Rank</th><th>ID</th><th>Tier</th><th>Gen</th><th>Strategy</th>
-            <th>Balance</th><th>Equity</th><th>ROI</th><th>Realized PnL</th><th>Trades</th><th>Fitness</th>
+            <th>Rank</th><th>ID</th><th class="col-secondary">Tier</th><th class="col-secondary">Gen</th><th>Strategy</th>
+            <th class="col-secondary">Balance</th><th>Equity</th><th>ROI</th><th class="col-secondary">Realized PnL</th><th class="col-secondary">Trades</th><th>Fitness</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -470,8 +592,8 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
     <div class="panel table-scroll">
       <table id="trades-table">
         <thead><tr>
-          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Amount</th>
-          <th>Net PnL</th><th>Reason</th><th>Opened</th><th>Closed</th>
+          <th>Agent</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Exit</th><th class="col-secondary">Qty</th><th class="col-secondary">Amount</th>
+          <th>Net PnL</th><th class="col-secondary">Reason</th><th class="col-secondary">Opened</th><th>Closed</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -482,6 +604,12 @@ pre.dna { background: var(--bg); border: 1px solid var(--line); border-radius: 8
 </div>
 
 <script>
+// Phones show the nav as a swipeable strip - make sure the current page's tab is in view.
+(function () {
+  const a = document.querySelector(".page-nav a.active"), nav = a && a.parentElement;
+  if (nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2;
+})();
+
 const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
 const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
@@ -536,6 +664,7 @@ async function section(name, fn) {
 // chronological order, evenly spaced by index (not by real elapsed time) -
 // close enough for these series and keeps the renderer simple.
 function renderLineChart(svg, points, color) {
+  svg._redraw = () => renderLineChart(svg, points, color);
   const w = svg.clientWidth || 400, h = svg.clientHeight || 190;
   const padL = 46, padR = 8, padT = 8, padB = 10;
   const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
@@ -646,9 +775,9 @@ async function refresh() {
     const m = await get("/api/market");
     lastLivePrice = m.live_price ?? m.close_price;
     document.getElementById("market-title").textContent = `${m.symbol} $${fmt(m.close_price)}`;
-    const cell = (t, v) => `<div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px;">${t}</div><div>${v}</div></div>`;
+    const cell = (t, v) => `<div><div class="mk-l">${t}</div><div class="mk-v num">${v}</div></div>`;
     document.getElementById("market-panel").innerHTML = `
-      <div class="grid" style="margin:0;grid-template-columns:repeat(6,minmax(0,1fr));">
+      <div class="market-grid">
         ${cell("Confirmed close", "$" + fmt(m.close_price))}
         ${cell("Live price (forming)", m.live_price == null ? "-" : "$" + fmt(m.live_price))}
         ${cell("Confirmed candle", new Date(m.candle_open_time).toISOString().slice(11, 19) + "Z")}
@@ -728,11 +857,11 @@ async function refresh() {
     const rows = await get("/api/trades/by-strategy");
     const tbody = document.querySelector("#strategy-table tbody");
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No closed trades yet</td></tr>`; return; }
-    const shareCell = (share) => `<td class="num">${pct(share)}</td>`;
+    const shareCell = (share) => `<td class="num col-secondary">${pct(share)}</td>`;
     const body = rows.map(r => `
       <tr>
         <td>${esc(r.strategy_family || "-")}</td>
-        <td class="num">${r.agent_count}</td>
+        <td class="num col-secondary">${r.agent_count}</td>
         <td class="num">${r.trade_count}</td>
         ${shareCell(r.trade_share)}
         <td class="num">${r.win_count}</td>
@@ -740,22 +869,22 @@ async function refresh() {
         <td class="num">${pct(r.win_rate)}</td>
         <td class="num ${r.total_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.total_pnl)}</td>
         <td class="num ${r.avg_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.avg_pnl)}</td>
-        <td class="num">$${fmt(r.total_fees)}</td>
+        <td class="num col-secondary">$${fmt(r.total_fees)}</td>
       </tr>`).join("");
     const sum = k => rows.reduce((a, r) => a + r[k], 0);
     const totTrades = sum("trade_count"), totWins = sum("win_count"), totPnl = sum("total_pnl");
     const total = `
       <tr style="font-weight:650; border-top:2px solid var(--line);">
         <td>All strategies</td>
-        <td class="num">${sum("agent_count")}</td>
+        <td class="num col-secondary">${sum("agent_count")}</td>
         <td class="num">${totTrades}</td>
-        <td class="num">100.0%</td>
+        <td class="num col-secondary">100.0%</td>
         <td class="num">${totWins}</td>
-        <td class="num">100.0%</td>
+        <td class="num col-secondary">100.0%</td>
         <td class="num">${pct(totTrades ? totWins / totTrades : null)}</td>
         <td class="num ${totPnl >= 0 ? 'pos' : 'neg'}">${dollar(totPnl)}</td>
         <td class="num ${totPnl >= 0 ? 'pos' : 'neg'}">${dollar(totTrades ? totPnl / totTrades : 0)}</td>
-        <td class="num">$${fmt(sum("total_fees"))}</td>
+        <td class="num col-secondary">$${fmt(sum("total_fees"))}</td>
       </tr>`;
     tbody.innerHTML = body + total;
   });
@@ -998,13 +1127,13 @@ async function refresh() {
         <td><span class="pill ${p.side === 'LONG' ? 'side-long' : 'side-short'}">${esc(p.side)}</span></td>
         <td class="num">$${fmt(p.entry_price)}</td>
         <td class="num">${priceCell}</td>
-        <td class="num">${fmt(p.quantity, 4)}</td>
-        <td class="num">$${fmt(p.quantity * p.entry_price)}</td>
-        <td class="num">${fmt(p.leverage, 1)}x</td>
+        <td class="num col-secondary">${fmt(p.quantity, 4)}</td>
+        <td class="num col-secondary">$${fmt(p.quantity * p.entry_price)}</td>
+        <td class="num col-secondary">${fmt(p.leverage, 1)}x</td>
         <td class="num ${p.unrealized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(p.unrealized_pnl)}</td>
-        <td class="num">${formatRule(p.stop_loss_method, p.stop_loss_value)}</td>
-        <td class="num">${formatRule(p.take_profit_method, p.take_profit_value)}</td>
-        <td>${ago(p.opened_at)}</td>
+        <td class="num col-secondary">${formatRule(p.stop_loss_method, p.stop_loss_value)}</td>
+        <td class="num col-secondary">${formatRule(p.take_profit_method, p.take_profit_value)}</td>
+        <td class="col-secondary">${ago(p.opened_at)}</td>
       </tr>`;
     }).join("");
   });
@@ -1017,14 +1146,14 @@ async function refresh() {
       <tr class="agent-row" data-agent-id="${esc(r.agent.id)}" title="click for agent detail">
         <td class="num">${r.rank}</td>
         <td>${esc(r.agent.identifier)}</td>
-        <td><span class="pill ${r.agent.is_professional ? 'tier-pro' : 'tier-std'}">${r.agent.is_professional ? 'PRO' : 'std'}</span></td>
-        <td class="num">${r.agent.generation}</td>
+        <td class="col-secondary"><span class="pill ${r.agent.is_professional ? 'tier-pro' : 'tier-std'}">${r.agent.is_professional ? 'PRO' : 'std'}</span></td>
+        <td class="num col-secondary">${r.agent.generation}</td>
         <td>${esc(r.strategy_family || "-")}</td>
-        <td class="num">$${fmt(r.agent.balance)}</td>
+        <td class="num col-secondary">$${fmt(r.agent.balance)}</td>
         <td class="num">$${fmt(r.agent.equity)}</td>
         <td class="num ${r.agent.roi >= 0 ? 'pos' : 'neg'}">${pct(r.agent.roi)}</td>
-        <td class="num ${r.agent.realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.agent.realized_pnl)}</td>
-        <td class="num">${r.agent.trade_count}</td>
+        <td class="num col-secondary ${r.agent.realized_pnl >= 0 ? 'pos' : 'neg'}">${dollar(r.agent.realized_pnl)}</td>
+        <td class="num col-secondary">${r.agent.trade_count}</td>
         <td class="num">${fmt(r.agent.fitness)}</td>
       </tr>`).join("");
 
@@ -1046,11 +1175,11 @@ async function refresh() {
         <td><span class="pill ${t.side === 'LONG' ? 'side-long' : 'side-short'}">${esc(t.side)}</span></td>
         <td class="num">$${fmt(t.entry_price)}</td>
         <td class="num">$${fmt(t.exit_price)}</td>
-        <td class="num">${fmt(t.quantity, 4)}</td>
-        <td class="num">$${fmt(t.quantity * t.entry_price)}</td>
+        <td class="num col-secondary">${fmt(t.quantity, 4)}</td>
+        <td class="num col-secondary">$${fmt(t.quantity * t.entry_price)}</td>
         <td class="num ${t.net_pnl >= 0 ? 'pos' : 'neg'}">${dollar(t.net_pnl)}</td>
-        <td>${esc(t.exit_reason)}</td>
-        <td>${ago(t.opened_at)}</td>
+        <td class="col-secondary">${esc(t.exit_reason)}</td>
+        <td class="col-secondary">${ago(t.opened_at)}</td>
         <td>${ago(t.closed_at)}</td>
       </tr>`).join("");
   });
@@ -1138,7 +1267,7 @@ async function pollHealth() {   // fallback while the stream is down
 async function refreshSlow() {
   await section("council", async () => {
     let c; try { c = await get("/api/council/latest"); } catch (e) { return; }
-    const rows = (c.analysts || []).map(a => `<tr><td>${esc(a.analyst)}</td><td>${esc(a.bias)}</td><td>${fmt(a.confidence)}</td><td>${a.valid ? "ok" : "FAILED"}</td><td>${esc(a.latency_ms)} ms</td><td style="white-space:normal;max-width:520px">${esc(a.reasoning)}</td></tr>`).join("");
+    const rows = (c.analysts || []).map(a => `<tr><td>${esc(a.analyst)}</td><td>${esc(a.bias)}</td><td>${fmt(a.confidence)}</td><td>${a.valid ? "ok" : "FAILED"}</td><td>${esc(a.latency_ms)} ms</td><td class="wrap-cell">${esc(a.reasoning)}</td></tr>`).join("");
     const fails = Object.entries(c.failure_reasons || {}).map(([k, v]) => esc(k) + ": " + esc(v)).join("; ") || "none";
     document.getElementById("council-panel").innerHTML =
       `<div class="hgrid" style="margin-bottom:10px">${card("Status", c.status === "COMPLETE" ? "ok" : "degraded", c.status, "quorum " + (c.quorum_met ? "met" : "NOT met") + " · " + esc(c.successful_analysts) + "/" + esc(c.expected_analysts) + " analysts")}
@@ -1216,6 +1345,18 @@ pollHealth();
 setInterval(refresh, 5000);
 setInterval(refreshSlow, 15000);
 setInterval(pollHealth, 5000);
+
+// Charts are drawn at the SVG's pixel width; redraw them when the width changes (phone rotation,
+// window resize). Height-only resizes (mobile URL bar showing/hiding) are ignored.
+let lastChartWidth = window.innerWidth, chartResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(() => {
+    if (window.innerWidth === lastChartWidth) return;
+    lastChartWidth = window.innerWidth;
+    document.querySelectorAll("svg").forEach(s => { if (typeof s._redraw === "function") s._redraw(); });
+  }, 150);
+});
 </script>
 </body>
 </html>
