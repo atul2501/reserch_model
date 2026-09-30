@@ -85,6 +85,11 @@ from app.worker.lease import LeaseLost
 
 logger = get_logger(__name__)
 
+# agent_id -> the UTC candle date whose max_trades_per_day cap was already audited. An agent that hits its cap
+# re-signals on (nearly) every remaining bar of the day; one audit row per agent-day is the evidence, the rest were
+# 61% of all Decision rows. Process-local: a restart re-audits at most once per agent-day.
+_daily_cap_audited: dict = {}
+
 
 @dataclass
 class CycleContext:
@@ -539,8 +544,10 @@ async def _process_agent_inner(cc: CycleContext, agent: Agent) -> None:
         await _keep(db, decision)
         return
     if agent.daily_trade_count >= dna.max_trades_per_day:
-        decision.risk_reasoning = {"skipped": "max_trades_per_day_reached"}
-        await _keep(db, decision)
+        if _daily_cap_audited.get(agent.id) != market_ts.date():
+            _daily_cap_audited[agent.id] = market_ts.date()
+            decision.risk_reasoning = {"skipped": "max_trades_per_day_reached"}
+            await _keep(db, decision)
         return
 
     # ---- 3. council as shared context (never an oracle) ------------------- #

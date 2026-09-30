@@ -47,6 +47,23 @@ def test_entry_levels_follow_the_dna():
     assert lv.trailing_distance is None and lv.trailing_active is False
 
 
+def test_a_stop_tighter_than_the_cost_floor_is_widened_and_the_reward_ratio_kept():
+    dna = make_dna()                                          # atr_multiple 2.0 stop, 2.0 R:R take-profit
+    lv = accounting.entry_levels(dna, Side.LONG, 100.0, atr=0.05, swing_low=None, swing_high=None,
+                                 min_stop_distance_pct=0.4)   # ATR stop would sit only 0.1 below entry
+    assert lv.stop_loss == pytest.approx(99.6)
+    assert lv.take_profit == pytest.approx(100.8)             # 2.0 x the FLOORED 0.4 distance
+    short = accounting.entry_levels(dna, Side.SHORT, 100.0, atr=0.05, swing_low=None, swing_high=None,
+                                    min_stop_distance_pct=0.4)
+    assert short.stop_loss == pytest.approx(100.4) and short.take_profit == pytest.approx(99.2)
+    wide = accounting.entry_levels(dna, Side.LONG, 100.0, atr=0.5, swing_low=None, swing_high=None,
+                                   min_stop_distance_pct=0.4)
+    assert wide.stop_loss == pytest.approx(99.0)              # already wider than the floor: untouched
+    off = accounting.entry_levels(dna, Side.LONG, 100.0, atr=0.05, swing_low=None, swing_high=None,
+                                  min_stop_distance_pct=0.0)
+    assert off.stop_loss == pytest.approx(99.9)               # 0 disables the floor
+
+
 def test_cash_identity_reconciles_through_wins_losses_and_bad_debt():
     start = balance = 100.0
     realized = bad_debt = 0.0

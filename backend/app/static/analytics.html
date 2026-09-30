@@ -439,6 +439,9 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
 const fmt = (n, d=2) => (n === null || n === undefined || isNaN(n)) ? "-" : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 const pct = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (Number(n)*100).toFixed(1) + "%";
 const dollar = (n) => (n === null || n === undefined || isNaN(n)) ? "-" : (n >= 0 ? "+" : "") + "$" + fmt(n);
+// seconds -> "45s" / "8.3m" / "2.1h" / "1.5d"
+const dur = (s) => (s === null || s === undefined || isNaN(s)) ? "-"
+  : s < 60 ? Math.round(s) + "s" : s < 3600 ? (s/60).toFixed(1) + "m" : s < 86400 ? (s/3600).toFixed(1) + "h" : (s/86400).toFixed(1) + "d";
 const secs = v => (v === null || v === undefined) ? "-" : (v < 90 ? v.toFixed(0) + "s" : (v / 60).toFixed(1) + "m");
 const card = (t, status, main, detail) =>
   `<div class="hcard"><div class="t">${esc(t)}</div><div class="v st-${esc(status)}">${esc(main)}</div><div class="d">${detail}</div></div>`;
@@ -584,6 +587,8 @@ async function refreshOverview() {
     cardHtml("Max Drawdown", o.max_drawdown_pct == null ? '<span class="na">Insufficient data</span>' : pct(o.max_drawdown_pct)),
     cardHtml("Win Rate", o.win_rate == null ? '<span class="na">N/A</span>' : pct(o.win_rate)),
     cardHtml("Total Trades", o.total_trades ?? 0),
+    cardHtml("Hold Time (Low / Avg / High)", o.hold_seconds_avg == null ? '<span class="na">N/A</span>'
+      : `${dur(o.hold_seconds_min)} / ${dur(o.hold_seconds_avg)} / ${dur(o.hold_seconds_max)}`, "small"),
     cardHtml("Active Agents", o.active_agents ?? 0),
     cardHtml("Dead Agents", o.dead_agents ?? 0),
     cardHtml("Generation", o.current_generation == null ? '<span class="na">N/A</span>' : "#" + o.current_generation),

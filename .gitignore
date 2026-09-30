@@ -38,3 +38,5 @@ backend/data/
 # run.sh service state (pidfiles, logs)
 backend/.run/
 backend/logs/
+
+*.dump

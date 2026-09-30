@@ -175,6 +175,37 @@ async def test_full_pipeline_produces_a_validated_next_generation_and_protects_o
     assert again.status == "SKIPPED" and again.reason == "interval_not_elapsed"
 
 
+async def test_rollover_marks_open_positions_at_the_live_price_not_the_sealed_epochs(db_session, cfg, monkeypatch):
+    """The sealed epoch is frozen (possibly days old); closing the retiring generation's paper positions at its last
+    close booked fake losses (every rollover exit in production closed at one stale price)."""
+    import app.research.pipeline as pipeline
+
+    c = await _seed_candles(db_session)
+    await ds.seal_epoch(db_session, c, symbol="SOL", timeframe="1m")
+    await db_session.commit()
+    last = c.iloc[-1]
+    live_close = float(last.close) * 1.05
+    db_session.add(MarketCandle(symbol="SOL", timeframe="1m", open_time=int(last.open_time) + 60_000,
+                                close_time=int(last.open_time) + 119_999, open=live_close, high=live_close,
+                                low=live_close, close=live_close, volume=1.0, is_final=True))
+    await db_session.commit()
+    await _seed_population(db_session)
+
+    seen = {}
+    real_retire = pipeline.retire_generation
+
+    async def spy(db, gen_no, *, mark_price, at, **kw):
+        seen.update(mark_price=mark_price, at=at)
+        return await real_retire(db, gen_no, mark_price=mark_price, at=at, **kw)
+
+    monkeypatch.setattr(pipeline, "retire_generation", spy)
+    started = datetime.now(timezone.utc)
+    report = await run_research_cycle(db_session, now=started)
+    assert report.status == "COMPLETED", report.reason
+    assert seen["mark_price"] == pytest.approx(live_close)
+    assert seen["at"] >= started
+
+
 async def test_pipeline_uses_a_seeded_rng_so_children_are_reproducible(db_session, cfg):
     """Same seed + same survivors -> identical child DNA (breeding is no longer unseeded)."""
     from app.evolution.breeding import select_and_breed_next_generation

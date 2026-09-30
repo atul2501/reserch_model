@@ -78,12 +78,12 @@ async def test_max_trades_per_day_stops_new_entries_and_resets_next_utc_day(db_s
     (agent,) = await make_agents(db_session, [_dna(max_trades_per_day=2)])
     eng = PaperExecutionAdapter()
     last = None
-    for i in (1, 3, 5):                       # three entry attempts on the same UTC day
+    for i in (1, 3, 5, 7, 9):                 # five entry attempts on the same UTC day
         last = await _trade_round_trip(db_session, eng, i, last)
     await db_session.refresh(agent)
     assert agent.trade_count == 2 and agent.daily_trade_count == 2
     decs = (await db_session.execute(select(Decision).where(Decision.agent_id == agent.id, Decision.risk_reasoning["skipped"].as_string() == "max_trades_per_day_reached"))).scalars().all()
-    assert len(decs) == 1
+    assert len(decs) == 1                     # three blocked attempts, ONE audit row per agent-day
 
     # Same agent, next UTC day: the counter resets and it may trade again.
     from tests.helpers_agents import T0

@@ -537,25 +537,40 @@ async def refresh_fitness_forward(
     )).scalars().all()
     corr_rows = (await db.execute(select(AgentCorrelation).order_by(AgentCorrelation.computed_at))).scalars().all()
 
-    def _latest_upto(rows, version_id, t):
+    # Indexed by version / agent once: the per-(agent, grid point) lookups used to rescan every row of every
+    # evidence table, which (x ~2000 agents x hourly grid) kept the refresh computing long past the connection's
+    # idle-in-transaction timeout, so fitness_forward_performance was never written.
+    def _by_version(rows) -> dict:
+        out: dict = {}
+        for r in rows:   # rows arrive ordered by computed_at, so each list stays ordered
+            out.setdefault(r.strategy_version_id, []).append(r)
+        return out
+
+    backtest_by_v, wfo_by_v = _by_version(backtest_rows), _by_version(wfo_rows)
+    regime_by_v, adversarial_by_v = _by_version(regime_rows), _by_version(adversarial_rows)
+    corr_by_agent: dict = {}
+    for r in corr_rows:
+        corr_by_agent.setdefault(r.agent_id_a, []).append(r)
+        if r.agent_id_b != r.agent_id_a:
+            corr_by_agent.setdefault(r.agent_id_b, []).append(r)
+
+    def _latest_upto(rows_by_version, version_id, t):
         latest = None
-        for r in rows:
-            if r.strategy_version_id == version_id and r.computed_at <= t:
-                latest = r
+        for r in rows_by_version.get(version_id, ()):
+            if r.computed_at > t:
+                break
+            latest = r
         return latest
 
     def _corr_upto(agent_id, t):
-        vals = []
-        for r in corr_rows:
-            if r.computed_at <= t and agent_id in (r.agent_id_a, r.agent_id_b):
-                vals.append(r.composite_correlation)
+        vals = [r.composite_correlation for r in corr_by_agent.get(agent_id, ()) if r.computed_at <= t]
         return (sum(vals) / len(vals)) if vals else None
 
     def _stage_evidence_upto(agent, t) -> dict:
-        bt = _latest_upto(backtest_rows, agent.strategy_version_id, t) if agent.strategy_version_id else None
-        wfo = _latest_upto(wfo_rows, agent.strategy_version_id, t) if agent.strategy_version_id else None
-        regime = _latest_upto(regime_rows, agent.strategy_version_id, t) if agent.strategy_version_id else None
-        adversarial = _latest_upto(adversarial_rows, agent.strategy_version_id, t) if agent.strategy_version_id else None
+        bt = _latest_upto(backtest_by_v, agent.strategy_version_id, t) if agent.strategy_version_id else None
+        wfo = _latest_upto(wfo_by_v, agent.strategy_version_id, t) if agent.strategy_version_id else None
+        regime = _latest_upto(regime_by_v, agent.strategy_version_id, t) if agent.strategy_version_id else None
+        adversarial = _latest_upto(adversarial_by_v, agent.strategy_version_id, t) if agent.strategy_version_id else None
         return {
             "oos_score": bt.oos_score if bt is not None else None,
             "walk_forward_consistency": wfo.walk_forward_consistency if wfo is not None else None,

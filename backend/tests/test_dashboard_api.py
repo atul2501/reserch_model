@@ -55,12 +55,12 @@ async def api(db_session, monkeypatch):
         yield c
 
 
-def _trade(db, agent, *, net_pnl: float, closed_at: datetime, exit_reason="take_profit"):
+def _trade(db, agent, *, net_pnl: float, closed_at: datetime, exit_reason="take_profit", holding_seconds: int = 60):
     pos_id = closed_position(db, agent)
     db.add(Trade(
         agent_id=agent.id, position_id=pos_id, symbol="SOL", side="LONG", quantity=1.0,
         entry_price=100.0, exit_price=100.0 + net_pnl, gross_pnl=net_pnl, fees=0.0, net_pnl=net_pnl,
-        opened_at=closed_at - timedelta(minutes=1), closed_at=closed_at, holding_seconds=60,
+        opened_at=closed_at - timedelta(seconds=holding_seconds), closed_at=closed_at, holding_seconds=holding_seconds,
         exit_reason=exit_reason,
     ))
 
@@ -80,6 +80,8 @@ async def test_all_dashboard_endpoints_handle_an_empty_database(api):
     overview = (await api.get("/api/dashboard/overview")).json()
     assert overview["current_generation"] is None and overview["total_trades"] == 0
     assert overview["win_rate"] is None  # never a fabricated 0% when there's no evidence
+    assert overview["hold_seconds_min"] is None and overview["hold_seconds_max"] is None
+    assert overview["hold_seconds_avg"] is None
 
     equity = (await api.get("/api/dashboard/equity")).json()
     assert equity["insufficient_data"] is True
@@ -103,13 +105,15 @@ async def test_all_dashboard_endpoints_handle_an_empty_database(api):
 async def test_overview_reflects_real_trades_and_champion_count(db_session, api):
     agents = await make_agents(db_session, [make_dna(), make_dna()], balance=100.0)
     now = datetime.now(timezone.utc)
-    _trade(db_session, agents[0], net_pnl=10.0, closed_at=now)
-    _trade(db_session, agents[0], net_pnl=-4.0, closed_at=now)
-    _trade(db_session, agents[1], net_pnl=5.0, closed_at=now)
+    _trade(db_session, agents[0], net_pnl=10.0, closed_at=now, holding_seconds=30)
+    _trade(db_session, agents[0], net_pnl=-4.0, closed_at=now, holding_seconds=600)
+    _trade(db_session, agents[1], net_pnl=5.0, closed_at=now, holding_seconds=7200)
     await db_session.commit()
 
     r = (await api.get("/api/dashboard/overview")).json()
     assert r["total_trades"] == 3
+    assert r["hold_seconds_min"] == 30 and r["hold_seconds_max"] == 7200
+    assert r["hold_seconds_avg"] == (30 + 600 + 7200) / 3
     assert r["total_pnl"] == 11.0
     assert r["win_rate"] == 2 / 3
     assert r["active_agents"] == 2 and r["dead_agents"] == 0

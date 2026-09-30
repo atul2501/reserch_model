@@ -24,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.agents.position_manager import stop_price, take_profit_price
+from app.core.config import get_settings
 from app.models.enums import Side
 from app.schemas.strategy_dna import StrategyDNA
 
@@ -63,11 +64,21 @@ class EntryLevels:
 
 
 def entry_levels(
-    dna: StrategyDNA, side: Side, fill_price: float, *, atr: float, swing_low: float | None, swing_high: float | None
+    dna: StrategyDNA, side: Side, fill_price: float, *, atr: float, swing_low: float | None, swing_high: float | None,
+    min_stop_distance_pct: float | None = None,
 ) -> EntryLevels:
-    """Protective levels for a freshly opened position - the same numbers in paper, shadow and backtest."""
+    """Protective levels for a freshly opened position - the same numbers in paper, shadow and backtest.
+
+    The stop is never closer to the fill than `min_stop_distance_pct` percent (default: the
+    `min_stop_distance_pct` setting)."""
+    if min_stop_distance_pct is None:
+        min_stop_distance_pct = get_settings().min_stop_distance_pct
     sl = stop_price(fill_price, side, method=dna.stop_loss.method, value=dna.stop_loss.value, atr=atr,
                     swing_low=swing_low, swing_high=swing_high) if dna.stop_loss.enabled else None
+    if sl is not None and min_stop_distance_pct > 0:
+        floor = fill_price * min_stop_distance_pct / 100
+        if abs(fill_price - sl) < floor:
+            sl = fill_price - floor if side == Side.LONG else fill_price + floor
     tp = take_profit_price(fill_price, side, method=dna.take_profit.method, value=dna.take_profit.value, atr=atr,
                            stop=sl) if dna.take_profit.enabled else None
     trail = (fill_price * dna.trailing_stop.trail_pct / 100

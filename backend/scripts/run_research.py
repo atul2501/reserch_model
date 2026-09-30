@@ -20,6 +20,7 @@ from app.core.database import AsyncSessionLocal, use_immediate_transactions
 from app.core.logging import configure_logging, get_logger
 from app.market.market_data_service import MarketDataService
 from app.research.pipeline import run_research_cycle
+from app.research.registry import fail_abandoned_experiments
 from app.worker.lease import LeaseKeeper
 
 logger = get_logger(__name__)
@@ -37,6 +38,13 @@ async def main(*, once: bool, force: bool) -> None:
     if not await lease.acquire():
         logger.critical("research.already_active_refusing_to_run")
         raise SystemExit(2)
+    # We hold the research lease, so no other research process is running: any RUNNING evolution experiment is the
+    # leftover of one that died mid-cycle.
+    async with AsyncSessionLocal() as db:
+        abandoned = await fail_abandoned_experiments(db)
+        await db.commit()
+    if abandoned:
+        logger.warning("research.abandoned_experiments_marked_failed", count=abandoned)
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

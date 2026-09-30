@@ -188,6 +188,14 @@ class Settings(BaseSettings):
     # Trailing stops count the CURRENT bar's own extreme (worst-case path: rally first, then fall). False = prior bars only
     # (optimistic). Shared by paper, shadow and the backtest so they can never disagree.
     trailing_stop_uses_same_bar_extreme: bool = True
+    # Floor on a stop-loss's distance from entry, in percent of the fill price (0 disables). A 1m ATR on SOL is ~0.1%,
+    # below the ~0.13% round-trip cost (2x taker fee + 2x slippage), so ATR stops of 1-2x sit inside the cost band
+    # (48% of paper trades exited on a stop). A risk_reward_multiple take-profit is measured from the floored stop, so
+    # its reward:risk ratio is preserved. Shared by paper, shadow and the backtest
+    # (app.execution.accounting.entry_levels) so they can never disagree. Off by default: backtesting 60 gen-4 DNAs
+    # with floors of 0.4/0.8/1.5 halved stop-outs and lifted win rate 34% -> 39-41% but left net PnL unchanged -
+    # those strategies have no gross edge, so wider stops only trade many small losses for fewer larger ones.
+    min_stop_distance_pct: float = 0.0
     # An agent that is flat and whose equity fell below this can never open another order (the minimum notional
     # and lot size make it untradeable): it is retired as DEAD instead of lingering as a zombie ACTIVE agent.
     agent_min_viable_equity: float = 1.0

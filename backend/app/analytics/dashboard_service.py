@@ -65,9 +65,10 @@ async def get_overview(db: AsyncSession) -> dict:
         )).all()
         by_status = {s.value: {"count": n, "equity": float(e)} for s, n, e in rows}
 
-    total_trades, wins, total_pnl = (await db.execute(
+    total_trades, wins, total_pnl, hold_min, hold_max, hold_avg = (await db.execute(
         select(func.count(), func.coalesce(func.sum(case((Trade.net_pnl > 0, 1), else_=0)), 0),
-               func.coalesce(func.sum(Trade.net_pnl), 0.0))
+               func.coalesce(func.sum(Trade.net_pnl), 0.0),
+               func.min(Trade.holding_seconds), func.max(Trade.holding_seconds), func.avg(Trade.holding_seconds))
     )).one()
 
     champion_count = (await db.execute(
@@ -83,6 +84,10 @@ async def get_overview(db: AsyncSession) -> dict:
         "max_drawdown_pct": equity_curve.get("max_drawdown_pct"),
         "win_rate": (wins / total_trades) if total_trades else None,
         "total_trades": total_trades,
+        # trade holding time in seconds (None with no trades, never a fabricated 0)
+        "hold_seconds_min": int(hold_min) if hold_min is not None else None,
+        "hold_seconds_max": int(hold_max) if hold_max is not None else None,
+        "hold_seconds_avg": float(hold_avg) if hold_avg is not None else None,
         "active_agents": by_status.get(AgentStatus.ACTIVE.value, {}).get("count", 0),
         "dead_agents": by_status.get(AgentStatus.DEAD.value, {}).get("count", 0),
         "current_generation": gen_no,

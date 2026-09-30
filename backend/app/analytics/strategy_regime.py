@@ -84,12 +84,14 @@ def episode_block_bootstrap_ci(
     if len(episodes) < 2:
         return None
     rng = np.random.default_rng(_seed(*seed_key))
-    means = np.empty(resamples)
     n = len(episodes)
-    for i in range(resamples):
-        idx = rng.integers(0, n, size=n)
-        pooled = np.concatenate([episodes[j] for j in idx])
-        means[i] = pooled.mean()
+    # Vectorised: the pooled mean of a resample is sum(episode sums) / sum(episode counts), so all resamples are
+    # drawn at once (the same draws as one-resample-at-a-time) instead of concatenating trades per resample - the
+    # per-resample loop made a full matrix refresh take hours.
+    sums = np.array([float(np.sum(e)) for e in episodes])
+    counts = np.array([len(e) for e in episodes], dtype=float)
+    idx = rng.integers(0, n, size=(resamples, n))
+    means = sums[idx].sum(axis=1) / counts[idx].sum(axis=1)
     return float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))
 
 

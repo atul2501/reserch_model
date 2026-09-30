@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backtesting.engine import ENGINE_VERSION
@@ -117,3 +118,16 @@ async def finish_experiment(db: AsyncSession, exp: Experiment, *, status: str, r
     exp.result = result
     exp.finished_at = datetime.now(timezone.utc)
     await db.flush()
+
+
+async def fail_abandoned_experiments(db: AsyncSession, *, kind: str = "evolution") -> int:
+    """Marks every still-RUNNING experiment of `kind` FAILED. Only call it while holding the lease that makes the
+    caller the sole runner of that kind: a RUNNING row is then the leftover of a process that died mid-cycle (killed,
+    OOM, host restart), which never reaches its own except-branch and would otherwise stay RUNNING forever."""
+    stale = (await db.execute(
+        select(Experiment).where(Experiment.kind == kind, Experiment.status == "RUNNING")
+    )).scalars().all()
+    for exp in stale:
+        await finish_experiment(db, exp, status="FAILED",
+                                result={"error": "abandoned: the research process stopped before the cycle finished"})
+    return len(stale)
