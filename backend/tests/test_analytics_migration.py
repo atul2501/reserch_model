@@ -85,7 +85,10 @@ def test_analytics_indexes_created(migrated_db):
         "uq_trade_analytics_trade", "ix_trade_analytics_agent", "ix_trade_analytics_family_regime",
         "ix_trade_analytics_regime", "ix_trade_analytics_version", "ix_trade_analytics_class",
         "uq_srm_cell", "ix_srm_dim", "uq_ffp_agent_asof_horizon", "ix_ffp_asof_horizon",
-        "ix_trades_position", "ix_fitness_scores_agent_asof", "ix_fitness_scores_asof",
+        # ix_fitness_scores_asof (no underscore before "of") was an exact duplicate of the later
+        # ix_fitness_scores_as_of, added here and never noticed; migration f4669ea054ae drops it
+        # (confirmed dead: 0 scans in production against 234 for the surviving index).
+        "ix_trades_position", "ix_fitness_scores_agent_asof", "ix_fitness_scores_as_of",
     }
     missing = expected - names
     assert not missing, f"missing indexes: {missing}"

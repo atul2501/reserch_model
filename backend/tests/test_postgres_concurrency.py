@@ -206,6 +206,60 @@ async def test_two_workers_deciding_the_same_agent_candle_concurrently_one_wins(
     assert all(isinstance(r, IntegrityError) for r in results if r is not None)
 
 
+async def test_retire_generation_does_not_lose_a_balance_update_committed_by_a_concurrent_session(pg):
+    """app.research.pipeline._run loads every Agent of the generation into ONE session at cycle start, then keeps
+    that same session open through minutes of backtesting before calling retire_generation near the end. If the
+    live paper worker (a separate connection) opens a position for one of those agents in the meantime - debiting
+    its balance for the entry fee, exactly as _fill_entry does - SQLAlchemy's identity map hands retire_generation
+    back the Agent object as it was at cycle start, not a fresh read of the row: settle_close computes the new
+    balance from that stale value and overwrites the committed row, silently erasing the concurrent entry-fee
+    debit. Confirmed in production data: 52 of 1996 retired agents overstated by exactly their lost entry fee."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.agents.lifecycle import retire_generation
+    from app.execution import accounting
+    from app.models.agent import Agent
+    from app.models.enums import Side
+    from app.models.trading import Position
+    from tests.helpers_agents import make_agents, make_dna
+
+    factory, _, _ = pg
+    async with factory() as s_research:
+        (agent,) = await make_agents(s_research, [make_dna()])
+        agent_id = agent.id
+        await s_research.commit()
+
+        # pipeline._run's early, generation-wide Agent load (line 235) - now cached in this session's identity map.
+        stale = (await s_research.execute(select(Agent).where(Agent.id == agent_id))).scalar_one()
+        assert stale.balance == 100.0
+
+        # The concurrently-running live paper worker (a different connection) fills an entry for this same agent.
+        entry_fee = 0.05
+        async with factory() as s_paper:
+            live_agent = await s_paper.get(Agent, agent_id)
+            live_agent.balance -= entry_fee
+            s_paper.add(Position(agent_id=agent_id, symbol="SOL", side=Side.LONG, quantity=1.0, entry_price=100.0,
+                                 entry_fee=entry_fee, is_open=True, opened_at=datetime.now(timezone.utc)))
+            await s_paper.commit()
+
+        # retire_generation runs on the SAME long-lived research session and force-closes that position.
+        counts = await retire_generation(s_research, 100, mark_price=101.0, at=datetime.now(timezone.utc),
+                                         fee_rate=0.00045, settle_close=accounting.settle_close)
+        await s_research.commit()
+        assert counts == {"retired": 1, "positions_closed": 1}
+
+    async with factory() as check:
+        refreshed = await check.get(Agent, agent_id)
+        exit_fee = 101.0 * 1.0 * 0.00045
+        expected_balance = 100.0 - entry_fee + (101.0 - 100.0) * 1.0 - exit_fee
+        assert refreshed.balance == pytest.approx(expected_balance), (
+            "the concurrently-committed entry-fee debit was lost: retire_generation settled from a stale, "
+            "identity-mapped Agent object instead of the row the paper worker actually committed"
+        )
+
+
 async def test_the_database_rejects_a_second_open_position_for_one_agent_concurrently(pg):
     from datetime import datetime, timezone
     from app.models.enums import Side

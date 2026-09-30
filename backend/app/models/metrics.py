@@ -58,7 +58,10 @@ class PerformanceMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 class FitnessScore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "fitness_scores"
     __table_args__ = (
-        Index("ix_fitness_scores_agent", 'agent_id'),
+        # agent_id-only lookups are served by the leading column of the composite index below;
+        # a standalone ix_fitness_scores_agent was dead weight (confirmed: 0 scans in production).
+        Index("ix_fitness_scores_agent_asof", 'agent_id', 'as_of'),
+        Index("ix_fitness_scores_as_of", 'as_of'),
     )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)

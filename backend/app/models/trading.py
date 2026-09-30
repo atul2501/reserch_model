@@ -151,6 +151,9 @@ class Trade(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_trades_agent_closed", 'agent_id', 'closed_at'),
         Index("ix_trades_closed_at", 'closed_at'),
         Index("ix_trades_stage", 'stage'),
+        # position_id has a FK but Postgres never indexes one automatically; the analytics_foundation
+        # migration created this index but never declared it here (confirmed in use: 30 scans in production).
+        Index("ix_trades_position", 'position_id'),
     )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("agents.id"), nullable=False)

@@ -23,7 +23,8 @@ const mk = (id) => els[id] || (els[id] = {id, innerHTML: '', textContent: '', st
   addEventListener(){}, querySelector(){ return mk(id + '>q'); }, getBoundingClientRect(){ return {width: 300, height: 100}; }, setAttribute(){}, });
 const document = { getElementById: mk, querySelector: (s) => mk('q:' + s), querySelectorAll: () => [], addEventListener(){},
                    createElement: () => mk('created') };
-const ctx = { document, window: {}, sessionStorage: {getItem(){return 'k'}, setItem(){}, removeItem(){}}, console: {log(){}, warn(){}, error(){}},
+const window = { innerWidth: 1024, addEventListener(){}, prompt(){ return null; }, alert(){} };
+const ctx = { document, window, sessionStorage: {getItem(){return 'k'}, setItem(){}, removeItem(){}}, console: {log(){}, warn(){}, error(){}},
               fetch: () => Promise.reject(new Error('offline')), setInterval(){}, setTimeout(){}, Date, Math, JSON, Promise, TextDecoder, encodeURIComponent, Number, String, Object, Array, isNaN };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx);

@@ -188,8 +188,16 @@ async def retire_generation(
     from app.models.strategy import StrategyVersion
     from app.models.trading import Position, Trade
 
+    # populate_existing: the caller's session (app.research.pipeline._run) loads every Agent of this generation
+    # once at cycle start and keeps the same session open through minutes of backtesting. Without this, an Agent
+    # already in the session's identity map is handed back as it was at that first load - not the current row -
+    # so the live paper worker's concurrent balance debits (a different connection) are silently overwritten
+    # when this function writes agent.balance below. Confirmed in production: 52 retired agents overstated by
+    # exactly their lost entry fee.
     everyone = (
-        await db.execute(select(Agent).where(Agent.generation == generation_number))
+        await db.execute(
+            select(Agent).where(Agent.generation == generation_number).execution_options(populate_existing=True)
+        )
     ).scalars().all()
     agents = [a for a in everyone if a.status == AgentStatus.ACTIVE]
     by_id = {a.id: a for a in everyone}
@@ -200,9 +208,14 @@ async def retire_generation(
         for v in (await db.execute(select(StrategyVersion).where(StrategyVersion.id.in_({a.strategy_version_id for a in everyone})))).scalars().all()
     }
     # EVERY open position of the generation is resolved - including those still held by DEAD/PAUSED agents
-    # (orphans): a rollover must never leave a position open behind a retired generation.
+    # (orphans): a rollover must never leave a position open behind a retired generation. populate_existing for
+    # the same reason as the Agent query above: a Position already in this session's identity map (e.g. from
+    # earlier ranking/backtest steps) must not be settled from its stale is_open/quantity snapshot.
     positions = (
-        await db.execute(select(Position).where(Position.agent_id.in_(list(by_id)), Position.is_open.is_(True)))
+        await db.execute(
+            select(Position).where(Position.agent_id.in_(list(by_id)), Position.is_open.is_(True))
+            .execution_options(populate_existing=True)
+        )
     ).scalars().all()
     for pos in positions:
         agent = by_id[pos.agent_id]

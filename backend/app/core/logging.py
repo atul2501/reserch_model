@@ -123,6 +123,10 @@ def configure_logging() -> None:
         stream=sys.stdout,
         level=level,
     )
+    # basicConfig() is a no-op once anything else has attached a root handler (pytest's own logging plugin does
+    # this for every test session) - the level above would then silently never apply. Setting it explicitly makes
+    # settings.log_level authoritative regardless of what touched the root logger first.
+    logging.getLogger().setLevel(level)
 
     processors: list = [
         structlog.contextvars.merge_contextvars,
