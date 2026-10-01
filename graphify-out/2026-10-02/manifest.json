@@ -2086,11 +2086,5 @@
     "seen": 1790789346.20985,
     "ast_hash": "99df5837bcc9fc63375acc1ca083c480",
     "semantic_hash": ""
-  },
-  "backend/scripts/research_exit_payoff.py": {
-    "mtime": 1790880862.158317,
-    "seen": 1790880896.42198,
-    "ast_hash": "ba8af86b63e2e71af0ae32a3764f19f1",
-    "semantic_hash": ""
   }
 }

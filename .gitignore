@@ -40,3 +40,6 @@ backend/.run/
 backend/logs/
 
 *.dump
+
+# Generated local research output (snapshot-specific, regenerate from scripts/research_*.py)
+backend/reports/
