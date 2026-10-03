@@ -1,0 +1,2578 @@
+{
+  "selected_horizon_min": 10,
+  "hour_group": 1,
+  "cost_model": {
+    "fee_bps": 8.786853236728248,
+    "slippage_bps": 5.318394885531891,
+    "total_bps": 14.10524812226014,
+    "source": "measured_paper_trades(n=282)",
+    "n_trades": 282
+  },
+  "A_status": {
+    "trading_mode": "paper",
+    "pretrade_mode": "off",
+    "shadow_status": "STALE",
+    "shadow_start_ms": 1790991453148.0,
+    "shadow_duration_s": 7873.086,
+    "last_shadow_decision_ms": 1790993883297.0,
+    "last_market_timestamp_ms": 1790993880000.0,
+    "last_successful_shadow_cycle_ms": 1790993883459.0,
+    "shadow_bars": 41,
+    "shadow_missed_cycles": 1,
+    "shadow_errors_note": "missed cycles = worker cycles COMPLETED after shadow start with no shadow bar record"
+  },
+  "B_opportunities": {
+    "total_candidates": 1979,
+    "would_trade": 315,
+    "would_reject": 1664,
+    "gate_pass_pct": 0.15917129863567459,
+    "gate_reject_pct": 0.8408287013643254,
+    "rejection_reasons": [
+      {
+        "category": "minimum_notional",
+        "count": 841,
+        "share_of_candidates": 0.4249621020717534
+      },
+      {
+        "category": "duplicate_position",
+        "count": 571,
+        "share_of_candidates": 0.2885295603840323
+      },
+      {
+        "category": "cooldown",
+        "count": 104,
+        "share_of_candidates": 0.05255179383527034
+      },
+      {
+        "category": "position_open",
+        "count": 571,
+        "share_of_candidates": 0.2885295603840323
+      },
+      {
+        "category": "pending_order",
+        "count": 140,
+        "share_of_candidates": 0.07074279939363315
+      },
+      {
+        "category": "stale",
+        "count": 12,
+        "share_of_candidates": 0.00606366851945427
+      },
+      {
+        "category": "price_drift",
+        "count": 0,
+        "share_of_candidates": 0.0
+      },
+      {
+        "category": "spread",
+        "count": 0,
+        "share_of_candidates": 0.0
+      },
+      {
+        "category": "risk",
+        "count": 1516,
+        "share_of_candidates": 0.7660434562910561
+      },
+      {
+        "category": "regime",
+        "count": 0,
+        "share_of_candidates": 0.0
+      },
+      {
+        "category": "conflict",
+        "count": 0,
+        "share_of_candidates": 0.0
+      },
+      {
+        "category": "other",
+        "count": 0,
+        "share_of_candidates": 0.0
+      }
+    ],
+    "note": "a candidate can have several reasons; shares do not sum to 100%"
+  },
+  "C_signal_edge": [
+    {
+      "group": "ALL SIGNALS",
+      "horizon_min": 1,
+      "n": 1939,
+      "bars": 39,
+      "mean_gross_bps": -0.3871782545301064,
+      "median_gross_bps": -0.41972717733429477,
+      "win_rate_gross": 0.37493553378029915,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.492426376790245,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -14.492426376790245,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "ALL SIGNALS",
+      "horizon_min": 5,
+      "n": 1810,
+      "bars": 35,
+      "mean_gross_bps": -2.048707221700814,
+      "median_gross_bps": -2.941794494641936,
+      "win_rate_gross": 0.36187845303867405,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -16.153955343960952,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -16.153955343960952,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "ALL SIGNALS",
+      "horizon_min": 10,
+      "n": 1416,
+      "bars": 30,
+      "mean_gross_bps": -1.9683611466637407,
+      "median_gross_bps": -0.41983290650304816,
+      "win_rate_gross": 0.4781073446327684,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -16.073609268923878,
+      "win_rate_net": 0.13206214689265536,
+      "profit_factor_net": 0.01573658508724244,
+      "avg_winner_net": 1.9459613282974462,
+      "avg_loser_net": -18.815399099420535,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "ALL SIGNALS",
+      "horizon_min": 30,
+      "n": 461,
+      "bars": 11,
+      "mean_gross_bps": -6.465037950101947,
+      "median_gross_bps": -12.993000544867517,
+      "win_rate_gross": 0.42733188720173537,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -20.570286072362087,
+      "win_rate_net": 0.2039045553145336,
+      "profit_factor_net": 0.11405551187037526,
+      "avg_winner_net": 12.987428530966842,
+      "avg_loser_net": -29.165450030707913,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 11 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "ALL SIGNALS",
+      "horizon_min": 60,
+      "n": 0,
+      "bars": 0,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 0 observations (< 100)",
+        "FEW INDEPENDENT BARS: 0 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 0 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-PASS",
+      "horizon_min": 1,
+      "n": 311,
+      "bars": 27,
+      "mean_gross_bps": -0.32522834561799274,
+      "median_gross_bps": -0.42015041384901863,
+      "win_rate_gross": 0.24115755627009647,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.430476467878133,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -14.430476467878133,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 27 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-PASS",
+      "horizon_min": 5,
+      "n": 303,
+      "bars": 23,
+      "mean_gross_bps": -3.1732703842748085,
+      "median_gross_bps": -2.941794494641936,
+      "win_rate_gross": 0.31683168316831684,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -17.278518506534947,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -17.278518506534947,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 23 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-PASS",
+      "horizon_min": 10,
+      "n": 271,
+      "bars": 19,
+      "mean_gross_bps": -6.550145458781241,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.31365313653136534,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -20.65539358104138,
+      "win_rate_net": 0.13284132841328414,
+      "profit_factor_net": 0.013823794475481467,
+      "avg_winner_net": 2.1795810005663885,
+      "avg_loser_net": -24.153517346734485,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 19 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-PASS",
+      "horizon_min": 30,
+      "n": 92,
+      "bars": 6,
+      "mean_gross_bps": -11.19953007352899,
+      "median_gross_bps": -12.993000544867517,
+      "win_rate_gross": 0.2826086956521739,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -25.30477819578913,
+      "win_rate_net": 0.10869565217391304,
+      "profit_factor_net": 0.06856976836887041,
+      "avg_winner_net": 17.13849629246541,
+      "avg_loser_net": -30.480787279722612,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 92 observations (< 100)",
+        "FEW INDEPENDENT BARS: 6 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-PASS",
+      "horizon_min": 60,
+      "n": 0,
+      "bars": 0,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 0 observations (< 100)",
+        "FEW INDEPENDENT BARS: 0 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 0 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-REJECTED",
+      "horizon_min": 1,
+      "n": 1628,
+      "bars": 39,
+      "mean_gross_bps": -0.39901266587633943,
+      "median_gross_bps": -0.41969194611080063,
+      "win_rate_gross": 0.4004914004914005,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.504260788136476,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -14.504260788136476,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-REJECTED",
+      "horizon_min": 5,
+      "n": 1507,
+      "bars": 35,
+      "mean_gross_bps": -1.8226006269696122,
+      "median_gross_bps": -2.941794494641936,
+      "win_rate_gross": 0.37093563370935634,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -15.927848749229751,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -15.927848749229751,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-REJECTED",
+      "horizon_min": 10,
+      "n": 1145,
+      "bars": 30,
+      "mean_gross_bps": -0.8839388334900788,
+      "median_gross_bps": 0.4197976575281981,
+      "win_rate_gross": 0.5170305676855895,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.989186955750217,
+      "win_rate_net": 0.13187772925764193,
+      "profit_factor_net": 0.016358840678051646,
+      "avg_winner_net": 1.8902639229882945,
+      "avg_loser_net": -17.553369131494193,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-REJECTED",
+      "horizon_min": 30,
+      "n": 369,
+      "bars": 11,
+      "mean_gross_bps": -5.28462256973531,
+      "median_gross_bps": -12.993000544867517,
+      "win_rate_gross": 0.4634146341463415,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -19.38987069199545,
+      "win_rate_net": 0.22764227642276422,
+      "profit_factor_net": 0.12791266546174182,
+      "avg_winner_net": 12.4932537974551,
+      "avg_loser_net": -28.78700212046509,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 11 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "GATE-REJECTED",
+      "horizon_min": 60,
+      "n": 0,
+      "bars": 0,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 0 observations (< 100)",
+        "FEW INDEPENDENT BARS: 0 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 0 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "LONG",
+      "horizon_min": 1,
+      "n": 720,
+      "bars": 26,
+      "mean_gross_bps": -0.7428791174943987,
+      "median_gross_bps": -0.41983290650304816,
+      "win_rate_gross": 0.18611111111111112,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.848127239754538,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -14.848127239754538,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 26 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "LONG",
+      "horizon_min": 5,
+      "n": 604,
+      "bars": 22,
+      "mean_gross_bps": -4.076392447859561,
+      "median_gross_bps": -5.456911388155294,
+      "win_rate_gross": 0.2433774834437086,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -18.181640570119697,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -18.181640570119697,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 22 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "LONG",
+      "horizon_min": 10,
+      "n": 529,
+      "bars": 21,
+      "mean_gross_bps": -8.48567934618576,
+      "median_gross_bps": -12.148632231577805,
+      "win_rate_gross": 0.10396975425330812,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -22.590927468445898,
+      "win_rate_net": 0.030245746691871456,
+      "profit_factor_net": 0.0008059880066538813,
+      "avg_winner_net": 0.602488147016988,
+      "avg_loser_net": -23.314308852164036,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 21 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "LONG",
+      "horizon_min": 30,
+      "n": 264,
+      "bars": 5,
+      "mean_gross_bps": -24.767608232237983,
+      "median_gross_bps": -28.90536634409857,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -38.87285635449812,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -38.87285635449812,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 5 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "LONG",
+      "horizon_min": 60,
+      "n": 0,
+      "bars": 0,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 0 observations (< 100)",
+        "FEW INDEPENDENT BARS: 0 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 0 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "SHORT",
+      "horizon_min": 1,
+      "n": 1219,
+      "bars": 35,
+      "mean_gross_bps": -0.177084225543814,
+      "median_gross_bps": -2.220446049250313e-12,
+      "win_rate_gross": 0.4864643150123052,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.282332347803953,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -14.282332347803953,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "SHORT",
+      "horizon_min": 5,
+      "n": 1206,
+      "bars": 33,
+      "mean_gross_bps": -1.033183277588141,
+      "median_gross_bps": -2.938090241342284,
+      "win_rate_gross": 0.42122719734660036,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -15.138431399848281,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -15.138431399848281,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "SHORT",
+      "horizon_min": 10,
+      "n": 887,
+      "bars": 28,
+      "mean_gross_bps": 1.9185174638741944,
+      "median_gross_bps": 2.1002226235977695,
+      "win_rate_gross": 0.7012401352874859,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -12.186730658385946,
+      "win_rate_net": 0.1927846674182638,
+      "profit_factor_net": 0.03173222909304389,
+      "avg_winner_net": 2.0716664212827522,
+      "avg_loser_net": -15.592018229088943,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 28 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "SHORT",
+      "horizon_min": 30,
+      "n": 197,
+      "bars": 10,
+      "mean_gross_bps": 18.062264356922995,
+      "median_gross_bps": 12.993000544867517,
+      "win_rate_gross": 1.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": 3.9570162346628543,
+      "win_rate_net": 0.47715736040609136,
+      "profit_factor_net": 2.7665007509953554,
+      "avg_winner_net": 12.987428530966842,
+      "avg_loser_net": -4.284330909536896,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 10 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    {
+      "group": "SHORT",
+      "horizon_min": 60,
+      "n": 0,
+      "bars": 0,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 0 observations (< 100)",
+        "FEW INDEPENDENT BARS: 0 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 0 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    }
+  ],
+  "D_gross_vs_net": {
+    "horizon_min": 10,
+    "population": "GATE-PASS",
+    "n": 271,
+    "gross_expected_move_bps": -6.550145458781241,
+    "fee_bps": -8.786853236728248,
+    "slippage_bps": -5.318394885531891,
+    "spread_bps_measured": 0.8396658130056598,
+    "spread_note": "measured book spread, shown for reference; the paper slippage model already charges for crossing it",
+    "estimated_total_cost_bps": -14.10524812226014,
+    "net_expected_move_bps": -20.65539358104138,
+    "cost_source": "measured_paper_trades(n=282)"
+  },
+  "E_mfe_mae": {
+    "ALL": {
+      "mfe_1m": 1.4749557888406404,
+      "mae_1m": -1.6012893976568179,
+      "mfe_5m": 3.646295027121433,
+      "mae_5m": -5.7832876038256416,
+      "mfe_10m": 6.269033811254199,
+      "mae_10m": -8.689502300334613,
+      "mfe_30m": 13.116038963284533,
+      "mae_30m": -19.980534331288947,
+      "mfe_60m": null,
+      "mae_60m": null
+    },
+    "LONG": {
+      "mfe_1m": 1.3016028620666438,
+      "mae_1m": -1.5878186462879755,
+      "mfe_5m": 2.479096040465427,
+      "mae_5m": -6.069983194118691,
+      "mfe_10m": 2.9731017355117295,
+      "mae_10m": -12.16755872966148,
+      "mfe_30m": 1.6603607992158103,
+      "mae_30m": -32.71644427239658,
+      "mfe_60m": null,
+      "mae_60m": null
+    },
+    "SHORT": {
+      "mfe_1m": 1.5773463608482514,
+      "mae_1m": -1.60924587098378,
+      "mfe_5m": 4.230862347138205,
+      "mae_5m": -5.6397020843090555,
+      "mfe_10m": 8.234702433653032,
+      "mae_10m": -6.615216109676312,
+      "mfe_30m": 28.467810716148204,
+      "mae_30m": -2.9131220244238984,
+      "mfe_60m": null,
+      "mae_60m": null
+    },
+    "by_strategy": {
+      "breakout": {
+        "mfe_1m": 2.101281781886621,
+        "mae_1m": -1.2607690691313067,
+        "mfe_5m": 2.101281781886621,
+        "mae_5m": -3.782307207396142,
+        "mfe_10m": 2.101281781886621,
+        "mae_10m": -15.549485185963881,
+        "mfe_30m": null,
+        "mae_30m": null,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "hybrid": {
+        "mfe_1m": 1.6450936130123712,
+        "mae_1m": -1.1489177403238935,
+        "mfe_5m": 3.931423038833124,
+        "mae_5m": -5.367888733722959,
+        "mfe_10m": 6.505903884626776,
+        "mae_10m": -8.074074300087108,
+        "mfe_30m": 2.9969862642333,
+        "mae_30m": -31.199476680295447,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "market_structure": {
+        "mfe_1m": 1.3202059684220517,
+        "mae_1m": -2.999388298419804,
+        "mfe_5m": 1.5602919191922853,
+        "mae_5m": -11.159633646721234,
+        "mfe_10m": 1.6803381518443183,
+        "mae_10m": -17.20667676503973,
+        "mfe_30m": 0.41912904983343324,
+        "mae_30m": -28.91990443857684,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "mean_reversion": {
+        "mfe_1m": 0.7985226814979929,
+        "mae_1m": -1.0903749407396421,
+        "mfe_5m": 3.142020399332419,
+        "mae_5m": -3.6597616111410733,
+        "mfe_10m": 5.2310546825675175,
+        "mae_10m": -6.311766476534241,
+        "mfe_30m": 35.75358072503088,
+        "mae_30m": -0.7996766660801523,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "momentum": {
+        "mfe_1m": 2.101281781886622,
+        "mae_1m": -1.2607690691313058,
+        "mfe_5m": 2.101281781886622,
+        "mae_5m": -3.782307207396141,
+        "mfe_10m": 2.101281781886622,
+        "mae_10m": -15.549485185963892,
+        "mfe_30m": null,
+        "mae_30m": null,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "order_flow": {
+        "mfe_1m": 2.101281781886621,
+        "mae_1m": -1.2607690691313067,
+        "mfe_5m": 2.101281781886621,
+        "mae_5m": -3.782307207396142,
+        "mfe_10m": 2.101281781886621,
+        "mae_10m": -15.549485185963881,
+        "mfe_30m": null,
+        "mae_30m": null,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "scalping": {
+        "mfe_1m": 1.45651680082558,
+        "mae_1m": -1.5098391055760936,
+        "mfe_5m": 4.373569422440488,
+        "mae_5m": -4.545892863196122,
+        "mfe_10m": 6.428590627009377,
+        "mae_10m": -9.033196153995965,
+        "mfe_30m": 10.39207038023215,
+        "mae_30m": -22.510626101388727,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "vwap": {
+        "mfe_1m": 1.886544778414521,
+        "mae_1m": -2.4958144896127745,
+        "mfe_5m": 7.074466448765718,
+        "mae_5m": -4.290630298071918,
+        "mfe_10m": 12.824872636567905,
+        "mae_10m": -4.290630298071918,
+        "mfe_30m": 28.303714642701024,
+        "mae_30m": -4.6929116346250614,
+        "mfe_60m": null,
+        "mae_60m": null
+      }
+    },
+    "by_regime": {
+      "BREAKDOWN": {
+        "mfe_1m": 2.1012817818866214,
+        "mae_1m": -1.2607690691313067,
+        "mfe_5m": 2.1012817818866214,
+        "mae_5m": -3.782307207396141,
+        "mfe_10m": 2.1012817818866214,
+        "mae_10m": -15.549485185963887,
+        "mfe_30m": null,
+        "mae_30m": null,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "HIGH_VOLATILITY": {
+        "mfe_1m": 1.2573871495025202,
+        "mae_1m": -2.0956452491727178,
+        "mfe_5m": 1.2573871495025202,
+        "mae_5m": -6.286935747517043,
+        "mfe_10m": 1.2573871495025202,
+        "mae_10m": -16.346032943543868,
+        "mfe_30m": 1.2573871495025202,
+        "mae_30m": -28.91990443857684,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "LOW_VOLATILITY": {
+        "mfe_1m": 0.5386964326533928,
+        "mae_1m": -2.4478022681379046,
+        "mfe_5m": 4.9076353119132,
+        "mae_5m": -5.230647319607642,
+        "mfe_10m": 8.140339723102851,
+        "mae_10m": -6.494613354872129,
+        "mfe_30m": null,
+        "mae_30m": null,
+        "mfe_60m": null,
+        "mae_60m": null
+      },
+      "RANGE": {
+        "mfe_1m": 1.4764916753067008,
+        "mae_1m": -1.5737088525278742,
+        "mfe_5m": 3.7656259695446823,
+        "mae_5m": -6.011204209205664,
+        "mfe_10m": 6.799820654676059,
+        "mae_10m": -7.753715045097231,
+        "mfe_30m": 13.912105867450457,
+        "mae_30m": -19.380437726864525,
+        "mfe_60m": null,
+        "mae_60m": null
+      }
+    },
+    "interpretation": "MFE >> |MAE| with near-zero forward return = good entry, bad exit; MFE ~ |MAE| = entry has no edge"
+  },
+  "F_strategy": [
+    {
+      "group": "hybrid",
+      "signals": 787,
+      "gate_pass_pct": 0.05972045743329098,
+      "n": 526,
+      "bars": 23,
+      "mean_gross_bps": -2.3784671084271944,
+      "median_gross_bps": 0.4198681613976074,
+      "win_rate_gross": 0.596958174904943,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -16.48371523068733,
+      "win_rate_net": 0.049429657794676805,
+      "profit_factor_net": 0.0027790337364877607,
+      "avg_winner_net": 0.9293299154687913,
+      "avg_loser_net": -17.38919357828745,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 23 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 2.9969862642333,
+      "mae_30m_bps": -31.199476680295447,
+      "paper_hold_avg_s": 555.6666666666666,
+      "paper_hold_median_s": 329.0,
+      "paper_fee_bps": 8.665795249582587,
+      "paper_slippage_bps": 5.148966412784388
+    },
+    {
+      "group": "scalping",
+      "signals": 390,
+      "gate_pass_pct": 0.2692307692307692,
+      "n": 344,
+      "bars": 11,
+      "mean_gross_bps": -0.918530543007185,
+      "median_gross_bps": 0.4199386889514045,
+      "win_rate_gross": 0.5872093023255814,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -15.02377866526732,
+      "win_rate_net": 0.1686046511627907,
+      "profit_factor_net": 0.021939446022482916,
+      "avg_winner_net": 1.9988009139270828,
+      "avg_loser_net": -18.475910188320736,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 11 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 10.39207038023215,
+      "mae_30m_bps": -22.510626101388727,
+      "paper_hold_avg_s": 166.85714285714286,
+      "paper_hold_median_s": 119.0,
+      "paper_fee_bps": 8.605763013354757,
+      "paper_slippage_bps": 4.9614104547826745
+    },
+    {
+      "group": "market_structure",
+      "signals": 308,
+      "gate_pass_pct": 0.21103896103896103,
+      "n": 88,
+      "bars": 2,
+      "mean_gross_bps": -15.946013656244482,
+      "median_gross_bps": -15.946013656244485,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -30.051261778504625,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -30.051261778504625,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 88 observations (< 100)",
+        "FEW INDEPENDENT BARS: 2 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 0.41912904983343324,
+      "mae_30m_bps": -28.91990443857684,
+      "paper_hold_avg_s": 310.0769230769231,
+      "paper_hold_median_s": 299.0,
+      "paper_fee_bps": 8.999626485923844,
+      "paper_slippage_bps": 5.974181333228956
+    },
+    {
+      "group": "mean_reversion",
+      "signals": 279,
+      "gate_pass_pct": 0.14695340501792115,
+      "n": 243,
+      "bars": 16,
+      "mean_gross_bps": -0.9616008328197749,
+      "median_gross_bps": -0.4199386889514045,
+      "win_rate_gross": 0.13580246913580246,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -15.066848955079914,
+      "win_rate_net": 0.09465020576131687,
+      "profit_factor_net": 0.014389821495260708,
+      "avg_winner_net": 2.3240801361783854,
+      "avg_loser_net": -16.88499154189328,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 16 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 35.75358072503088,
+      "mae_30m_bps": -0.7996766660801523,
+      "paper_hold_avg_s": 470.42857142857144,
+      "paper_hold_median_s": 419.0,
+      "paper_fee_bps": 8.997138027653625,
+      "paper_slippage_bps": 5.099834263569821
+    },
+    {
+      "group": "vwap",
+      "signals": 128,
+      "gate_pass_pct": 0.0703125,
+      "n": 128,
+      "bars": 13,
+      "mean_gross_bps": 12.110925151764505,
+      "median_gross_bps": 15.507774843874778,
+      "win_rate_gross": 1.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -1.9943229704956345,
+      "win_rate_net": 0.625,
+      "profit_factor_net": 0.40023354234296143,
+      "avg_winner_net": 2.1293486806195028,
+      "avg_loser_net": -8.867109055687528,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 13 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 28.303714642701024,
+      "mae_30m_bps": -4.6929116346250614,
+      "paper_hold_avg_s": 1187.0,
+      "paper_hold_median_s": 1319.0,
+      "paper_fee_bps": 7.995803044626465,
+      "paper_slippage_bps": 3.605619845046647
+    },
+    {
+      "group": "momentum",
+      "signals": 63,
+      "gate_pass_pct": 0.49206349206349204,
+      "n": 63,
+      "bars": 1,
+      "mean_gross_bps": -13.027947047699055,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -27.13319516995919,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -27.13319516995919,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 63 observations (< 100)",
+        "FEW INDEPENDENT BARS: 1 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": 268.03225806451616,
+      "paper_hold_median_s": 359.0,
+      "paper_fee_bps": 9.005053265744447,
+      "paper_slippage_bps": 6.01966794908411
+    },
+    {
+      "group": "breakout",
+      "signals": 12,
+      "gate_pass_pct": 0.9166666666666666,
+      "n": 12,
+      "bars": 1,
+      "mean_gross_bps": -13.027947047699053,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -27.133195169959194,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -27.133195169959194,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 12 observations (< 100)",
+        "FEW INDEPENDENT BARS: 1 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": 173.0,
+      "paper_hold_median_s": 119.0,
+      "paper_fee_bps": 9.004726914174851,
+      "paper_slippage_bps": 6.002733721530335
+    },
+    {
+      "group": "order_flow",
+      "signals": 12,
+      "gate_pass_pct": 0.5,
+      "n": 12,
+      "bars": 1,
+      "mean_gross_bps": -13.027947047699053,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -27.133195169959194,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -27.133195169959194,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 12 observations (< 100)",
+        "FEW INDEPENDENT BARS: 1 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": 179.0,
+      "paper_hold_median_s": 149.0,
+      "paper_fee_bps": 9.003895341407148,
+      "paper_slippage_bps": 5.0214602434290905
+    }
+  ],
+  "G_regime": [
+    {
+      "group": "RANGE",
+      "signals": 1697,
+      "gate_pass_pct": 0.14849734826163818,
+      "n": 1134,
+      "bars": 24,
+      "mean_gross_bps": -0.39838131039609426,
+      "median_gross_bps": 0.41983290650304816,
+      "win_rate_gross": 0.5343915343915344,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.503629432656234,
+      "win_rate_net": 0.16490299823633156,
+      "profit_factor_net": 0.02164621617582285,
+      "avg_winner_net": 1.9459613282974462,
+      "avg_loser_net": -17.75185907605469,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 24 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 13.912105867450457,
+      "mae_30m_bps": -19.380437726864525,
+      "paper_hold_avg_s": 393.3243243243243,
+      "paper_hold_median_s": 299.0,
+      "paper_fee_bps": 8.72800462713477,
+      "paper_slippage_bps": 5.161235982014764
+    },
+    {
+      "group": "BREAKDOWN",
+      "signals": 154,
+      "gate_pass_pct": 0.3961038961038961,
+      "n": 154,
+      "bars": 1,
+      "mean_gross_bps": -13.027947047699055,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -27.133195169959183,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -27.133195169959183,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 1 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": 204.0,
+      "paper_hold_median_s": 119.0,
+      "paper_fee_bps": 9.00459309222411,
+      "paper_slippage_bps": 5.899882828545267
+    },
+    {
+      "group": "LOW_VOLATILITY",
+      "signals": 99,
+      "gate_pass_pct": 0.0,
+      "n": 99,
+      "bars": 4,
+      "mean_gross_bps": 1.463674980017579,
+      "median_gross_bps": 2.1002226235977695,
+      "win_rate_gross": 0.7171717171717171,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -12.641573142242562,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -12.641573142242562,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 99 observations (< 100)",
+        "FEW INDEPENDENT BARS: 4 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": null,
+      "paper_hold_median_s": null,
+      "paper_fee_bps": null,
+      "paper_slippage_bps": null
+    },
+    {
+      "group": "HIGH_VOLATILITY",
+      "signals": 29,
+      "gate_pass_pct": 0.06896551724137931,
+      "n": 29,
+      "bars": 1,
+      "mean_gross_bps": -16.346032943543868,
+      "median_gross_bps": -16.346032943543864,
+      "win_rate_gross": 0.0,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -30.451281065803997,
+      "win_rate_net": 0.0,
+      "profit_factor_net": 0.0,
+      "avg_winner_net": null,
+      "avg_loser_net": -30.451281065803997,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "INSUFFICIENT SAMPLE: only 29 observations (< 100)",
+        "FEW INDEPENDENT BARS: 1 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 1.2573871495025202,
+      "mae_30m_bps": -28.91990443857684,
+      "paper_hold_avg_s": null,
+      "paper_hold_median_s": null,
+      "paper_fee_bps": null,
+      "paper_slippage_bps": null
+    }
+  ],
+  "H_time_of_day": [
+    {
+      "group": 1,
+      "signals": 1029,
+      "gate_pass_pct": 0.1467444120505345,
+      "n": 1029,
+      "bars": 23,
+      "mean_gross_bps": -0.10498562334480466,
+      "median_gross_bps": 0.41983290650304816,
+      "win_rate_gross": 0.5481049562682215,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -14.210233745604942,
+      "win_rate_net": 0.1661807580174927,
+      "profit_factor_net": 0.023653920211573556,
+      "avg_winner_net": 2.0716664212827522,
+      "avg_loser_net": -17.455227834809833,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 23 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI",
+        "DO NOT SELECT AN HOUR FROM THIS TABLE WITHOUT OOS CONFIRMATION"
+      ],
+      "mfe_30m_bps": 13.116038963284533,
+      "mae_30m_bps": -19.980534331288947,
+      "paper_hold_avg_s": 454.54140127388536,
+      "paper_hold_median_s": 299.0,
+      "paper_fee_bps": 8.671569551601644,
+      "paper_slippage_bps": 4.96943227696681
+    },
+    {
+      "group": 2,
+      "signals": 950,
+      "gate_pass_pct": 0.1726315789473684,
+      "n": 387,
+      "bars": 7,
+      "mean_gross_bps": -6.922917770682306,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.29198966408268734,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -21.028165892942447,
+      "win_rate_net": 0.041343669250646,
+      "profit_factor_net": 0.0011831559390135628,
+      "avg_winner_net": 0.602488147016988,
+      "avg_loser_net": -21.96102428819676,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 7 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 1 two-hour blocks (< 5) - no t-stat/CI",
+        "DO NOT SELECT AN HOUR FROM THIS TABLE WITHOUT OOS CONFIRMATION"
+      ],
+      "mfe_30m_bps": null,
+      "mae_30m_bps": null,
+      "paper_hold_avg_s": 225.56,
+      "paper_hold_median_s": 239.0,
+      "paper_fee_bps": 8.93164954524726,
+      "paper_slippage_bps": 5.756691921889634
+    }
+  ],
+  "I_long_short": [
+    {
+      "group": "SHORT",
+      "signals": 1230,
+      "gate_pass_pct": 0.13983739837398373,
+      "n": 887,
+      "bars": 28,
+      "mean_gross_bps": 1.9185174638741944,
+      "median_gross_bps": 2.1002226235977695,
+      "win_rate_gross": 0.7012401352874859,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -12.186730658385946,
+      "win_rate_net": 0.1927846674182638,
+      "profit_factor_net": 0.03173222909304389,
+      "avg_winner_net": 2.0716664212827522,
+      "avg_loser_net": -15.592018229088943,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 28 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 28.467810716148204,
+      "mae_30m_bps": -2.9131220244238984,
+      "paper_hold_avg_s": 379.57142857142856,
+      "paper_hold_median_s": 299.0,
+      "paper_fee_bps": 8.711017660654797,
+      "paper_slippage_bps": 5.07579245884212
+    },
+    {
+      "group": "LONG",
+      "signals": 749,
+      "gate_pass_pct": 0.1909212283044059,
+      "n": 529,
+      "bars": 21,
+      "mean_gross_bps": -8.48567934618576,
+      "median_gross_bps": -12.148632231577805,
+      "win_rate_gross": 0.10396975425330812,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -22.590927468445898,
+      "win_rate_net": 0.030245746691871456,
+      "profit_factor_net": 0.0008059880066538813,
+      "avg_winner_net": 0.602488147016988,
+      "avg_loser_net": -23.314308852164036,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 21 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "mfe_30m_bps": 1.6603607992158103,
+      "mae_30m_bps": -32.71644427239658,
+      "paper_hold_avg_s": 309.6542056074766,
+      "paper_hold_median_s": 299.0,
+      "paper_fee_bps": 8.910883384511925,
+      "paper_slippage_bps": 5.715174555351611
+    }
+  ],
+  "J_llm": {
+    "n": 1979,
+    "council_available_pct": 0.0,
+    "agreement_pct_of_directional": null,
+    "disagreement_pct_of_directional": null,
+    "council_confidence_mean": null,
+    "council_age_ms": {
+      "n": 0,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "quant_only": {
+      "n": 1416,
+      "bars": 30,
+      "mean_gross_bps": -1.9683611466637407,
+      "median_gross_bps": -0.41983290650304816,
+      "win_rate_gross": 0.4781073446327684,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -16.073609268923878,
+      "win_rate_net": 0.13206214689265536,
+      "profit_factor_net": 0.01573658508724244,
+      "avg_winner_net": 1.9459613282974462,
+      "avg_loser_net": -18.815399099420535,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ]
+    },
+    "llm_agree": {
+      "n": 0,
+      "warnings": [
+        "NO DATA"
+      ]
+    },
+    "llm_disagree": {
+      "n": 0,
+      "warnings": [
+        "NO DATA"
+      ]
+    },
+    "llm_value": "INSUFFICIENT DATA",
+    "authority": "NONE: the LLM never authorises, vetoes or sizes anything"
+  },
+  "K_latency": {
+    "bar_close_to_features": {
+      "n": 41,
+      "p50": 2818.0,
+      "p90": 3268.0,
+      "p95": 3495.0,
+      "p99": 20809.40000000004,
+      "max": 32337.0
+    },
+    "features": {
+      "n": 41,
+      "p50": 43.0,
+      "p90": 68.0,
+      "p95": 95.0,
+      "p99": 112.20000000000003,
+      "max": 121.0
+    },
+    "features_to_signal": {
+      "n": 41,
+      "p50": 216.0,
+      "p90": 365.0,
+      "p95": 383.0,
+      "p99": 552.4000000000003,
+      "max": 644.0
+    },
+    "signal_to_decision": {
+      "n": 41,
+      "p50": 21.0,
+      "p90": 42.0,
+      "p95": 46.0,
+      "p99": 54.20000000000002,
+      "max": 59.0
+    },
+    "decision_to_book": {
+      "n": 41,
+      "p50": 159.0,
+      "p90": 180.0,
+      "p95": 237.0,
+      "p99": 281.8,
+      "max": 283.0
+    },
+    "total_decision_latency": {
+      "n": 41,
+      "p50": 3138.0,
+      "p90": 3700.0,
+      "p95": 3847.0,
+      "p99": 21485.20000000004,
+      "max": 33148.0
+    },
+    "stale_pct": 0.00606366851945427,
+    "price_drift_abs_bps": {
+      "n": 1979,
+      "p50": 0.41995632454217,
+      "p90": 1.4250001565346109,
+      "p95": 2.096260271675643,
+      "p99": 2.931568808108853,
+      "max": 2.931568808108853
+    },
+    "spread_bps": {
+      "n": 1979,
+      "p50": 0.8396658130056598,
+      "p90": 0.8405127127552104,
+      "p95": 0.8405127127552104,
+      "p99": 1.680531047810774,
+      "max": 1.680531047810774
+    },
+    "book_timestamp_lag_ms": {
+      "n": 1979,
+      "p50": 2358.0,
+      "p90": 2644.0,
+      "p95": 2699.0,
+      "p99": 3074.0,
+      "max": 3074.0
+    }
+  },
+  "L_paper_vs_shadow": {
+    "paper": {
+      "signals": 1979,
+      "trades": 327,
+      "win_rate": 0.09219858156028368,
+      "net_expectancy_bps": -15.788898811182165,
+      "gross_expectancy_bps": -7.002045574453919,
+      "profit_factor": 0.04940385103938767,
+      "avg_winner_bps": 8.900048120597118,
+      "avg_loser_bps": -18.296369983941,
+      "avg_hold_s": 353.0425531914894,
+      "fee_bps": 8.786853236728248,
+      "slippage_bps": 5.318394885531892,
+      "note": "realised paper P&L (closed trades only)"
+    },
+    "shadow": {
+      "n": 271,
+      "bars": 19,
+      "mean_gross_bps": -6.550145458781241,
+      "median_gross_bps": -13.027947047699051,
+      "win_rate_gross": 0.31365313653136534,
+      "cost_bps": 14.10524812226014,
+      "net_expectancy_bps": -20.65539358104138,
+      "win_rate_net": 0.13284132841328414,
+      "profit_factor_net": 0.013823794475481467,
+      "avg_winner_net": 2.1795810005663885,
+      "avg_loser_net": -24.153517346734485,
+      "t_stat_gross": null,
+      "t_stat_net": null,
+      "net_ci95_low": null,
+      "net_ci95_high": null,
+      "warnings": [
+        "FEW INDEPENDENT BARS: 19 distinct signal bars (< 30)",
+        "TOO FEW INDEPENDENT TIME BLOCKS: 2 two-hour blocks (< 5) - no t-stat/CI"
+      ],
+      "trades": 315,
+      "mfe_30m_bps": 9.090718264965696,
+      "mae_30m_bps": -23.997189493584063,
+      "note": "HYPOTHETICAL: gate-pass candidates held 10 min at measured cost"
+    },
+    "same_direction_pct": 1.0,
+    "paper_trade_and_shadow_pass_pct": 0.15917129863567459,
+    "paper_trade_and_shadow_reject_pct": 0.00606366851945427,
+    "shadow_pass_and_paper_no_trade_pct": 0.0,
+    "note": "observational only: shadow never authorises or vetoes a paper trade"
+  },
+  "M_equity": {
+    "label": "HYPOTHETICAL SHADOW - NOT REAL P&L",
+    "horizon_min": 10,
+    "cost_bps": 14.10524812226014,
+    "points": [
+      {
+        "t": 1790991603138,
+        "cum_net_bps": 3.9022061262430014
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": 7.804412252486003
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -24.308290118277277
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -56.42099248904056
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -88.53369485980383
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -120.64639723056712
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -152.7590996013304
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -184.8718019720937
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -180.96959584585068
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -177.06738971960766
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -209.18009209037095
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -205.27788596412796
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -237.39058833489125
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -269.50329070565454
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -301.6159930764178
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -333.72869544718105
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -365.8413978179443
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -397.95410018870757
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -430.06680255947083
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -462.1795049302341
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -494.29220730099735
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -526.4049096717606
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -558.5176120425239
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -590.6303144132871
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -622.7430167840504
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -654.8557191548136
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -650.9535130285707
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -683.0662153993339
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -715.1789177700972
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -747.2916201408605
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -779.4043225116237
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -811.517024882387
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -843.6297272531502
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -875.7424296239135
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -871.8402234976705
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -903.9529258684338
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -936.065628239197
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -968.1783306099603
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -1000.2910329807236
+      },
+      {
+        "t": 1790991603138,
+        "cum_net_bps": -1032.4037353514868
+      },
+      {
+        "t": 1790991663389,
+        "cum_net_bps": -1058.6576157053248
+      },
+      {
+        "t": 1790991663389,
+        "cum_net_bps": -1084.9114960591628
+      },
+      {
+        "t": 1790991663389,
+        "cum_net_bps": -1086.8681119498451
+      },
+      {
+        "t": 1790991663389,
+        "cum_net_bps": -1088.8247278405274
+      },
+      {
+        "t": 1790991663389,
+        "cum_net_bps": -1090.7813437312097
+      },
+      {
+        "t": 1790991783779,
+        "cum_net_bps": -1121.2326247970138
+      },
+      {
+        "t": 1790991783779,
+        "cum_net_bps": -1151.683905862818
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1182.97344502829
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1214.262984193762
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1245.5525233592339
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1276.8420625247059
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1308.1316016901778
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1339.4211408556498
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1370.7106800211218
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1402.0002191865938
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1433.2897583520657
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1464.5792975175377
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1495.8688366830097
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1527.1583758484817
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1558.4479150139537
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1555.368872093002
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1586.658411258474
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1617.947950423946
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1649.237489589418
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1646.1584466684662
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1643.0794037475146
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1640.0003608265629
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1636.9213179056112
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1633.8422749846595
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1630.7632320637078
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1627.6841891427562
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1624.6051462218045
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1655.8946853872765
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1687.1842245527484
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1718.4737637182204
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1715.3947207972687
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1746.6842599627407
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1777.9737991282127
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1774.894756207261
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1771.8157132863093
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1803.1052524517813
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1834.3947916172533
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1865.6843307827253
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1896.9738699481973
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1928.2634091136692
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1959.5529482791412
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -1990.8424874446132
+      },
+      {
+        "t": 1790991903359,
+        "cum_net_bps": -2022.1320266100852
+      },
+      {
+        "t": 1790991963082,
+        "cum_net_bps": -2019.0486611407641
+      },
+      {
+        "t": 1790992083370,
+        "cum_net_bps": -2018.4757796761096
+      },
+      {
+        "t": 1790992083370,
+        "cum_net_bps": -2017.902898211455
+      },
+      {
+        "t": 1790992083370,
+        "cum_net_bps": -2017.3300167468005
+      },
+      {
+        "t": 1790992142655,
+        "cum_net_bps": -2015.9170834321608
+      },
+      {
+        "t": 1790992142655,
+        "cum_net_bps": -2045.5405129913208
+      },
+      {
+        "t": 1790992142655,
+        "cum_net_bps": -2044.127579676681
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2045.227835559985
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2046.3280914432887
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2047.4283473265925
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2048.528603209896
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2049.6288590932
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2050.7291149765038
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2051.8293708598076
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2078.9396112210243
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2106.049851582241
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2133.1600919434577
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2160.2703323046744
+      },
+      {
+        "t": 1790992202862,
+        "cum_net_bps": -2161.3705881879782
+      },
+      {
+        "t": 1790992262766,
+        "cum_net_bps": -2160.7952440532026
+      },
+      {
+        "t": 1790992262766,
+        "cum_net_bps": -2160.219899918427
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2180.6215842577885
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2201.02326859715
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2221.4249529365115
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2241.826637275873
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2262.2283216152346
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2270.037133520393
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2290.4388178597546
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2310.840502199116
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2318.6493141042747
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2326.4581260094333
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2334.266937914592
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2342.0757498197504
+      },
+      {
+        "t": 1790992322948,
+        "cum_net_bps": -2362.477434159112
+      },
+      {
+        "t": 1790992382617,
+        "cum_net_bps": -2377.0024799389003
+      },
+      {
+        "t": 1790992502960,
+        "cum_net_bps": -2390.6878598997628
+      },
+      {
+        "t": 1790992502960,
+        "cum_net_bps": -2404.3732398606253
+      },
+      {
+        "t": 1790992502960,
+        "cum_net_bps": -2418.058619821488
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2432.583806632699
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2447.1089934439105
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2460.7943028772193
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2474.479612310528
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2488.1649217438367
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2501.8502311771454
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2515.535540610454
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2530.0607274216654
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2543.746036854974
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2557.431346288283
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2571.1166557215915
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2584.8019651549002
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2598.487274588209
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2612.1725840215177
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2626.697770832729
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2640.3830802660377
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2654.908267077249
+      },
+      {
+        "t": 1790992562773,
+        "cum_net_bps": -2669.4334538884605
+      },
+      {
+        "t": 1790992622777,
+        "cum_net_bps": -2690.678259358166
+      },
+      {
+        "t": 1790992622777,
+        "cum_net_bps": -2697.643950132981
+      },
+      {
+        "t": 1790992622777,
+        "cum_net_bps": -2704.609640907796
+      },
+      {
+        "t": 1790992622777,
+        "cum_net_bps": -2711.575331682611
+      },
+      {
+        "t": 1790992622777,
+        "cum_net_bps": -2718.5410224574257
+      },
+      {
+        "t": 1790992683133,
+        "cum_net_bps": -2738.106390702328
+      },
+      {
+        "t": 1790992802727,
+        "cum_net_bps": -2754.311861448186
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2765.4782792249234
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2776.644697001661
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2787.8111147783984
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2798.977532555136
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2810.1439503318734
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2821.310368108611
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2832.4767858853484
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2843.643203662086
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2854.8096214388233
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2865.976039215561
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2877.1424569922983
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2888.308874769036
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2899.4752925457733
+      },
+      {
+        "t": 1790992983353,
+        "cum_net_bps": -2910.641710322511
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -2937.7749054924698
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -2964.9081006624288
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -2992.0412958323877
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3019.1744910023467
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3046.3076861723057
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3073.4408813422647
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3100.5740765122237
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3127.7072716821826
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3154.8404668521416
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3181.9736620221006
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3209.1068571920596
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3236.2400523620186
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3263.3732475319775
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3290.5064427019365
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3317.6396378718955
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3344.7728330418545
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3371.9060282118135
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3399.0392233817724
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3426.1724185517314
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3453.3056137216904
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3480.4388088916494
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3507.5720040616084
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3534.7051992315673
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3561.8383944015263
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3588.9715895714853
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3616.1047847414443
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3643.2379799114033
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3670.3711750813623
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3697.5043702513212
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3724.63756542128
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3751.770760591239
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3778.903955761198
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3806.037150931157
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3833.170346101116
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3860.303541271075
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3887.436736441034
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3914.569931610993
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3941.703126780952
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3968.836321950911
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -3995.96951712087
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4023.102712290829
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4050.235907460788
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4077.369102630747
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4104.502297800706
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4131.635492970666
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4158.768688140625
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4185.901883310585
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4213.035078480544
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4240.168273650504
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4267.301468820463
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4294.434663990422
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4321.567859160382
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4348.701054330341
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4375.834249500301
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4402.96744467026
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4430.10063984022
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4457.233835010179
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4484.3670301801385
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4511.500225350098
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4538.633420520057
+      },
+      {
+        "t": 1790993223485,
+        "cum_net_bps": -4565.766615690017
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4594.579600081554
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4623.392584473092
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4652.20556886463
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4651.603080717613
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4680.416065109151
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4709.229049500688
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4738.042033892226
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4766.8550182837635
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4795.668002675301
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4824.480987066839
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4853.293971458376
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4852.69148331136
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4852.088995164343
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4880.901979555881
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4909.714963947418
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4938.527948338956
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4967.3409327304935
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4996.153917122031
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -4995.5514289750145
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5024.364413366552
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5053.17739775809
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5081.990382149627
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5110.803366541165
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5139.6163509327025
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5139.013862785686
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5167.8268471772235
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5196.639831568761
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5225.452815960299
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5254.265800351836
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5283.078784743374
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5282.476296596357
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5311.289280987895
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5340.1022653794325
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5368.91524977097
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5368.3127616239535
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5367.710273476937
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5396.5232578684745
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5425.336242260012
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5454.14922665155
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5482.962211043087
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5511.775195434625
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5511.172707287608
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5539.985691679146
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5568.7986760706835
+      },
+      {
+        "t": 1790993283441,
+        "cum_net_bps": -5597.611660462221
+      }
+    ],
+    "n_trades": 271,
+    "method": "entry = real book mid at the shadow execution point; exit = confirmed bar close at the horizon; no high/low fills; one unit notional per candidate"
+  },
+  "daily": [
+    {
+      "day": "2026-10-03",
+      "signals": 1979,
+      "gate_passes": 315,
+      "gross_expectancy_bps": -6.550145458781241,
+      "net_expectancy_bps": -20.65539358104138,
+      "cost_bps": 14.10524812226014,
+      "mfe_30m_bps": 13.116038963284533,
+      "mae_30m_bps": -19.980534331288947
+    }
+  ],
+  "warnings": [
+    "SINGLE WINDOW: fewer than 2 days of shadow data - no time-stability evidence"
+  ]
+}

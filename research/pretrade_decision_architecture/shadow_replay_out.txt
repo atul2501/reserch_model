@@ -1,0 +1,71 @@
+candidates: 48016 (ordered 44557, council-vetoed 3459); on council bars 0.239
+                     subset                   metric       mean        p50        p90        p99        max
+                        ALL      old_decision_age_ms  5274.2516  3172.8184 11708.5600 17816.5288 47275.1570
+                        ALL      new_decision_age_ms  2795.6849  2697.5212  3036.3859  3449.8133 42210.4350
+                council_bar      old_decision_age_ms 11985.1132 11233.9520 15344.9614 21042.3918 47275.1570
+                council_bar      new_decision_age_ms  2726.8638  2696.6144  3033.2129  3368.6186  3652.4942
+            non_council_bar      old_decision_age_ms  3161.7635  3018.2145  3567.4865  4227.5901 42026.2671
+            non_council_bar      new_decision_age_ms  2817.3488  2697.7711  3036.9092  3499.3363 42210.4350
+fast_path_compute_benchmark                  signals    73.7000    37.0000   200.5000   286.5300   295.0000
+fast_path_compute_benchmark              features_ms    27.3803    23.1767    42.7534    64.0371   122.1591
+fast_path_compute_benchmark population_indicators_ms   249.5238   222.3107   364.0346   436.2411   498.6574
+fast_path_compute_benchmark     strategy_eval_497_ms    10.0745     7.6478    18.6220    35.5132    64.2419
+fast_path_compute_benchmark      decision_records_ms     1.7539     1.1893     3.6562     8.1027     8.4395
+fast_path_compute_benchmark              gate_all_ms     0.5600     0.3121     1.1479     2.9307     5.9115
+fast_path_compute_benchmark     gate_per_decision_us     3.0938     2.4124     4.6232    12.8305    17.8000
+fast_path_compute_benchmark       fast_path_total_ms   289.2926   256.6875   423.9177   496.3567   596.9738
+         subset  max_decision_age_s     n  old_stale_share  new_stale_share
+            ALL                   1 48016           1.0000           1.0000
+            ALL                   2 48016           1.0000           1.0000
+            ALL                   5 48016           0.2431           0.0027
+            ALL                  10 48016           0.2003           0.0027
+            ALL                  15 48016           0.0300           0.0027
+            ALL                  30 48016           0.0006           0.0002
+            ALL  async_council<= 30 48016              NaN           0.9968
+            ALL  async_council<= 60 48016              NaN           0.9968
+            ALL async_council<= 120 48016              NaN           0.7922
+            ALL async_council<= 300 48016              NaN           0.2401
+    council_bar                   1 11496           1.0000           1.0000
+    council_bar                   2 11496           1.0000           1.0000
+    council_bar                   5 11496           1.0000           0.0000
+    council_bar                  10 11496           0.8254           0.0000
+    council_bar                  15 11496           0.1140           0.0000
+    council_bar                  30 11496           0.0016           0.0000
+    council_bar  async_council<= 30 11496              NaN           0.9982
+    council_bar  async_council<= 60 11496              NaN           0.9982
+    council_bar async_council<= 120 11496              NaN           0.9982
+    council_bar async_council<= 300 11496              NaN           0.9982
+non_council_bar                   1 36520           1.0000           1.0000
+non_council_bar                   2 36520           1.0000           1.0000
+non_council_bar                   5 36520           0.0048           0.0036
+non_council_bar                  10 36520           0.0036           0.0036
+non_council_bar                  15 36520           0.0036           0.0035
+non_council_bar                  30 36520           0.0002           0.0002
+non_council_bar  async_council<= 30 36520              NaN           0.9963
+non_council_bar  async_council<= 60 36520              NaN           0.9963
+non_council_bar async_council<= 120 36520              NaN           0.7274
+non_council_bar async_council<= 300 36520              NaN           0.0014
+         subset max_entry_drift_bps     n  old_reject_share_est  new_reject_share_est  guaranteed_within_tolerance_exact  old_abs_drift_mean  old_abs_drift_p90  new_abs_drift_mean  new_abs_drift_p90  old_signed_drift_mean  new_signed_drift_mean
+            ALL                   2 48016                0.3173                0.2673                             0.0364                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+            ALL                   5 48016                0.0611                0.0342                             0.2385                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+            ALL                  10 48016                0.0084                0.0022                             0.6103                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+            ALL                  15 48016                0.0017                0.0001                             0.8249                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+            ALL                  20 48016                0.0006                0.0001                             0.9237                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+            ALL             summary 48016                   NaN                   NaN                                NaN              1.7944             4.0724              1.5075             3.4217                 0.0848                 0.0593
+    council_bar                   2 11496                0.4334                0.2672                             0.0534                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+    council_bar                   5 11496                0.1349                0.0329                             0.2073                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+    council_bar                  10 11496                0.0259                0.0013                             0.5799                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+    council_bar                  15 11496                0.0064                0.0001                             0.7950                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+    council_bar                  20 11496                0.0025                0.0001                             0.9164                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+    council_bar             summary 11496                   NaN                   NaN                                NaN              2.5338             5.7949              1.4886             3.3368                 0.2629                 0.1731
+non_council_bar                   2 36520                0.2808                0.2673                             0.0311                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+non_council_bar                   5 36520                0.0379                0.0347                             0.2483                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+non_council_bar                  10 36520                0.0028                0.0025                             0.6199                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+non_council_bar                  15 36520                0.0002                0.0002                             0.8344                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+non_council_bar                  20 36520                0.0000                0.0001                             0.9260                 NaN                NaN                 NaN                NaN                    NaN                    NaN
+non_council_bar             summary 36520                   NaN                   NaN                                NaN              1.5616             3.5183              1.5134             3.4494                 0.0288                 0.0235
+
+NEW vs OLD live-equivalent entry (traded signals, n=43878): mean +0.022 bps (cluster t +0.86); council bars +0.094, non-council +0.006
+Paper fill (bar K+1 open) vs an OLD live order at decision time: mean +0.045 bps (t +1.20) | council bars +0.169
+Hypothetical economics: OLD traded n=43878 mean net -13.52 bps | NEW (gate 5s/10bps) n=43661 (0.995 of old) mean net -13.43 bps; rejected by NEW gate: 0.005 (their actual net -24.79)
+Signals the OLD council vetoed that NEW (no LLM gate) would submit: 3459 (0.0788 of traded volume); their outcome is unknown (never traded) - Phase/forensic estimate: fwd30 mid +4.6 bps, i.e. ~ -9 bps after 13.5 bps cost

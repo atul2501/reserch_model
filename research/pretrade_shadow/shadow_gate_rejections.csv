@@ -1,0 +1,10 @@
+reason,count,share_of_candidates
+risk_rejected,1514,0.7697000508388409
+position_already_open,571,0.2902897813929842
+<allowed>,315,0.1601423487544484
+order_already_pending,140,0.0711743772241993
+<total candidates>,1967,1.0
+<would_trade>,315,0.1601423487544484
+risk_detail: risk:below_min_order_notional,839,0.42653787493645146
+risk_detail: risk:duplicate_position_not_allowed,571,0.2902897813929842
+risk_detail: cooldown_active,104,0.05287239450940519

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
+<title>Pre-Trade Shadow — Trading Lab</title>
+<style>
+:root { --bg:#060810; --surface:#0b0e15; --surface-2:#10141c; --surface-3:#151a24; --line:#1d232d; --line-strong:#2b3340;
+  --text:#e6e9ee; --text-strong:#f8f9fb; --muted:#8791a0; --blue:#6ea8ff; --green:#3fd096; --red:#f16b7c; --amber:#e2ac57; --radius:10px; }
+* { box-sizing: border-box; }
+body { margin:0; padding:0 0 40px; background:var(--bg); color:var(--text); font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.wrap { width:min(1400px, calc(100% - 32px)); margin:0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+header { position:sticky; top:0; z-index:10; padding:14px 0; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  background:rgba(6,8,16,.9); border-bottom:1px solid var(--line); margin-bottom:12px; }
+h1 { margin:0; font-size:16px; color:var(--text-strong); }
+h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:26px 0 10px; }
+nav a { color:var(--muted); text-decoration:none; font-size:11px; font-weight:650; padding:6px 10px; border-radius:6px; }
+nav a.active, nav a:hover { color:var(--text-strong); background:var(--surface-3); }
+.banner { margin:4px 0 14px; padding:10px 16px; border-radius:var(--radius); background:rgba(226,172,87,.12); border:1px solid rgba(226,172,87,.4);
+  color:var(--amber); font-weight:750; font-size:12px; text-align:center; text-transform:uppercase; letter-spacing:.04em; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:10px; }
+.card { padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
+.card .label { color:var(--muted); font-size:9px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+.card .value { font-size:18px; font-weight:700; color:var(--text-strong); }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px; overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:12px; }
+th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+th { color:var(--muted); font-weight:650; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+th:first-child, td:first-child { text-align:left; }
+.pos { color:var(--green); } .neg { color:var(--red); } .muted { color:var(--muted); }
+.warn { display:inline-block; margin:2px 4px 2px 0; padding:2px 7px; border-radius:5px; background:rgba(241,107,124,.12); color:var(--red); font-size:10px; font-weight:700; }
+.controls { display:flex; gap:10px; align-items:center; color:var(--muted); font-size:12px; }
+select { background:var(--surface-2); color:var(--text); border:1px solid var(--line-strong); border-radius:6px; padding:4px 8px; }
+svg { width:100%; height:240px; display:block; }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:10px; } @media (max-width:900px) { .two { grid-template-columns:1fr; } }
+.headline { font-size:13px; padding:10px 14px; border-left:3px solid var(--amber); background:var(--surface-2); border-radius:6px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Pre-Trade Shadow — can the pre-trade path find trades with positive NET expectancy?</h1>
+  <nav><a href="/">Dashboard</a><a href="/analytics">Analytics</a><a href="/entry-quality">Entry Quality</a>
+       <a class="active" href="/pretrade-shadow">Pre-Trade Shadow</a><a href="/research-lab">Research Lab</a></nav>
+  <div class="controls">Horizon
+    <select id="horizon"><option>1</option><option>5</option><option selected>10</option><option>30</option><option>60</option></select>
+    Hour group <select id="hourgroup"><option>1</option><option>2</option><option>4</option><option>6</option></select>
+    <a id="csv" href="/api/pretrade-shadow/decisions.csv" style="color:var(--blue)">raw CSV</a></div>
+</header>
+<div class="banner" id="banner">SHADOW / HYPOTHETICAL — DOES NOT AFFECT PAPER OR LIVE TRADING</div>
+<div id="global-warnings"></div>
+
+<h2>A · Live shadow status</h2><div class="grid" id="A"></div>
+<h2>B · Shadow opportunities</h2><div class="grid" id="B"></div><div class="panel" style="margin-top:10px"><table id="B-reasons"></table></div>
+<h2>C · Signal edge (most important) — NET expectancy after measured cost</h2><div class="panel"><table id="C"></table></div>
+<h2>D · Gross edge vs net edge</h2><div class="two"><div class="panel"><svg id="D-chart"></svg></div><div class="panel"><table id="D"></table><div class="headline" id="D-head"></div></div></div>
+<h2>E · MFE / MAE — good entry + bad exit, or bad entry?</h2><div class="two"><div class="panel"><svg id="E-chart"></svg></div><div class="panel"><table id="E"></table></div></div>
+<h2>F · Strategy performance</h2><div class="panel"><table id="F"></table></div>
+<h2>G · Regime performance</h2><div class="panel"><table id="G"></table></div>
+<h2>H · Time of day (UTC)</h2><div class="panel"><table id="H"></table></div>
+<h2>I · Long vs short</h2><div class="panel"><table id="I"></table></div>
+<h2>J · LLM council (non-authoritative)</h2><div class="grid" id="J"></div><div class="panel" style="margin-top:10px"><table id="J-t"></table></div>
+<h2>K · Latency / freshness</h2><div class="panel"><table id="K"></table></div>
+<h2>L · Paper vs shadow (observational)</h2><div class="panel"><table id="L"></table></div><div class="grid" id="L-agree" style="margin-top:10px"></div>
+<h2>M · Cumulative shadow P&amp;L — HYPOTHETICAL SHADOW, NOT REAL P&amp;L</h2><div class="panel"><svg id="M-chart"></svg><div class="muted" id="M-note"></div></div>
+<h2>Daily (2-week run tracking)</h2><div class="panel"><table id="daily"></table></div>
+</div>
+<script>
+"use strict";
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) { const k = window.prompt("API key (viewer role or higher):", ""); if (k) { sessionStorage.setItem("apiKey", k.trim()); return await get(path); } throw new Error("auth required"); }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+const esc = s => String(s == null ? "—" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toFixed(d);
+const pct = v => (v == null || !isFinite(v)) ? "—" : (100 * v).toFixed(1) + "%";
+const cls = v => (v == null) ? "" : (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
+const sgn = (v, d = 2) => `<span class="${cls(v)} num">${v == null ? "—" : (v > 0 ? "+" : "") + f(v, d)}</span>`;
+const when = ms => ms ? new Date(ms).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—";
+const dur = s => { if (s == null) return "—"; const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return `${d}d ${h}h ${m}m`; };
+const warns = w => (w || []).map(x => `<span class="warn">⚠ ${esc(x)}</span>`).join("");
+const card = (label, value) => `<div class="card"><div class="label">${esc(label)}</div><div class="value num">${value}</div></div>`;
+function table(el, head, rows) { document.getElementById(el).innerHTML = `<tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr>` + rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join(""); }
+const edgeCols = e => [e.n ?? 0, e.bars ?? 0, sgn(e.mean_gross_bps), f(e.median_gross_bps), pct(e.win_rate_net), f(e.profit_factor_net),
+  sgn(e.net_expectancy_bps), f(e.t_stat_net), e.net_ci95_low == null ? "—" : `[${f(e.net_ci95_low)}, ${f(e.net_ci95_high)}]`, warns(e.warnings)];
+const edgeHead = ["n", "bars", "gross mean bps", "median", "win rate (net)", "PF (net)", "NET expectancy bps", "t (net)", "net 95% CI", "warnings"];
+
+function bars(svgId, items) {           // items: [{label, value, color}]
+  const W = 600, H = 240, pad = 40, n = items.length, max = Math.max(1, ...items.map(i => Math.abs(i.value || 0)));
+  const y0 = H / 2, bw = (W - pad * 2) / Math.max(1, n) * 0.7;
+  let out = `<line x1="${pad}" x2="${W - pad}" y1="${y0}" y2="${y0}" stroke="#2b3340"/>`;
+  items.forEach((it, i) => { const x = pad + i * (W - pad * 2) / n + 6, h = (Math.abs(it.value || 0) / max) * (H / 2 - 30);
+    const y = (it.value || 0) >= 0 ? y0 - h : y0;
+    out += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="${it.color}" opacity=".85"/>`;
+    out += `<text x="${x + bw / 2}" y="${(it.value || 0) >= 0 ? y - 4 : y + h + 12}" fill="#e6e9ee" font-size="11" text-anchor="middle">${it.value == null ? "n/a" : f(it.value)}</text>`;
+    out += `<text x="${x + bw / 2}" y="${H - 6}" fill="#8791a0" font-size="10" text-anchor="middle">${esc(it.label)}</text>`; });
+  const s = document.getElementById(svgId); s.setAttribute("viewBox", `0 0 ${W} ${H}`); s.innerHTML = out;
+}
+function line(svgId, pts) {
+  const s = document.getElementById(svgId), W = 900, H = 240, pad = 36; s.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (!pts.length) { s.innerHTML = `<text x="20" y="40" fill="#8791a0">No gate-pass candidate with a completed horizon yet.</text>`; return; }
+  const vs = pts.map(p => p.cum_net_bps), lo = Math.min(0, ...vs), hi = Math.max(0, ...vs), X = i => pad + i * (W - 2 * pad) / Math.max(1, pts.length - 1),
+        Y = v => H - pad - (v - lo) / Math.max(1e-9, hi - lo) * (H - 2 * pad);
+  s.innerHTML = `<line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2b3340"/>` +
+    `<polyline points="${pts.map((p, i) => `${X(i).toFixed(1)},${Y(p.cum_net_bps).toFixed(1)}`).join(" ")}" fill="none" stroke="#e2ac57" stroke-width="1.6"/>` +
+    `<text x="${pad}" y="16" fill="#8791a0" font-size="11">cumulative NET bps (1 unit per candidate) — HYPOTHETICAL</text>` +
+    `<text x="${W - pad}" y="16" fill="#e6e9ee" font-size="11" text-anchor="end">${f(vs[vs.length - 1], 0)} bps</text>`;
+}
+const grpRows = rows => rows.map(r => [esc(r.group), r.signals, pct(r.gate_pass_pct), pct(r.win_rate_net), sgn(r.mean_gross_bps), sgn(r.net_expectancy_bps),
+  f(r.profit_factor_net), f(r.mfe_30m_bps), f(r.mae_30m_bps), f(r.paper_hold_avg_s, 0), f(r.paper_hold_median_s, 0), f(r.paper_fee_bps), f(r.paper_slippage_bps), warns(r.warnings)]);
+const grpHead = ["group", "signals", "gate-pass", "win rate (net)", "gross exp bps", "NET exp bps", "PF", "MFE30", "MAE30", "paper hold avg s", "median s", "paper fee bps", "paper slip bps", "warnings"];
+const dist = d => d ? [d.n ?? 0, f(d.p50, 0), f(d.p90, 0), f(d.p95, 0), f(d.p99, 0), f(d.max, 0)] : ["—", "—", "—", "—", "—", "—"];
+
+async function load() {
+  const h = document.getElementById("horizon").value, g = document.getElementById("hourgroup").value;
+  const p = await get(`/api/pretrade-shadow/summary?horizon=${h}&hour_group=${g}`);
+  document.getElementById("global-warnings").innerHTML = warns(p.warnings);
+  const A = p.A_status;
+  document.getElementById("A").innerHTML = [card("Trading mode", esc(A.trading_mode)), card("Pre-trade mode", esc(A.pretrade_mode)),
+    card("Shadow status", esc(A.shadow_status)), card("Shadow start", when(A.shadow_start_ms)), card("Duration", dur(A.shadow_duration_s)),
+    card("Last decision", when(A.last_shadow_decision_ms)), card("Last market time", when(A.last_market_timestamp_ms)),
+    card("Last shadow cycle", when(A.last_successful_shadow_cycle_ms)), card("Missed shadow cycles", A.shadow_missed_cycles ?? "—")].join("");
+  const B = p.B_opportunities;
+  document.getElementById("B").innerHTML = [card("Candidates", B.total_candidates), card("Would trade", B.would_trade), card("Would reject", B.would_reject),
+    card("Gate pass", pct(B.gate_pass_pct)), card("Gate reject", pct(B.gate_reject_pct))].join("");
+  table("B-reasons", ["rejection category", "count", "share of candidates"], B.rejection_reasons.map(r => [esc(r.category), r.count, pct(r.share_of_candidates)]));
+  table("C", ["group", "horizon min", ...edgeHead], p.C_signal_edge.map(r => [esc(r.group), r.horizon_min, ...edgeCols(r)]));
+  const D = p.D_gross_vs_net;
+  bars("D-chart", [{label: "gross move", value: D.gross_expected_move_bps, color: "#6ea8ff"}, {label: "fees", value: D.fee_bps, color: "#f16b7c"},
+                   {label: "slippage", value: D.slippage_bps, color: "#f16b7c"}, {label: "NET", value: D.net_expected_move_bps, color: (D.net_expected_move_bps || 0) > 0 ? "#3fd096" : "#f16b7c"}]);
+  table("D", ["component (bps)", `gate-pass, ${D.horizon_min} min, n=${D.n}`], [["Gross expected move", sgn(D.gross_expected_move_bps)], ["Fees", sgn(D.fee_bps)],
+    ["Slippage", sgn(D.slippage_bps)], ["Spread (measured, already in slippage)", f(D.spread_bps_measured)], ["Estimated total cost", sgn(D.estimated_total_cost_bps)],
+    ["<b>Net expected move</b>", sgn(D.net_expected_move_bps)], ["Cost source", esc(D.cost_source)]]);
+  document.getElementById("D-head").innerHTML = D.gross_expected_move_bps == null ? "No completed horizon yet." :
+    `Gross ${sgn(D.gross_expected_move_bps)} bps − cost ${f(-D.estimated_total_cost_bps)} bps = <b>${sgn(D.net_expected_move_bps)} bps net</b> per trade.`;
+  const E = p.E_mfe_mae, hz = [1, 5, 10, 30, 60];
+  bars("E-chart", hz.flatMap(x => [{label: `MFE ${x}m`, value: E.ALL[`mfe_${x}m`], color: "#3fd096"}, {label: `MAE ${x}m`, value: E.ALL[`mae_${x}m`], color: "#f16b7c"}]));
+  const eRows = [["ALL", E.ALL], ["LONG", E.LONG], ["SHORT", E.SHORT], ...Object.entries(E.by_strategy).map(([k, v]) => ["strategy: " + k, v]),
+                 ...Object.entries(E.by_regime).map(([k, v]) => ["regime: " + k, v])];
+  table("E", ["group", ...hz.flatMap(x => [`MFE ${x}m`, `MAE ${x}m`])], eRows.map(([k, v]) => [esc(k), ...hz.flatMap(x => [f(v[`mfe_${x}m`]), f(v[`mae_${x}m`])])]));
+  table("F", grpHead, grpRows(p.F_strategy)); table("G", grpHead, grpRows(p.G_regime));
+  table("H", ["UTC hour", ...grpHead.slice(1)], grpRows(p.H_time_of_day)); table("I", grpHead, grpRows(p.I_long_short));
+  const J = p.J_llm;
+  document.getElementById("J").innerHTML = [card("LLM value", esc(J.llm_value)), card("Council available", pct(J.council_available_pct)),
+    card("Agreement (directional)", pct(J.agreement_pct_of_directional)), card("Disagreement", pct(J.disagreement_pct_of_directional)),
+    card("Mean confidence", f(J.council_confidence_mean)), card("Council age p50 (s)", J.council_age_ms ? f(J.council_age_ms.p50 / 1000, 0) : "—"), card("Authority", "NONE")].join("");
+  table("J-t", ["subset", ...edgeHead], [["quant only (all)", ...edgeCols(J.quant_only || {})], ["LLM agrees", ...edgeCols(J.llm_agree || {})], ["LLM disagrees", ...edgeCols(J.llm_disagree || {})]]);
+  const K = p.K_latency;
+  table("K", ["stage (ms)", "n", "p50", "p90", "p95", "p99", "max"], [["bar close → features", ...dist(K.bar_close_to_features)], ["features", ...dist(K.features)],
+    ["features → signal", ...dist(K.features_to_signal)], ["signal → decision", ...dist(K.signal_to_decision)], ["decision → book", ...dist(K.decision_to_book)],
+    ["TOTAL decision latency", ...dist(K.total_decision_latency)], ["|price drift| bps", ...dist(K.price_drift_abs_bps)], ["spread bps", ...dist(K.spread_bps)],
+    ["book timestamp lag ms", ...dist(K.book_timestamp_lag_ms)], ["stale %", pct(K.stale_pct), "", "", "", "", ""]]);
+  const L = p.L_paper_vs_shadow || {}, P = L.paper || {}, S = L.shadow || {};
+  table("L", ["metric", "paper (realised)", `shadow (hypothetical, ${p.selected_horizon_min} min)`], [["signals", P.signals ?? "—", S.n ?? "—"], ["trades", P.trades ?? "—", S.trades ?? "—"],
+    ["win rate", pct(P.win_rate), pct(S.win_rate_net)], ["gross expectancy bps", sgn(P.gross_expectancy_bps), sgn(S.mean_gross_bps)],
+    ["NET expectancy bps", sgn(P.net_expectancy_bps), sgn(S.net_expectancy_bps)], ["PF", f(P.profit_factor), f(S.profit_factor_net)],
+    ["avg winner bps", f(P.avg_winner_bps), f(S.avg_winner_net)], ["avg loser bps", f(P.avg_loser_bps), f(S.avg_loser_net)],
+    ["MFE30 / MAE30", "—", `${f(S.mfe_30m_bps)} / ${f(S.mae_30m_bps)}`], ["avg hold s", f(P.avg_hold_s, 0), `${p.selected_horizon_min * 60} (fixed)`],
+    ["fees bps", f(P.fee_bps), f(p.cost_model.fee_bps)], ["slippage bps", f(P.slippage_bps), f(p.cost_model.slippage_bps)]]);
+  document.getElementById("L-agree").innerHTML = [card("Same direction", pct(L.same_direction_pct)), card("Paper trade & shadow pass", pct(L.paper_trade_and_shadow_pass_pct)),
+    card("Paper trade & shadow reject", pct(L.paper_trade_and_shadow_reject_pct)), card("Shadow pass & paper no trade", pct(L.shadow_pass_and_paper_no_trade_pct))].join("");
+  line("M-chart", p.M_equity.points || []);
+  document.getElementById("M-note").textContent = `${p.M_equity.label}. ${p.M_equity.method || ""} Cost ${f(p.M_equity.cost_bps)} bps/trade.`;
+  table("daily", ["day", "signals", "gate passes", "gross exp bps", "NET exp bps", "cost bps", "MFE30", "MAE30"],
+        (p.daily || []).map(d => [esc(d.day), d.signals, d.gate_passes, sgn(d.gross_expectancy_bps), sgn(d.net_expectancy_bps), f(d.cost_bps), f(d.mfe_30m_bps), f(d.mae_30m_bps)]));
+}
+document.getElementById("horizon").addEventListener("change", () => load().catch(showErr));
+document.getElementById("hourgroup").addEventListener("change", () => load().catch(showErr));
+function showErr(e) { document.getElementById("global-warnings").innerHTML = `<span class="warn">${esc(e.message)}</span>`; }
+load().catch(showErr); setInterval(() => load().catch(showErr), 60000);
+</script>
+</body>
+</html>

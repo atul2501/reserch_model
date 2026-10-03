@@ -143,7 +143,27 @@ async def test_paper_and_shadow_adapters_never_touch_the_network(monkeypatch):
     for name in ("request", "get", "post", "send"):
         monkeypatch.setattr(httpx.AsyncClient, name, _no_net)
     monkeypatch.setattr(httpx.Client, "send", _no_net)
+    import ipaddress
     import socket
-    monkeypatch.setattr(socket.socket, "connect", _no_net)
+    real_connect = socket.socket.connect
+
+    def _no_external_connect(sock, address, *a, **k):
+        # Block every NON-loopback connection. Loopback stays allowed because the OS event loop needs it: on Windows
+        # asyncio's ProactorEventLoop builds its self-pipe with socket.socketpair(), which is a 127.0.0.1 TCP connect.
+        host = address[0] if isinstance(address, tuple) else address
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = False                      # a hostname (e.g. api.hyperliquid.xyz) is never allowed
+        if not loopback:
+            _no_net()
+        return real_connect(sock, address, *a, **k)
+    monkeypatch.setattr(socket.socket, "connect", _no_external_connect)
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:                                           # the guard itself still refuses any external destination
+        with pytest.raises(AssertionError, match="never perform network I/O"):
+            probe.connect(("203.0.113.1", 443))    # TEST-NET-3: refused by the guard before any packet is sent
+    finally:
+        probe.close()
     r = await pa.PaperExecutionAdapter().submit_order(_req("net"))
     assert r.status == OrderStatus.FILLED

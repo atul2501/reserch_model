@@ -29,6 +29,15 @@ def code_version() -> str:
     configured = get_settings().code_version
     if configured:
         return configured[:64]
+    return _git_code_version()
+
+
+@lru_cache(maxsize=1)
+def _git_code_version() -> str:
+    """Resolved ONCE per process. It used to spawn two blocking `git` subprocesses on EVERY call - from async
+    research code running on the event loop (evaluate_oos_once called it twice per evaluation), stalling lease
+    heartbeats for ~0.3 s per evaluation on Windows (process creation is slow there) and a few ms on Linux. The code
+    a process is running cannot change while it runs, so the first answer is the right one."""
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "--short=12", "HEAD"], cwd=_BACKEND, capture_output=True, text=True, timeout=5
@@ -55,6 +64,14 @@ def schema_version() -> str:
         return ScriptDirectory.from_config(cfg).get_current_head() or "unknown"
     except Exception:
         return "unknown"
+
+
+def warm_provenance_cache() -> None:
+    """Resolve the per-process provenance constants NOW (git revision: 2 subprocesses; alembic head: parses every
+    migration script). Call at process start-up, before the event loop serves lease heartbeats; otherwise the first
+    experiment registered pays for both synchronously ON the loop (~0.2-0.4 s on Windows)."""
+    _git_code_version()
+    schema_version()
 
 
 def parameter_hash() -> str:

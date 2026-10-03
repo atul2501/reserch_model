@@ -1,0 +1,75 @@
+=== ORPHANS / DUPLICATES ===
+trades without agent                                    0
+trades without position                                 0
+trades without trade_analytics                          36
+trades without entry order                              0
+trades without exit order                               555
+duplicate trade ids                                     0
+positions with >1 trade                                 0
+dup (agent,opened_at,side) trades                       0
+dup position ids                                        0
+closed positions without a trade                        0
+open positions                                          3
+                               agent_id   side                 opened_at  generation  status
+0  3876a5d3-18a4-46a6-a463-bb0888185b36   LONG 2026-10-02 15:15:00+00:00           6  ACTIVE
+1  b5416390-96a4-41d5-afb7-75491f9ded5c  SHORT 2026-10-02 15:10:00+00:00           6  ACTIVE
+2  52a51eb0-73db-4d29-b5a3-2ae079cfd6f1   LONG 2026-10-02 16:24:00+00:00           6  ACTIVE
+
+=== TIMESTAMPS ===
+closed_at < opened_at                                   189
+closed_at == opened_at                                  0
+future timestamps (> backup time)                       0
+holding_seconds mismatch >1s                            189
+signal bar >= opened_at (lookahead in fill)             0
+open - signal_bar_open (ms) quantiles                   {0.0: 60000.0, 0.5: 60000.0, 0.99: 60000.0, 1.0: 60000.0}
+entry_delay_seconds quantiles                           {0.0: 0.0, 0.5: 0.0, 0.99: 0.0, 1.0: 0.0}
+
+=== P&L IDENTITY ===
+net = gross - fees + funding  (violations >1e-6)        5560
+net = gross - fees - funding  (violations >1e-6)        0
+net = gross - fees - funding - bad_debt?  (violations >1e-6) 0
+gross = (exit-entry)*qty*sign violations >1e-6          0
+fees != entry_order_fee + exit_order_fee (>1e-6)        0
+funding == +sum(payments) violations                    0
+funding == -sum(payments) violations                    5560
+trades with nonzero funding                             5560
+bad_debt nonzero trades                                 0
+nonfinite pnl                                           0
+
+=== BALANCES / AGENTS ===
+agent.realized_pnl != sum(trade.net_pnl) (>1e-4)        87
+agent.balance != start + realized (>1e-4)               159
+agent.trade_count != #trades                            3
+negative balances                                       0
+negative equity                                         0
+agents w/ death_timestamp                               0
+death reasons                                           {None: 2988}
+trades OPENED after agent death                         0
+agent.fees_paid != sum(trade.fees) (>1e-4)              201
+
+=== OVERLAPPING POSITIONS PER AGENT ===
+trades opened before same agent's previous trade closed 0
+generation_rollover exits                               555
+
+=== CANDLES ===
+candles                                                 12028
+duplicate open_time                                     0
+non-final                                               1
+OHLC violations                                         0
+close_time != open_time+59999                           0
+gaps (diff != 60000)                                    0
+zero-volume candles                                     2
+candle range                                            2026-09-24 08:00:00+00:00 -> 2026-10-02 16:27:00+00:00
+abs 1m return > 2%                                      0
+
+=== TRADE PRICE SANITY vs CANDLES ===
+entry price outside entry-bar [low,high] (>5bps)        0
+exit price outside exit-bar [low,high] (>5bps)          204
+trade stage counts                                      {'PAPER': 43877, 'SHADOW': 1}
+trades w/ zero quantity                                 0
+
+=== MFE/MAE sanity ===
+mfe_bps < 0                                             0
+mae_bps > 0 (should be <=0?)                            0
+mae_bps sign quantiles                                  {0.0: -115.03425807874792, 0.5: -15.281854591953412, 1.0: 0.0}
+missing mfe/mae                                         36

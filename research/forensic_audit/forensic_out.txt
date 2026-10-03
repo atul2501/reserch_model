@@ -1,0 +1,512 @@
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:289: DeprecationWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  netdir = g.groupby("bar").apply(lambda x: np.sign((x.side == "LONG").sum() - (x.side == "SHORT").sum())).reindex(
+trades loaded: 43878
+
+=== P&L RECONCILIATION (independent vs DB) ===
+gross_diff: |diff|>1e-09: 0 of 43878 (max 0.00e+00); excluding stale rollovers: 0
+fees_diff: |diff|>1e-07: 0 of 43878 (max 0.00e+00); excluding stale rollovers: 0
+net_diff: |diff|>1e-07: 0 of 43878 (max 0.00e+00); excluding stale rollovers: 0
+funding indep (sum of payments) vs trade.funding mismatches: 0
+entry reference == open of bar after signal: 1.0000  entry filled vs that open (bps adverse):  {'count': 43878.0, 'mean': 2.001, 'std': 0.183, 'min': 1.409, '25%': 1.867, '50%': 2.002, '75%': 2.135, 'max': 2.606}
+entry slippage indep - model (bps): {'count': 43878.0, 'mean': 0.0, 'std': 0.183, 'min': -0.591, '25%': -0.135, '50%': 0.0, '75%': 0.134, 'max': 0.604}
+exit slippage vs reference by kind (bps): {'market': {'count': 16886, 'mean': 2.002, 'min': 0.839, 'max': 2.586}, 'rollover(no order)': {'count': 0, 'mean': nan, 'min': nan, 'max': nan}, 'stop': {'count': 21747, 'mean': 4.003, 'min': 3.393, 'max': 4.647}, 'take_profit': {'count': 4690, 'mean': 0.002, 'min': -0.542, 'max': 0.586}}
+fee bps by exit kind: {'market': 8.999, 'rollover(no order)': 9.065, 'stop': 9.0, 'take_profit': 6.0}
+
+=== EXECUTION AUDIT ===
+                                                                                                check     n                  value
+                                          TP exits filled at exact TP level, zero slippage, maker fee  4690           0.0015 exact
+                 TP exits where bar only TOUCHED the level (<1 bp through) - fill not guaranteed live   808      0.172 of TP exits
+                                                  stop exits filled at gapped OPEN (worse than level)   527        0.0242 of stops
+                                                            stop exit slippage bps (model 4 + impact) 21747                  4.003
+                                    signal exits referenced at OPEN of exit bar (decided prior close) 16886                 0.9999
+signal exits executed at bar OPEN but closed_at stamped at bar CLOSE (+59.999s) - timestamp label bug 16886 1.0000 of signal exits
+                              decision written AFTER the price it is filled at (seconds, p50/p90/p99) 43878   3.12 / 11.21 / 17.14
+                                                               partial fills (entry filled_qty < qty) 43878                       
+TP touch-only fills: 808 trades; their mean net bps 22.73; share of all trades 0.0184; if they had NOT filled, the system loses their +bps (upper bound of optimism 0.406 bps per average trade)
+
+=== TRADE TRACES ===
+30 traces. Check pass rates:
+features_replay==stored(close,rsi,atr,regime)   1.0000
+order_atr==replay_atr                           1.0000
+signal_replay==db                               1.0000
+conf_replay==db                                 0.9330
+order_requested_price==signal_close             1.0000
+stop_indep==db                                  1.0000
+tp_indep==db                                    1.0000
+net_indep==db                                   1.0000
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:85: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig["bars_to_mfe_60"] = np.where(complete, np.nanargmax(np.nan_to_num(fav, nan=-1e18), axis=1), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:86: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig["bars_to_mae_60"] = np.where(complete, np.nanargmax(np.nan_to_num(adv, nan=-1e18), axis=1), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:79: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"fwd_{hz}"] = np.where(complete, fwd, np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:80: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mfe_{hz}"] = np.where(complete, np.where(sgn > 0, up, -dn), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:81: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig[f"mae_{hz}"] = np.where(complete, np.where(sgn > 0, dn, -up), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:85: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig["bars_to_mfe_60"] = np.where(complete, np.nanargmax(np.nan_to_num(fav, nan=-1e18), axis=1), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\..\phase2_signal_horizon\p2lib.py:86: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  sig["bars_to_mae_60"] = np.where(complete, np.nanargmax(np.nan_to_num(adv, nan=-1e18), axis=1), np.nan)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+C:\Users\LENOVO\Desktop\Ftspl\reserch model\reserch_model\research\forensic_audit\forensic.py:25: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  q = lambda s: pd.read_sql(s, conn)
+ generation           family  side         exit_reason  decision_lag_s db_signal replay_signal          council_reason  entry_slip_bps  stop_bps   exit_kind replay_first_protective              exit_bar_utc      replay_first_bar_utc   net_bps  hold_s
+          5             vwap  LONG           stop_loss          3.2523      LONG          LONG    council_not_required          1.9595   27.4587        stop               stop_loss 2026-10-01 07:26:00+00:00 2026-10-01 07:26:00+00:00  -40.4420     179
+          5             vwap SHORT           stop_loss          2.7321     SHORT         SHORT    council_not_required          1.8626   10.1874        stop               stop_loss 2026-10-02 00:21:00+00:00 2026-10-02 00:21:00+00:00  -23.0168     119
+          4             vwap  LONG         take_profit          3.2148      LONG          LONG    council_not_required          1.9179   12.6335 take_profit             take_profit 2026-09-30 05:23:00+00:00 2026-09-30 05:23:00+00:00   11.4133     359
+          2         scalping SHORT         take_profit         15.8123     SHORT         SHORT         council_aligned          2.2582    9.3085 take_profit             take_profit 2026-09-28 07:13:00+00:00 2026-09-28 07:13:00+00:00    5.6368     479
+          5         breakout  LONG          exit_rules         10.1910      LONG          LONG         council_aligned          1.7140   13.4916      market             take_profit 2026-10-02 00:09:00+00:00 2026-10-02 00:44:00+00:00  -22.3069     239
+          4   mean_reversion SHORT          exit_rules         12.1302     SHORT         SHORT         council_aligned          2.0484   18.6953      market             take_profit 2026-09-30 05:52:00+00:00 2026-09-30 05:57:00+00:00   17.3011     419
+          4         momentum  LONG     signal_reversal          2.7851      LONG          LONG    council_not_required          2.0200   22.7190      market               stop_loss 2026-09-30 02:13:00+00:00 2026-09-30 02:20:00+00:00  -21.5842     539
+          1           hybrid SHORT     signal_reversal         19.8776     SHORT         SHORT         council_aligned          1.8952   15.4742      market             take_profit 2026-09-27 10:50:00+00:00 2026-09-27 11:20:00+00:00   -5.0805    1499
+          6 market_structure  LONG       trailing_stop          2.7837      LONG          LONG    council_not_required          1.8413   23.5539        stop             take_profit 2026-10-02 03:53:00+00:00 2026-10-02 03:53:00+00:00  -15.0108      59
+          2           hybrid SHORT       trailing_stop         11.2135     SHORT         SHORT         council_aligned          1.7959   19.5112        stop             take_profit 2026-09-28 04:00:00+00:00 2026-09-28 04:00:00+00:00   -0.6842     299
+          5       order_flow  LONG generation_rollover          3.6626      LONG          LONG    council_not_required          1.8174   24.3207        None               stop_loss 2026-10-02 00:55:00+00:00 2026-10-02 01:19:00+00:00   -9.1358     654
+          5             vwap SHORT generation_rollover          3.9338     SHORT         SHORT    council_not_required          2.0121   26.9133        None             take_profit 2026-10-02 00:55:00+00:00 2026-10-02 01:20:00+00:00   -7.6499     354
+          2         momentum SHORT           stop_loss         10.5781     SHORT         SHORT         council_aligned          2.1335   16.5716        stop               stop_loss 2026-09-28 22:32:00+00:00 2026-09-28 22:32:00+00:00  -29.7186    1919
+          6             vwap SHORT           stop_loss         10.5978     SHORT         SHORT council_opposed_reduced          1.8522   54.9156        stop               stop_loss 2026-10-02 04:48:00+00:00 2026-10-02 04:48:00+00:00  -67.8015    1379
+          6  trend_following SHORT         take_profit         11.0078     SHORT         SHORT         council_aligned          1.8436   23.9553 take_profit             take_profit 2026-10-02 15:06:00+00:00 2026-10-02 15:06:00+00:00   53.0812     659
+          6 market_structure  LONG           stop_loss          2.5334      LONG          LONG    council_not_required          2.0342   22.4056        stop               stop_loss 2026-10-02 04:08:00+00:00 2026-10-02 04:08:00+00:00  -35.2539     599
+          2         scalping SHORT           stop_loss         12.5922     SHORT         SHORT         council_aligned          2.1437    7.8202        stop               stop_loss 2026-09-29 00:01:00+00:00 2026-09-29 00:01:00+00:00  -20.8144      59
+          5   mean_reversion SHORT          exit_rules         14.6243     SHORT         SHORT         council_neutral          2.1800   10.2170      market               stop_loss 2026-10-01 05:47:00+00:00 2026-10-01 05:54:00+00:00    0.7012     719
+          2           hybrid  LONG     signal_reversal          2.5614      LONG          LONG    council_not_required          2.1481   14.2292      market               stop_loss 2026-09-28 08:21:00+00:00 2026-09-28 08:24:00+00:00  -11.0549     779
+          2         breakout SHORT          exit_rules          9.3856     SHORT         SHORT         council_aligned          1.9186   31.5958      market               stop_loss 2026-09-28 01:20:00+00:00 2026-09-28 01:21:00+00:00  -27.6641     299
+          6       order_flow SHORT           stop_loss          2.6473     SHORT         SHORT    council_not_required          1.9845   17.8772        stop               stop_loss 2026-10-02 15:26:00+00:00 2026-10-02 15:26:00+00:00  -30.9322     119
+          1       volatility  LONG         take_profit          2.6589      LONG          LONG    council_not_required          2.2396   26.2704 take_profit             take_profit 2026-09-28 00:48:00+00:00 2026-09-28 00:48:00+00:00   43.5287     239
+          1           hybrid SHORT          exit_rules          3.6477     SHORT         SHORT    council_not_required          2.1751   38.5752      market             take_profit 2026-09-27 13:59:00+00:00 2026-09-27 14:27:00+00:00  -22.8701    1199
+          2         scalping  LONG          exit_rules          2.8364      LONG          LONG    council_not_required          2.1237   19.9616      market               stop_loss 2026-09-28 08:50:00+00:00 2026-09-28 09:02:00+00:00  -23.9190     179
+          3             vwap  LONG         take_profit          2.9627      LONG          LONG    council_not_required          2.1041   16.7958 take_profit             take_profit 2026-09-29 08:16:00+00:00 2026-09-29 08:16:00+00:00   13.5981     539
+          4   mean_reversion SHORT           stop_loss          9.6818     SHORT         SHORT         council_neutral          2.0610   22.5167        stop               stop_loss 2026-09-30 02:06:00+00:00 2026-09-30 02:06:00+00:00  -35.3155     959
+          5             vwap SHORT          exit_rules         12.3487     SHORT         SHORT council_opposed_reduced          2.1336   12.2316      market               stop_loss 2026-10-01 03:07:00+00:00 2026-10-01 03:42:00+00:00   12.0131     419
+          6   mean_reversion  LONG           stop_loss         10.0435      LONG          LONG council_opposed_reduced          1.8867    8.4115        stop               stop_loss 2026-10-02 01:21:00+00:00 2026-10-02 01:21:00+00:00  -21.1831      59
+          1             vwap SHORT          exit_rules          3.3568     SHORT         SHORT    council_not_required          2.1124   39.2980      market             take_profit 2026-09-27 12:50:00+00:00 2026-09-27 13:00:00+00:00   35.6763   16319
+          2           hybrid SHORT generation_rollover          2.9127     SHORT         SHORT    council_not_required          2.1987   11.3562        None             take_profit 2026-09-29 00:40:00+00:00 2026-09-29 00:52:00+00:00 -408.4321       0
+
+=== SIGNAL REPLAY PARITY on 400 random directional decisions (incl. untraded) ===
+replayed 400: direction match 1.0000, confidence match 0.9900
+
+=== STRATEGY SIGNAL AUDIT ===
+          family  unique_signals  signal_bar_share direction_modes  long_share  persistence_prev_bar_same  reversal_within_10m  netdir_autocorr_lag1    pre1     pre5    pre10    pre30  gap_to_fill   post1   post5  post10   post30   post60  t_post30                                             character
+            vwap            5475            0.6489            both      0.4796                     0.8690               0.3538                0.8414 -0.7096  -5.1464 -10.2102 -26.3781       0.0526 -0.1379 -0.0534 -0.2082   0.3998   3.5169    0.2123      fading (enters against move) / no follow-through
+          hybrid            4143            0.5383            both      0.5023                     0.8569               0.4156                0.8285  2.2835  13.7063  24.1243  26.8792       0.0018 -0.0462 -0.3685 -0.8096   1.8257   3.2518    0.8055 trend-chasing (enters after move) / no follow-through
+        scalping            3095            0.3976            both      0.5099                     0.3548               0.7477                0.2819  7.2837  15.3230  15.9410  16.3090       0.0082  0.1762 -0.4706 -1.3536   0.1488  -0.5162    0.1450 trend-chasing (enters after move) / no follow-through
+  mean_reversion            2207            0.2868            both      0.4490                     0.6443               0.2383                0.6419 -4.1417 -17.3782 -25.2995 -29.0632       0.0419 -0.1563  0.4184  0.8642  -1.0231   0.9427   -0.4666      fading (enters against move) / no follow-through
+market_structure            1375            0.1787            both      0.4676                     0.8000               0.0771                0.8001 -0.4520  -0.0952   3.1274  30.4338      -0.0812  0.0340 -0.2608 -0.1902   2.3436  -0.6319    0.6678 trend-chasing (enters after move) / no follow-through
+        momentum             725            0.0926            both      0.4745                     0.4979               0.1338                0.4809  5.2391  16.1465  31.3000  73.5002      -0.0513  0.2140  0.4520  0.5712   0.9726  -3.9449    0.2576 trend-chasing (enters after move) / no follow-through
+      order_flow             512            0.0626            both      0.4492                     0.2871               0.2500                0.2782  6.1936  22.1487  30.0003  44.8269      -0.0809  0.1809 -0.2506  0.9079   5.6977   8.8801    1.6612 trend-chasing (enters after move) / no follow-through
+ trend_following             235            0.0299            both      0.5915                     0.8511               0.0383                0.8506  0.1983  12.8486  35.0932 112.8802      -0.0713  0.5946  3.5840  5.4740   2.2024 -23.5622    0.6028 trend-chasing (enters after move) / no follow-through
+        breakout             161            0.0209            both      0.5280                     0.0870               0.0062                0.0869 14.8411  33.7364  38.7328  51.3983      -0.0344 -0.5209 -1.2825 -0.3075   5.8195  15.8714    0.9378 trend-chasing (enters after move) / no follow-through
+      volatility               7            0.0009            auto      0.5714                     0.1429               0.2857                0.1428  5.0277  31.6316  29.1859  22.6873      -0.5832  9.3775 23.9719 -3.4878 -16.1773 -35.0772   -0.8624 trend-chasing (enters after move) / no follow-through
+ALL families: pre10 5.27 pre30 5.93 | post10 -0.28 post30 0.90 | gap signal-close->fill-open 0.011 bps
+DNA direction_mode / stop method census (agents): [{'m': 'both', 'slm': 'atr_multiple', 'count': 2936}, {'m': 'auto', 'slm': 'atr_multiple', 'count': 52}]
+
+=== COUNCIL (LLM) EFFECT ===
+council directional calls (n=817): fwd5 mean +0.45 bps, dir.acc 0.482, cluster t +0.64
+council directional calls (n=817): fwd30 mean +0.69 bps, dir.acc 0.483, cluster t +0.26
+council directional calls (n=817): fwd60 mean +0.66 bps, dir.acc 0.461, cluster t +0.17
+  high-confidence (>=0.6, i.e. would veto) n=303: fwd30 +1.30, t +0.32
+                                       n   fwd10   fwd30   fwd60
+reason                                                          
+council_aligned                     1022 -0.0400  2.4300  3.5900
+council_directional_conflict_veto    169  2.1000  4.2900 10.3000
+council_neutral                     1049  0.1800  0.3300  1.4900
+council_not_required               11819 -0.4300  0.3600  1.4900
+council_opposed_reduced              594 -1.6000 -1.6800  0.8400
+VETOED signals (unique bar,side) n=168: their fwd30 +4.55 (t +0.88) -> a positive value means the veto removed winners
+                         trades  net_bps     wr
+council_reason                                 
+council_aligned            3693 -11.2170 0.2640
+council_neutral            1861 -14.5940 0.2800
+council_not_required      35781 -13.5460 0.2870
+council_opposed_reduced    2341 -12.5280 0.3990
+
+=== STRATEGY SKILL PERSISTENCE across generations (same strategy_version carried as elite) ===
+versions traded in consecutive generations: 42; Spearman(exp gen g, exp gen g+1) = -0.034
+Spearman(agent.fitness, agent's own realized exp) = 0.576
+mean net bps by generation: {1: -16.26, 2: -14.87, 3: -11.44, 4: -14.95, 5: -13.34, 6: -9.83}
+
+=== SIZING ===
+notional $ quantiles: {0.05: 10.69, 0.25: 14.12, 0.5: 18.94, 0.75: 26.69, 0.95: 47.31}
+leverage: {2.0: 24539, 1.0: 16946, 3.0: 2191}
+round-trip cost / risk-at-stop: median 0.86, p90 1.58
+stop distance bps: median 17.5 p10 9.5 p90 31.1
+TP distance bps: median 39.6
+risk outcome of directional decisions: [{'r': None, 'count': 324301}, {'r': 'below_min_order_notional', 'count': 100262}, {'r': 'position_size_reduced_to_limit', 'count': 26272}, {'r': 'trading_halted:catchup_replay', 'count': 649}, {'r': 'trading_halted:venue_mismatch:PAPER', 'count': 63}]
+
+=== LOSS WATERFALL ===
+                                                                       component  bps_per_trade  t_cluster
+                                  Signal latency (signal close -> fill-bar open)        -0.0013    -0.0309
+Raw directional move over the actual hold (fill-bar open -> exit-bar close, mid)        -0.5745    -0.7540
+                            Exit logic (actual exit reference vs exit-bar close)         0.6580     2.9093
+                                                = Gross edge at reference prices         0.0835        NaN
+                                                                  Entry slippage        -2.0013        NaN
+                                                                       Entry fee        -4.5000        NaN
+                                                                   Exit slippage        -2.7899        NaN
+                                                                        Exit fee        -4.1750        NaN
+                                                                         Funding         0.0006        NaN
+                       = Final expectancy (sum of components from fill-bar open)       -13.3821        NaN
+                                        Final expectancy (DB net_pnl / notional)       -13.3818        NaN
+                        Memo: fixed 10m hold, mid (exit-independent signal edge)         1.2518     1.2530
+waterfall by exit reason (bps):
+                 hold_same_duration_exit_at_bar_close  exit_logic_vs_same_duration_close  entry_slippage  entry_fee  exit_slippage  exit_fee   net_db      n
+exit_rules                                    11.6600                            -0.0800         -2.0000    -4.5000        -2.0000   -4.5000  -1.4200  16386
+signal_reversal                               -6.4200                            -0.3300         -1.9900    -4.5000        -2.0000   -4.5000 -19.7400    500
+stop_loss                                    -17.5800                             1.6100         -2.0000    -4.5000        -4.0000   -4.5000 -30.9800  21712
+take_profit                                   35.7500                            -0.9200         -2.0000    -4.5000        -0.0000   -1.5000  26.8400   4690
+trailing_stop                                 34.3300                           -16.4800         -1.9500    -4.5000        -4.0100   -4.5000   2.9100     35

@@ -1,0 +1,4 @@
+subset,n,bars,mean_gross_bps,median_gross_bps,win_rate_gross,cost_bps,net_expectancy_bps,win_rate_net,profit_factor_net,avg_winner_net,avg_loser_net,t_stat_gross,t_stat_net,net_ci95_low,net_ci95_high
+quant_only,1416,30.0,-1.9683611466637407,-0.41983290650304816,0.4781073446327684,14.10524812226014,-16.073609268923878,0.13206214689265536,0.01573658508724244,1.9459613282974462,-18.815399099420535,,,,
+llm_agree,0,,,,,,,,,,,,,,
+llm_disagree,0,,,,,,,,,,,,,,

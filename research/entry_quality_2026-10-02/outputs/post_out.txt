@@ -1,0 +1,241 @@
+=== PHASE 18: SAME-PERIOD TRUE OOS (FINAL fold) ===
+                   model fset target     thr_rule   thr  trades  bars  win_rate    pf  exp_bps  exp_usd      net  max_dd  payoff  hold_min   auc  pr_auc  brier   ece  precision  recall  train_auc  val_auc  val_exp_bps  train_exp_bps_at_thr
+   BASELINE (all trades)    -      -     keep_all 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118   NaN     NaN    NaN   NaN        NaN     NaN        NaN      NaN          NaN                   NaN
+V1 frozen (val-selected)   v1     t1 val-selected 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118 0.546   0.394  0.262 0.171      0.353   1.000        NaN      NaN          NaN                   NaN
+V1 frozen (prod_default)   v1     t1 prod_default 0.600    2026   186     0.401 0.455  -11.694   -0.026  -52.906  60.370   0.678    12.470 0.546   0.394  0.262 0.171      0.401   0.308        NaN      NaN          NaN                   NaN
+                      LR   v1     t1     keep_all 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118 0.541   0.402  0.264 0.169      0.353   1.000      0.675    0.544      -13.033               -14.181
+                      RF   v1     t1       top30% 0.469    1833   255     0.358 0.392  -13.659   -0.030  -55.474  59.991   0.704    11.869 0.535   0.373  0.240 0.079      0.358   0.249      0.956    0.509      -12.032                 7.905
+                     HGB   v1     t1       top30% 0.559    1739   189     0.254 0.212  -19.703   -0.043  -75.141  75.260   0.624    10.480 0.460   0.339  0.274 0.184      0.254   0.167      0.918    0.493      -12.480                 7.830
+                     XGB   v1     t1       top30% 0.555    1593   218     0.315 0.286  -15.895   -0.034  -54.917  54.983   0.622    11.602 0.479   0.348  0.265 0.188      0.315   0.190      0.884    0.500      -12.976                 3.683
+                      LR  ext     t1     keep_all 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118 0.517   0.359  0.265 0.158      0.353   1.000      0.687    0.561      -13.033               -14.181
+                      RF  ext     t1       top30% 0.447    2319   322     0.352 0.370  -13.616   -0.030  -70.319  72.200   0.682    11.826 0.538   0.371  0.240 0.084      0.352   0.309      0.956    0.517      -12.216                 6.881
+                     HGB  ext     t1          abs 0.550    1883   204     0.283 0.243  -18.223   -0.040  -75.506  75.625   0.617    10.318 0.483   0.346  0.268 0.150      0.283   0.202      0.916    0.527      -10.228                 6.631
+                     XGB  ext     t1       top50% 0.483    2466   328     0.332 0.292  -14.529   -0.032  -77.804  77.869   0.589    10.430 0.480   0.341  0.264 0.161      0.332   0.310      0.886    0.516      -12.200                -0.690
+                      LR  ext     t2     keep_all 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118 0.507   0.273  0.261 0.209      0.264   1.000      0.717    0.572      -13.033               -14.181
+                      RF  ext     t2       top50% 0.278    3955   510     0.395 0.470  -10.447   -0.023  -91.370  91.436   0.719    11.276 0.567   0.286  0.211 0.081      0.309   0.620      0.959    0.617      -12.753                -2.989
+                     HGB  ext     t2     keep_all 0.000    7469   702     0.353 0.433  -10.704   -0.024 -176.973 177.039   0.793     9.118 0.545   0.274  0.238 0.181      0.264   1.000      0.975    0.535      -13.033               -14.181
+                     XGB  ext     t2       top10% 0.520    1199   182     0.314 0.328  -16.478   -0.037  -44.666  44.897   0.717    11.241 0.535   0.275  0.233 0.155      0.261   0.159      0.965    0.603      -12.702                13.091
+
+confusion matrices [tn, fp, fn, tp]:
+  V1 frozen (val-selected) v1  t1: [0, 4831, 0, 2638]   boot(mean,lo,hi,P<=0)=(0.0, 0.0, 0.0, 1.0)
+  V1 frozen (prod_default) v1  t1: [3618, 1213, 1825, 813]   boot(mean,lo,hi,P<=0)=(-0.39, -9.24, 10.05, 0.55)
+  LR                       v1  t1: [0, 4831, 0, 2638]   boot(mean,lo,hi,P<=0)=(0.0, 0.0, 0.0, 1.0)
+  RF                       v1  t1: [3654, 1177, 1982, 656]   boot(mean,lo,hi,P<=0)=(-2.48, -11.87, 8.1, 0.69)
+  HGB                      v1  t1: [3533, 1298, 2197, 441]   boot(mean,lo,hi,P<=0)=(-8.44, -16.77, 1.25, 0.96)
+  XGB                      v1  t1: [3739, 1092, 2137, 501]   boot(mean,lo,hi,P<=0)=(-4.46, -11.83, 4.59, 0.86)
+  LR                       ext t1: [0, 4831, 0, 2638]   boot(mean,lo,hi,P<=0)=(0.0, 0.0, 0.0, 1.0)
+  RF                       ext t1: [3328, 1503, 1822, 816]   boot(mean,lo,hi,P<=0)=(-2.46, -10.26, 6.02, 0.73)
+  HGB                      ext t1: [3480, 1351, 2106, 532]   boot(mean,lo,hi,P<=0)=(-7.1, -14.47, 1.34, 0.95)
+  XGB                      ext t1: [3183, 1648, 1820, 818]   boot(mean,lo,hi,P<=0)=(-3.38, -9.46, 3.83, 0.84)
+  LR                       ext t2: [0, 5496, 0, 1973]   boot(mean,lo,hi,P<=0)=(0.0, 0.0, 0.0, 1.0)
+  RF                       ext t2: [2765, 2731, 749, 1224]   boot(mean,lo,hi,P<=0)=(0.33, -3.63, 3.97, 0.42)
+  HGB                      ext t2: [0, 5496, 0, 1973]   boot(mean,lo,hi,P<=0)=(0.0, 0.0, 0.0, 1.0)
+  XGB                      ext t2: [4610, 886, 1660, 313]   boot(mean,lo,hi,P<=0)=(-5.4, -12.58, 2.99, 0.91)
+
+=== WALK-FORWARD SUMMARY: OOS exp_bps minus fold baseline (positive = model helped) ===
+fold               FINAL     WF1     WF2  folds_improved
+model fset target                                       
+HGB   ext  t1     -7.519  -4.707  -7.534               0
+           t2      0.000  -7.972  -6.024               0
+      v1   t1     -8.999  -2.778   0.000               0
+LR    ext  t1      0.000   6.093 -12.926               1
+           t2      0.000  -2.665  -6.096               0
+      v1   t1      0.000   1.334  -5.553               1
+RF    ext  t1     -2.912   3.264  -9.203               1
+           t2      0.257 -12.437  -5.651               1
+      v1   t1     -2.955  -0.679 -11.671               0
+XGB   ext  t1     -3.825   2.116   2.691               2
+           t2     -5.774 -12.590  -6.238               0
+      v1   t1     -5.191   0.624   4.035               2
+
+OOS exp_bps (absolute):
+fold                FINAL     WF1     WF2
+model fset target                        
+HGB   ext  t1     -18.223 -19.385 -19.987
+           t2     -10.704 -22.650 -18.478
+      v1   t1     -19.703 -17.456 -12.453
+LR    ext  t1     -10.704  -8.585 -25.380
+           t2     -10.704 -17.342 -18.549
+      v1   t1     -10.704 -13.344 -18.006
+RF    ext  t1     -13.616 -11.414 -21.656
+           t2     -10.447 -27.115 -18.104
+      v1   t1     -13.659 -15.357 -24.124
+XGB   ext  t1     -14.529 -12.562  -9.763
+           t2     -16.478 -27.267 -18.691
+      v1   t1     -15.895 -14.054  -8.419
+
+any model with positive OOS expectancy in ANY fold: Empty DataFrame
+Columns: [fold, model, fset, target, trades, bars, exp_bps]
+Index: []
+
+=== PHASE 27: OVERFITTING (train AUC vs OOS AUC; train exp@thr vs OOS exp) ===
+       train_auc  val_auc  oos_auc  train_exp_at_thr  val_exp  oos_exp
+model                                                                 
+HGB        0.939    0.557    0.501             6.965   -7.672  -17.671
+LR         0.695    0.605    0.552            -9.274   -8.849  -14.813
+RF         0.956    0.581    0.524            11.220   -9.856  -17.277
+XGB        0.919    0.573    0.503            12.235   -7.412  -15.295
+
+=== PHASE 19: STABILITY — FINAL OOS split into 4 chronological slices (selected thresholds) ===
+                            min                       max
+slice                                                    
+OOS-1 2026-10-01 14:00:00+00:00 2026-10-02 01:20:00+00:00
+OOS-2 2026-10-02 01:20:00+00:00 2026-10-02 04:08:00+00:00
+OOS-3 2026-10-02 04:10:00+00:00 2026-10-02 07:34:00+00:00
+OOS-4 2026-10-02 07:36:00+00:00 2026-10-02 15:30:00+00:00
+slice                            OOS-1  OOS-2   OOS-3   OOS-4  slices_pos
+model                                                                    
+BASELINE                       -12.069 -7.185  -9.771 -13.790           0
+HGB|ext|t1                     -12.118 -2.058 -27.018 -17.673           0
+HGB|ext|t2                     -12.069 -7.185  -9.771 -13.790           0
+HGB|v1|t1                      -17.955 -3.069 -27.857 -15.578           0
+LR|ext|t1                      -12.069 -7.185  -9.771 -13.790           0
+LR|ext|t2                      -12.069 -7.185  -9.771 -13.790           0
+LR|v1|t1                       -12.069 -7.185  -9.771 -13.790           0
+RF|ext|t1                      -11.643  6.493 -23.823 -14.380           1
+RF|ext|t2                      -12.037 -2.377 -12.626 -13.577           0
+RF|v1|t1                       -12.243  8.670 -25.173 -15.777           1
+V1 frozen (prod_default)|v1|t1  -9.962  9.332 -21.610 -14.814           1
+V1 frozen (val-selected)|v1|t1 -12.069 -7.185  -9.771 -13.790           0
+XGB|ext|t1                     -11.252  0.342 -22.167 -13.797           1
+XGB|ext|t2                      -5.159 -9.647 -22.013 -16.082           0
+XGB|v1|t1                      -12.283  1.151 -22.772 -13.587           1
+slice                             OOS-1    OOS-2    OOS-3    OOS-4
+model                                                             
+BASELINE                       1868.000 1867.000 1867.000 1867.000
+HGB|ext|t1                      442.000  242.000  778.000  421.000
+HGB|ext|t2                     1868.000 1867.000 1867.000 1867.000
+HGB|v1|t1                       342.000  217.000  739.000  441.000
+LR|ext|t1                      1868.000 1867.000 1867.000 1867.000
+LR|ext|t2                      1868.000 1867.000 1867.000 1867.000
+LR|v1|t1                       1868.000 1867.000 1867.000 1867.000
+RF|ext|t1                       326.000  457.000  917.000  619.000
+RF|ext|t2                       782.000  883.000 1350.000  940.000
+RF|v1|t1                        267.000  385.000  689.000  492.000
+V1 frozen (prod_default)|v1|t1  190.000  453.000  815.000  568.000
+V1 frozen (val-selected)|v1|t1 1868.000 1867.000 1867.000 1867.000
+XGB|ext|t1                      670.000  249.000  840.000  707.000
+XGB|ext|t2                      113.000  210.000  516.000  360.000
+XGB|v1|t1                       286.000  154.000  688.000  465.000
+slice                           OOS-1  OOS-2  OOS-3  OOS-4
+model                                                     
+BASELINE                        0.330  0.395  0.367  0.320
+HGB|ext|t1                      0.303  0.583  0.166  0.304
+HGB|ext|t2                      0.330  0.395  0.367  0.320
+HGB|v1|t1                       0.170  0.581  0.158  0.317
+LR|ext|t1                       0.330  0.395  0.367  0.320
+LR|ext|t2                       0.330  0.395  0.367  0.320
+LR|v1|t1                        0.330  0.395  0.367  0.320
+RF|ext|t1                       0.371  0.641  0.213  0.334
+RF|ext|t2                       0.381  0.485  0.379  0.346
+RF|v1|t1                        0.330  0.681  0.209  0.329
+V1 frozen (prod_default)|v1|t1  0.405  0.702  0.283  0.329
+V1 frozen (val-selected)|v1|t1  0.330  0.395  0.367  0.320
+XGB|ext|t1                      0.343  0.602  0.218  0.361
+XGB|ext|t2                      0.442  0.419  0.254  0.297
+XGB|v1|t1                       0.322  0.630  0.196  0.381
+
+=== PHASE 21: INTERACTIONS — OOS AUC (t1) of each FINAL ext model + V1 within subgroups ===
+     group           value    n  base_exp  auc_V1  rho_exp_V1  auc_LR  rho_exp_LR  auc_RF  rho_exp_RF  auc_HGB  rho_exp_HGB  auc_XGB  rho_exp_XGB
+      side            LONG 3976    -9.960   0.536      -0.046   0.527      -0.069   0.484      -0.089    0.445       -0.101    0.447       -0.111
+      side           SHORT 3493   -11.550   0.588       0.003   0.554      -0.056   0.626       0.044    0.536       -0.076    0.551       -0.034
+trendrange           RANGE 4784   -12.561   0.510      -0.102   0.476      -0.165   0.529      -0.033    0.498       -0.061    0.474       -0.115
+trendrange           TREND 2685    -7.395   0.589       0.090   0.595       0.067   0.555      -0.007    0.493       -0.058    0.512       -0.007
+    family  mean_reversion 2149   -13.526   0.503      -0.133   0.455      -0.192   0.515      -0.060    0.449       -0.120    0.434       -0.150
+    family        momentum  760    -7.984   0.497       0.097   0.512       0.082   0.480       0.102    0.504        0.144    0.464        0.079
+    family      order_flow 1131    -5.398   0.579       0.177   0.512      -0.012   0.548       0.067    0.482        0.054    0.532        0.082
+    family        scalping  322   -10.554   0.490      -0.094   0.502      -0.021   0.515      -0.065    0.492       -0.088    0.529       -0.040
+    family            vwap 2383   -10.814   0.529      -0.031   0.417      -0.220   0.516      -0.084    0.437       -0.239    0.430       -0.214
+    regime       BREAKDOWN  546    -9.742   0.621       0.393   0.528      -0.029   0.661      -0.041    0.799        0.380    0.774        0.211
+    regime        BREAKOUT 1039    -6.327   0.411      -0.053   0.534      -0.008   0.441       0.124    0.311       -0.106    0.388        0.003
+    regime HIGH_VOLATILITY  462    -7.605   0.588       0.162   0.584       0.028   0.588       0.242    0.613        0.318    0.561        0.193
+    regime  LOW_VOLATILITY  629   -12.607   0.560      -0.080   0.573      -0.027   0.656       0.335    0.614        0.223    0.524        0.055
+    regime           RANGE 3693   -13.173   0.497      -0.133   0.450      -0.224   0.514      -0.094    0.479       -0.124    0.458       -0.173
+    regime        TREND_UP 1041    -7.043   0.615       0.020   0.607       0.035   0.528      -0.074    0.474       -0.170    0.541       -0.034
+  volstate        HIGH_VOL 2757   -11.273   0.570      -0.018   0.518      -0.095   0.451      -0.162    0.449       -0.164    0.433       -0.175
+  volstate      NORMAL_VOL 4712   -10.371   0.543      -0.045   0.514      -0.107   0.588       0.095    0.521        0.010    0.519       -0.011
+  momstate     MOM_EXTREME 4376    -7.081   0.542       0.002   0.508      -0.051   0.506      -0.073    0.480       -0.096    0.499       -0.071
+  momstate      MOM_NORMAL 3093   -15.830   0.509      -0.173   0.514      -0.197   0.567      -0.009    0.489       -0.079    0.480       -0.104
+
+=== PHASE 26: PERMUTATION IMPORTANCE (OOS, avg-precision drop) — ext/t1 ===
+
+LR:
+model             feature  mean_imp  min_imp  mean_rank
+   LR      trend_strength     0.014    0.005      6.667
+   LR               ret_3     0.014    0.004      6.333
+   LR price_dist_ema_slow     0.013    0.001     10.667
+   LR           macd_hist     0.012    0.002      7.667
+   LR               ret_5     0.011    0.003      9.000
+   LR      ema_fast_slope     0.011    0.002     10.000
+   LR     dist_from_low20     0.010    0.009      7.333
+   LR              ret_10     0.010    0.007      6.000
+   LR price_dist_ema_fast     0.009   -0.001     14.667
+   LR         bb_position     0.008    0.002      9.333
+
+RF:
+model         feature  mean_imp  min_imp  mean_rank
+   RF dist_from_low20     0.010    0.003      8.000
+   RF    rsi_14_slope     0.010    0.004      6.000
+   RF macd_hist_slope     0.008   -0.001     10.333
+   RF  ema_fast_slope     0.008   -0.001     10.333
+   RF      lower_wick     0.008    0.006      7.000
+   RF      atr_pctile     0.007   -0.001     13.000
+   RF     candle_body     0.007    0.002      9.667
+   RF    volume_ratio     0.006    0.001     10.667
+   RF            side     0.006    0.002     12.667
+   RF          ret_10     0.006    0.000     11.667
+
+HGB:
+model         feature  mean_imp  min_imp  mean_rank
+  HGB  ema_fast_slope     0.026    0.005      4.000
+  HGB     bb_position     0.024    0.004      6.333
+  HGB           ret_1     0.019    0.004      6.000
+  HGB dist_from_low20     0.019   -0.002     14.000
+  HGB           ret_5     0.017    0.003      8.000
+  HGB          ret_10     0.017    0.002      8.333
+  HGB    rsi_14_slope     0.017    0.008      6.000
+  HGB        bb_width     0.016    0.010      7.000
+  HGB    volume_ratio     0.014   -0.000     13.667
+  HGB      atr_pctile     0.013   -0.008     12.000
+
+XGB:
+model         feature  mean_imp  min_imp  mean_rank
+  XGB          ret_10     0.015    0.004      7.667
+  XGB     bb_position     0.013   -0.003     10.333
+  XGB        bb_width     0.013    0.007      7.667
+  XGB  trend_strength     0.013   -0.002      9.333
+  XGB    rsi_14_slope     0.011    0.001      7.333
+  XGB      atr_pctile     0.011   -0.019     10.333
+  XGB dist_from_low20     0.009    0.001     10.333
+  XGB    volume_ratio     0.009    0.004      7.667
+  XGB          atr_14     0.009    0.001     10.000
+  XGB  ema_fast_slope     0.009   -0.000      8.667
+
+Features with positive permutation importance in ALL 3 folds for >=3 of 4 models:
+{'family': 4, 'ret_10': 4, 'dist_from_low20': 3, 'lower_wick': 3, 'macd_hist_slope': 3, 'ret_3': 3, 'ret_5': 3, 'rsi_14_slope': 3, 'volume_ratio': 3}
+
+Importance rank stability across folds (Spearman of importance vectors):
+  LR: WF1-WF2=0.27  WF2-FINAL=0.20  WF1-FINAL=-0.25
+  RF: WF1-WF2=-0.22  WF2-FINAL=-0.17  WF1-FINAL=-0.14
+  HGB: WF1-WF2=0.23  WF2-FINAL=0.34  WF1-FINAL=0.04
+  XGB: WF1-WF2=0.23  WF2-FINAL=-0.07  WF1-FINAL=-0.10
+
+Top-1 feature share of total positive importance (concentration):
+  FINAL HGB: top=macd_hist_slope share=0.14
+  FINAL LR: top=candle_body share=0.16
+  FINAL RF: top=bb_width share=0.15
+  FINAL XGB: top=rsi_14_slope share=0.13
+  WF1   HGB: top=bb_position share=0.09
+  WF1   LR: top=ret_3 share=0.11
+  WF1   RF: top=dist_from_low20 share=0.11
+  WF1   XGB: top=bb_position share=0.12
+  WF2   HGB: top=ret_10 share=0.17
+  WF2   LR: top=regime share=0.09
+  WF2   RF: top=ret_10 share=0.12
+  WF2   XGB: top=ret_10 share=0.22
+
+=== PHASE 25: XGB dependence on one regime/generation/family (FINAL OOS, selected threshold) ===
+  by regime: {'BREAKDOWN': {'n': 15, 'exp': -4.63}, 'BREAKOUT': {'n': 214, 'exp': -21.04}, 'HIGH_VOLATILITY': {'n': 29, 'exp': -17.23}, 'LOW_VOLATILITY': {'n': 207, 'exp': -11.76}, 'RANGE': {'n': 1750, 'exp': -15.22}, 'TREND_DOWN': {'n': 9, 'exp': -11.46}, 'TREND_UP': {'n': 242, 'exp': -6.52}}
+  by generation: {5: {'n': 532, 'exp': -8.36}, 6: {'n': 1934, 'exp': -16.23}}
+  by family: {'breakout': {'n': 42, 'exp': -21.55}, 'hybrid': {'n': 11, 'exp': -13.72}, 'market_structure': {'n': 3, 'exp': 30.68}, 'mean_reversion': {'n': 1046, 'exp': -14.91}, 'momentum': {'n': 82, 'exp': -13.04}, 'order_flow': {'n': 120, 'exp': -23.15}, 'scalping': {'n': 61, 'exp': -10.5}, 'trend_following': {'n': 6, 'exp': -24.26}, 'vwap': {'n': 1095, 'exp': -13.37}}
+  by side: {'LONG': {'n': 1364, 'exp': -19.4}, 'SHORT': {'n': 1102, 'exp': -8.51}}

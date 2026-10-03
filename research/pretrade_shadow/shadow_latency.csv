@@ -1,0 +1,18 @@
+subset,stage,n,mean,p50,p90,p99,max
+steady_state,event_to_features_start_ms,40,2847.3,2817.5,3194.2000000000003,3509.03,3518.0
+steady_state,feature_ms,40,41.05,42.5,59.000000000000014,97.44,99.0
+steady_state,features_to_signal_ms,40,228.8,207.0,357.8,402.52,415.0
+steady_state,signal_to_decision_ms,40,24.2,21.0,38.400000000000006,54.31999999999999,59.0
+steady_state,decision_to_shadow_execution_ms,40,164.725,159.0,181.0,281.83,283.0
+steady_state,signal_to_decision_total_ms,40,3141.35,3135.5,3578.5,3934.84,3991.0
+steady_state,old_path_done_ms_after_event,40,4295.9,4082.5,5604.3,6157.34,6272.0
+cold_start_bar,event_to_features_start_ms,1,32337.0,32337.0,32337.0,32337.0,32337.0
+cold_start_bar,feature_ms,1,121.0,121.0,121.0,121.0,121.0
+cold_start_bar,features_to_signal_ms,1,644.0,644.0,644.0,644.0,644.0
+cold_start_bar,signal_to_decision_ms,1,46.0,46.0,46.0,46.0,46.0
+cold_start_bar,decision_to_shadow_execution_ms,1,159.0,159.0,159.0,159.0,159.0
+cold_start_bar,signal_to_decision_total_ms,1,33148.0,33148.0,33148.0,33148.0,33148.0
+cold_start_bar,old_path_done_ms_after_event,1,34534.0,34534.0,34534.0,34534.0,34534.0
+steady_state,candidate decision age at gate (new path),1967,3359.739196746314,3384.0,3789.0,4229.0,4229.0
+steady_state,old path decision age for the same agent+bar,1265,4069.6302825083376,4016.64990234375,5063.535009765625,5795.708476562499,6081.208984375
+steady_state,gate_validation_us (per decision),1967,7.2542450284638855,7.099995855242014,8.800001523923129,21.400002879090607,32.89999585831538

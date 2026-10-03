@@ -220,6 +220,10 @@ class OllamaClient:
         if isinstance(exc, OllamaAuthError):
             return any(not health.disabled for health in self._key_health)
         if isinstance(exc, OllamaRateLimitError):
+            if not self._key_health:
+                # Keyless client (e.g. a self-hosted Ollama): there is no per-key cooldown/rotation state, so a 429 is
+                # a plain transient error and gets the normal backoff retry. any([]) used to make it never retry.
+                return True
             return any(not health.disabled and health.cooldown_until <= time.monotonic() for health in self._key_health)
         if isinstance(exc, OllamaUnavailableError):
             return False

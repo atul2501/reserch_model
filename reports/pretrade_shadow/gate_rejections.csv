@@ -1,0 +1,13 @@
+category,count,share_of_candidates
+minimum_notional,841,0.4249621020717534
+duplicate_position,571,0.2885295603840323
+cooldown,104,0.05255179383527034
+position_open,571,0.2885295603840323
+pending_order,140,0.07074279939363315
+stale,12,0.00606366851945427
+price_drift,0,0.0
+spread,0,0.0
+risk,1516,0.7660434562910561
+regime,0,0.0
+conflict,0,0.0
+other,0,0.0

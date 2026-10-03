@@ -81,13 +81,31 @@ async def _add_trade(
 
 
 @pytest_asyncio.fixture
-async def api(db_session):
+async def api(db_session, monkeypatch):
+    """Authenticated as a VIEWER exactly like tests/test_api_endpoints.py: every /api route requires auth by default
+    (fail-closed), so an unauthenticated client gets 401 - the endpoints under test are viewer-level."""
+    from pydantic import SecretStr
+
+    from app.core.config import get_settings
+    from app.core.security import hash_api_key
+
+    viewer_key = "eq-viewer-key-1234"
+    s = get_settings()
+    monkeypatch.setattr(s, "api_auth_required", True)
+    monkeypatch.setattr(s, "api_keys", SecretStr(f"eqv:viewer:{hash_api_key(viewer_key)}"))
+
     async def _db():
         yield db_session
     app = create_app()
     app.dependency_overrides[get_db] = _db
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        c.headers.update({"X-API-Key": viewer_key})
         yield c
+
+
+async def test_entry_quality_api_rejects_unauthenticated_requests(api):
+    r = await api.get("/api/entry-quality/export.csv", headers={"X-API-Key": ""})
+    assert r.status_code == 401
 
 
 async def test_build_audit_runs_end_to_end_with_no_trades(db_session):

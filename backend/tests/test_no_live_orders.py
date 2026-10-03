@@ -86,7 +86,7 @@ def test_every_http_post_in_the_codebase_targets_an_allowlisted_endpoint_or_is_i
     """`.post(` call sites outside tests: exactly the two known clients (plus FastAPI's own route decorators)."""
     posts = {}
     for path, text in _sources():
-        rel = str(path.relative_to(BACKEND))
+        rel = path.relative_to(BACKEND).as_posix()   # '/'-separated on every OS (Windows gives '\')
         for line in text.splitlines():
             if re.search(r"\.post\(", line) and "@router.post" not in line and "@app.post" not in line:
                 posts.setdefault(rel, []).append(line.strip())

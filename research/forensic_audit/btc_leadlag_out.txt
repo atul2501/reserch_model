@@ -1,0 +1,10 @@
+bars 5111  2026-09-29 03:17:00 -> 2026-10-02 16:27:00; same-bar corr(BTC,SOL) 0.813
+h= 1: corr(BTC ret_t, SOL fwd) +0.0349 | corr(BTC residual_t, SOL fwd) +0.0506 | corr(SOL ret_t, SOL fwd) +0.0067
+h= 5: corr(BTC ret_t, SOL fwd) +0.0222 | corr(BTC residual_t, SOL fwd) +0.0347 | corr(SOL ret_t, SOL fwd) +0.0025
+h=15: corr(BTC ret_t, SOL fwd) +0.0049 | corr(BTC residual_t, SOL fwd) +0.0220 | corr(SOL ret_t, SOL fwd) -0.0097
+  BTC led UP (resid top 5%) -> SOL fwd1 in BTC direction: +0.90 bps (t +1.34, n 256)
+  BTC led UP (resid top 5%) -> SOL fwd5 in BTC direction: +0.41 bps (t +0.26, n 256)
+  BTC led UP (resid top 5%) -> SOL fwd15 in BTC direction: -1.01 bps (t -0.33, n 256)
+  BTC led DOWN (resid bottom 5%) -> SOL fwd1 in BTC direction: +0.71 bps (t +1.38, n 256)
+  BTC led DOWN (resid bottom 5%) -> SOL fwd5 in BTC direction: +1.34 bps (t +0.98, n 256)
+  BTC led DOWN (resid bottom 5%) -> SOL fwd15 in BTC direction: +3.14 bps (t +1.10, n 256)

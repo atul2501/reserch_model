@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060810">
+<title>Research Lab — Trading Lab</title>
+<style>
+:root { --bg:#060810; --surface:#0b0e15; --surface-2:#10141c; --surface-3:#151a24; --line:#1d232d; --line-strong:#2b3340;
+  --text:#e6e9ee; --text-strong:#f8f9fb; --muted:#8791a0; --blue:#6ea8ff; --green:#3fd096; --red:#f16b7c; --amber:#e2ac57; --radius:10px; }
+* { box-sizing: border-box; }
+body { margin:0; padding:0 0 40px; background:var(--bg); color:var(--text); font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.wrap { width:min(1400px, calc(100% - 32px)); margin:0 auto; }
+header { position:sticky; top:0; z-index:10; padding:14px 0; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  background:rgba(6,8,16,.9); border-bottom:1px solid var(--line); margin-bottom:12px; }
+h1 { margin:0; font-size:16px; color:var(--text-strong); }
+h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:26px 0 10px; }
+nav a { color:var(--muted); text-decoration:none; font-size:11px; font-weight:650; padding:6px 10px; border-radius:6px; }
+nav a.active, nav a:hover { color:var(--text-strong); background:var(--surface-3); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:10px; }
+.card { padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
+.card .label { color:var(--muted); font-size:9px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+.card .value { font-size:15px; font-weight:700; color:var(--text-strong); word-break:break-word; }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px; overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:12px; }
+th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+th { color:var(--muted); font-weight:650; font-size:10px; text-transform:uppercase; }
+th:first-child, td:first-child, td.l { text-align:left; }
+.pos { color:var(--green); } .neg { color:var(--red); } .muted { color:var(--muted); }
+.tag { display:inline-block; padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; background:var(--surface-3); }
+.warn { display:inline-block; margin:2px 4px 2px 0; padding:2px 7px; border-radius:5px; background:rgba(241,107,124,.12); color:var(--red); font-size:10px; font-weight:700; }
+.next { padding:14px; border-left:3px solid var(--amber); background:var(--surface-2); border-radius:6px; }
+ul { margin:6px 0 0 18px; padding:0; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Research Lab — is there a VERIFIED, cost-adjusted, out-of-sample edge?</h1>
+  <nav><a href="/">Dashboard</a><a href="/analytics">Analytics</a><a href="/pretrade-shadow">Pre-Trade Shadow</a><a class="active" href="/research-lab">Research Lab</a></nav>
+</header>
+<h2>Current research status</h2><div class="grid" id="status"></div>
+<h2>Next best research experiment</h2><div class="next" id="next"></div>
+<h2>Experiment leaderboard — sorted by OUT-OF-SAMPLE NET expectancy (never training score)</h2><div class="panel"><table id="board"></table></div>
+<h2>Research failures (do not repeat)</h2><div class="panel"><table id="fail"></table></div>
+<h2>Data sufficiency</h2><div class="grid" id="data"></div>
+<h2>Rules</h2><div class="panel"><ul id="rules"></ul></div>
+</div>
+<script>
+"use strict";
+function apiKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch (e) { return ""; } }
+async function get(path) {
+  const key = apiKey();
+  const res = await fetch(path, { headers: key ? { "X-API-Key": key } : {} });
+  if (res.status === 401 || res.status === 403) { const k = window.prompt("API key (viewer role or higher):", ""); if (k) { sessionStorage.setItem("apiKey", k.trim()); return await get(path); } throw new Error("auth required"); }
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return await res.json();
+}
+const esc = s => String(s == null ? "—" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toFixed(d);
+const sgn = v => `<span class="${v == null ? "" : (v > 0 ? "pos" : "neg")}">${v == null ? "—" : (v > 0 ? "+" : "") + f(v)}</span>`;
+const card = (l, v) => `<div class="card"><div class="label">${esc(l)}</div><div class="value">${v}</div></div>`;
+const warns = w => (w || []).map(x => `<span class="warn">⚠ ${esc(x)}</span>`).join("");
+const row = r => [esc(r.experiment_id) + (r.seed ? ' <span class="tag">prior</span>' : ""), `<span class="l">${esc(r.hypothesis)}</span>`, esc(r.model), r.horizon_min ?? "—",
+  r.oos_trades ?? "—", sgn(r.oos_net_expectancy_bps), f(r.oos_profit_factor), sgn(r.oos_total_net_bps), `<span class="tag">${esc(r.status)}</span>`, esc(r.decision), warns(r.warnings)];
+const head = ["experiment", "hypothesis", "model", "horizon", "OOS trades", "OOS NET exp bps", "OOS PF", "OOS P&L bps", "status", "decision", "warnings"];
+function table(id, rows) { document.getElementById(id).innerHTML = `<tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr>` + rows.map(r => `<tr>${row(r).map((c, i) => `<td class="${i === 1 ? "l" : ""}">${c}</td>`).join("")}</tr>`).join(""); }
+async function load() {
+  const p = await get("/api/research-lab/summary"), s = p.current_status, b = s.best_verified_experiment || {};
+  document.getElementById("status").innerHTML = [card("Current deployable edge", esc(s.deployable_edge)), card("Best verified OOS NET expectancy", b.oos_net_expectancy_bps == null ? "—" : sgn(b.oos_net_expectancy_bps) + " bps"),
+    card("Best OOS PF", f(b.oos_profit_factor)), card("Best experiment", esc(b.experiment_id)), card("Its hypothesis", esc(b.hypothesis)),
+    card("Horizon", b.horizon_min ?? "—"), card("OOS sample", b.oos_trades ?? "—"), card("New experiments run", s.experiments_run),
+    card("Prior experiments (seeded)", s.seeded_prior_experiments), card("Last experiment", esc(s.last_experiment ? s.last_experiment.experiment_id : "—"))].join("");
+  const n = p.next_experiment;
+  document.getElementById("next").innerHTML = `<b>${esc(n.action)}</b> ${esc(n.hypothesis || n.experiment || "")}<div class="muted">${esc(n.why)}</div>` +
+    ((n.skipped || []).length ? `<div class="muted" style="margin-top:8px">Skipped (already tested): ${n.skipped.map(x => esc(x.hypothesis)).join(", ")}</div>` : "");
+  table("board", p.leaderboard); table("fail", p.failures);
+  const d = p.data_sufficiency;
+  document.getElementById("data").innerHTML = [card("Shadow observations", d.shadow_observations), card("Independent signal bars", d.independent_signal_bars),
+    card("Shadow days collected", f(d.shadow_days_collected)), card("1-day OOS windows available", d.oos_windows_available_1d),
+    card("Order-book coverage (h)", d.order_book_coverage_hours), card("Trade-flow coverage (h)", d.trade_flow_coverage_hours),
+    card("BTC coverage (h)", d.btc_coverage_hours), card("Requirement", esc(d.requirement))].join("");
+  document.getElementById("rules").innerHTML = p.rules.map(r => `<li>${esc(r)}</li>`).join("");
+}
+load().catch(e => { document.getElementById("next").innerHTML = `<span class="warn">${esc(e.message)}</span>`; });
+</script>
+</body>
+</html>

@@ -89,12 +89,17 @@ SUBFIELD_COVERAGE: dict[str, tuple[str, str]] = {
 
 
 def _model_subfields() -> set[str]:
+    from typing import get_origin
+
     from pydantic import BaseModel
 
     out: set[str] = set()
     for name, field in StrategyDNA.model_fields.items():
         ann = field.annotation
-        if isinstance(ann, type) and issubclass(ann, BaseModel) and name not in ("entry_rules", "exit_rules"):
+        # get_origin() excludes parameterised generics such as list[IndicatorConfig]: on Python 3.10
+        # isinstance(list[X], type) is True (fixed in 3.11) and issubclass() then raises TypeError.
+        if (get_origin(ann) is None and isinstance(ann, type) and issubclass(ann, BaseModel)
+                and name not in ("entry_rules", "exit_rules")):
             out |= {f"{name}.{sub}" for sub in ann.model_fields}
     return out
 

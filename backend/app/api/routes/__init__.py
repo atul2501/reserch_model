@@ -18,6 +18,8 @@ from app.api.routes.entry_quality import router as entry_quality_router
 from app.api.routes.evolution import router as evolution_router
 from app.api.routes.exit_analytics import router as exit_analytics_router
 from app.api.routes.export import router as export_router
+from app.api.routes.pretrade_shadow import router as pretrade_shadow_router
+from app.api.routes.research_lab import router as research_lab_router
 from app.api.routes.shadow import router as shadow_router
 from app.api.routes.status import router as status_router
 from app.api.routes.system import router as system_router
@@ -44,3 +46,5 @@ api_router.include_router(entry_quality_router, dependencies=[viewer_required])
 api_router.include_router(shadow_router, dependencies=[viewer_required])
 api_router.include_router(status_router, dependencies=[viewer_required])
 api_router.include_router(export_router, dependencies=[viewer_required])
+api_router.include_router(pretrade_shadow_router, dependencies=[viewer_required])
+api_router.include_router(research_lab_router, dependencies=[viewer_required])

@@ -105,6 +105,14 @@ def create_app() -> FastAPI:
     async def entry_quality_page():
         return FileResponse(STATIC_DIR / "entry_quality.html")
 
+    @app.get("/pretrade-shadow")
+    async def pretrade_shadow_page():
+        return FileResponse(STATIC_DIR / "pretrade_shadow.html")
+
+    @app.get("/research-lab")
+    async def research_lab_page():
+        return FileResponse(STATIC_DIR / "research_lab.html")
+
     return app
 
 

@@ -72,3 +72,23 @@ def immediate_fills(monkeypatch):
     from app.core.config import get_settings
 
     monkeypatch.setattr(get_settings(), "paper_fill_timing", "signal_close")
+
+
+# --------------------------------------------------------------------------- test categories (pytest.ini, TESTING.md)
+_INTEGRATION_FILES = {
+    "test_postgres.py", "test_postgres_concurrency.py",      # real PostgreSQL (TEST_POSTGRES_ADMIN_URL), skip if absent
+    "test_dashboard_js.py", "test_entry_quality_page.py",    # Node.js, skip if absent
+}
+_SHADOW_FILES = {"test_pretrade_shadow.py", "test_pretrade_architecture.py", "test_pretrade_dashboard.py"}
+_CATEGORY_MARKS = ("integration", "external", "performance")
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        fname = item.path.name
+        if fname in _INTEGRATION_FILES:
+            item.add_marker(pytest.mark.integration)
+        if fname in _SHADOW_FILES:
+            item.add_marker(pytest.mark.shadow)
+        if not any(item.get_closest_marker(m) for m in _CATEGORY_MARKS):
+            item.add_marker(pytest.mark.unit)

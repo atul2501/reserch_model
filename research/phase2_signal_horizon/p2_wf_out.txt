@@ -1,0 +1,248 @@
+SOL 124.27 -> 119.93 (-349 bps) over the trading window; unconditional mean LONG fwd_60 per bar = -2.46 bps (shorts get the negative of this for free)
+
+=== 8. ORDER FLOW — bar-level proxy flow_imbalance_p (volume-weighted candle direction) ===
+ p condition           value  n_bars  cont_fwd1  cont_fwd5  cont_fwd10  cont_fwd30    t30  cont_fwd60    t60  drift_part30  Q1_fwd30  Q2_fwd30  Q3_fwd30  Q4_fwd30  quarters_pos
+ 5    bucket      strong_neg    2210     -0.002     -0.193       0.054       3.430  1.312       5.230  1.030         1.187     8.026     6.089     2.617    -3.153         3.000
+ 5    bucket        weak_neg     971      0.327     -0.895      -1.222       0.131  0.055       1.194  0.234         1.219    -0.343    -1.799     4.055    -1.410         1.000
+ 5    bucket         neutral    1515      0.270      0.478       0.030       0.326  0.257      -2.983 -1.789        -0.012    -0.988    -1.728     0.077     3.989         2.000
+ 5    bucket        weak_pos     876      0.280      0.734      -0.959      -2.299 -0.892      -3.799 -0.730        -1.243    -5.608     1.178    -4.916     0.174         2.000
+ 5    bucket      strong_pos    2124      0.016     -1.421      -1.381       0.843  0.290      -0.141 -0.028        -1.240    -7.218     2.422     2.612     5.600         3.000
+10    bucket      strong_neg    1733     -0.022     -0.849      -0.888       3.038  1.073       5.875  1.180         1.157    10.192     3.973    -1.129    -0.966         2.000
+10    bucket        weak_neg    1127      0.012      0.108       2.230       6.019  1.480       7.744  1.117         1.154     6.036     7.096    10.955    -0.167         3.000
+10    bucket         neutral    1984      0.217     -0.712      -0.540      -0.873 -0.647      -0.042 -0.019         0.038    -2.437     3.297    -1.833    -2.525         1.000
+10    bucket        weak_pos    1216     -0.166     -0.811      -0.202       0.226  0.090       1.387  0.290        -1.244    -8.407     8.090    -2.239     3.535         2.000
+10    bucket      strong_pos    1636     -0.121     -0.414      -1.195       2.926  0.894       0.776  0.137        -1.216    -6.538     2.952     8.439     6.911         3.000
+10  persist3           False    1666      0.358     -0.091      -0.391      -0.144 -0.218      -0.139 -0.145        -0.000    -0.523     1.482    -1.909     0.377         2.000
+10  persist3            True    6030     -0.098     -0.709      -0.273       2.587  1.434       3.651  1.434         0.014     1.705     3.518     4.482     0.610         4.000
+10     accel           False    4157      0.039     -0.244      -0.463       1.733  1.239       2.778  1.374        -0.009    -0.225     3.867     3.673    -0.435         2.000
+10     accel            True    3539     -0.044     -0.964      -0.104       2.300  1.281       2.887  1.075         0.035     1.810     3.663     2.039     1.687         4.000
+10 mom_agree           False    2202      0.104      0.237       1.207       3.812  1.842       6.918  2.143         0.041     3.404     5.369     2.236     4.252         4.000
+10 mom_agree            True    5494     -0.040     -0.900      -0.902       1.270  0.767       1.202  0.526        -0.000     0.052     3.240     2.892    -1.123         3.000
+10   highvol           False    5089      0.106      0.165       0.717       2.546  1.807       2.119  1.099        -0.002     2.955     2.081     2.758     2.392         4.000
+10   highvol            True    2607     -0.204     -2.023      -2.288       0.905  0.297       4.246  0.888         0.050    -3.502    -2.413     9.457     0.053         2.000
+10 vol_spike           False    6154     -0.017     -0.619      -0.426       1.594  1.122       2.479  1.178         0.005     0.265     3.929     2.687    -0.541         3.000
+10 vol_spike            True    1542      0.074     -0.398       0.213       3.590  1.755       4.215  1.539         0.036     2.783     3.891     2.833     4.863         4.000
+10    regime       BREAKDOWN     177     -0.614      1.415       3.170       5.193  1.247      -2.247 -0.393         0.591     3.227     8.384     7.405     1.799         4.000
+10    regime        BREAKOUT     164      0.448      0.453       2.838       4.161  1.166       6.995  1.254        -0.195    -6.294     3.058     8.769    11.109         3.000
+10    regime HIGH_VOLATILITY     996     -0.102     -2.444      -2.854      -0.407 -0.155       6.474  1.419        -0.004    -0.232     5.390    -3.358    -3.429         1.000
+10    regime  LOW_VOLATILITY    1502      0.224      0.847       1.515       2.413  1.027      -0.958 -0.278         0.017     6.705    -2.532     1.321     4.143         3.000
+10    regime           RANGE    4475     -0.074     -0.884      -1.071       1.725  1.054       3.132  1.356        -0.000     0.378     4.407     4.176    -2.165         3.000
+10    regime      TREND_DOWN     209      0.189      2.575       8.643       6.986  1.076      14.750  2.031         0.442   -18.227    30.288     8.395     7.974         3.000
+10    regime        TREND_UP     168      0.503     -0.951       1.165       7.777  0.658      -6.303 -0.375        -0.297   -15.592    11.997    23.092    11.610         3.000
+10    regime       UNCERTAIN       5      3.006     -2.339       6.006       7.677    NaN      -0.837    NaN        10.512       NaN       NaN       NaN       NaN           NaN
+20    bucket      strong_neg    1277     -0.063     -0.309       0.042       5.030  1.383       7.453  1.268         1.071     9.511     4.186     9.660    -3.356         3.000
+20    bucket        weak_neg    1362      0.064      0.741       3.093       5.343  1.289       6.023  0.939         1.122    10.365     4.352     0.178     6.475         4.000
+20    bucket         neutral    2551      0.051      0.239       0.689       0.464  0.270       1.360  0.490         0.004    -2.278     2.189     3.243    -1.315         2.000
+20    bucket        weak_pos    1404      0.190      0.629       0.813       2.109  0.693       4.282  0.681        -1.230    -9.787     8.306     7.927     1.984         3.000
+20    bucket      strong_pos    1102      0.036     -0.799      -0.089       4.737  0.965      -1.488 -0.210        -1.227     0.669    -0.168     1.314    17.194         3.000
+
+Order-flow STRATEGY (traded signals) by flow at signal bar (p=10 bucket):
+           n  fwd10  fwd30  fwd60     net    mid
+mag                                             
+<0.2      50  1.509  1.676 -2.796 -12.751  0.414
+0.2-0.45  49 14.464 22.001 30.243  -8.254  4.315
+0.45-0.7  87 -0.955  1.301 -3.891 -15.656 -2.374
+>0.7      85  2.736 16.960 29.020  -5.355  7.316
+         n  fwd30  fwd60     net
+side                            
+LONG   135 11.535 11.013 -10.833
+SHORT  136  8.525 14.443 -10.270
+
+=== 13. OFFLINE EXITS on traded signals (ATR-based SL/TP, max 60m; stop-first if both in one bar) ===
+                                          exit    n  exp_bps_S1like  frictionless_exp    pf  win_rate  avg_win  avg_loss  be_wr  t_cluster  flipped_direction_exp  edge_vs_flipped  share_tp  share_stop
+EXISTING (actual production exits, real fills) 6500         -13.898            -0.495   NaN       NaN      NaN       NaN    NaN        NaN                    NaN              NaN       NaN         NaN
+                                      fixed_5m 6500         -13.382            -0.382 0.170     0.213   12.824   -20.490  0.615    -38.729                -12.618           -0.763     0.000       0.000
+                                     fixed_10m 6500         -13.590            -0.590 0.267     0.273   18.176   -25.495  0.584    -24.986                -12.410           -1.179     0.000       0.000
+                                     fixed_30m 6500         -13.351            -0.351 0.444     0.338   31.650   -36.279  0.534    -14.567                -12.649           -0.702     0.000       0.000
+                                     fixed_60m 6498         -11.172             1.828 0.627     0.411   45.726   -50.909  0.527     -8.752                -14.828            3.655     0.000       0.000
+                                       sl1_tp1 6498         -11.892            -0.285 0.089     0.300    3.860   -18.631  0.828    -55.407                -11.274           -0.618     0.485       0.515
+                                       sl1_tp2 6498         -12.674            -0.044 0.230     0.337   11.220   -24.846  0.689    -50.503                -11.396           -1.278     0.338       0.661
+                                       sl1_tp4 6498         -12.918             0.572 0.334     0.217   29.804   -24.789  0.454    -32.463                -11.597           -1.321     0.214       0.779
+                                       sl1_tp8 6498         -14.046             0.227 0.337     0.139   51.356   -24.588  0.324    -23.554                -12.993           -1.053     0.086       0.852
+                                       sl2_tp1 6498         -11.633            -1.028 0.115     0.391    3.870   -21.588  0.848    -33.067                -10.372           -1.261     0.628       0.372
+                                       sl2_tp2 6498         -12.452            -0.828 0.306     0.481   11.426   -34.547  0.751    -26.390                -10.555           -1.897     0.482       0.516
+                                       sl2_tp4 6498         -12.673             0.005 0.442     0.336   29.935   -34.198  0.533    -18.914                -10.885           -1.788     0.325       0.652
+                                       sl2_tp8 6498         -14.008            -0.211 0.448     0.236   48.239   -33.211  0.408    -14.023                -13.039           -0.969     0.132       0.727
+                                       sl4_tp1 6498         -11.429            -1.737 0.137     0.468    3.873   -24.864  0.865    -21.843                -10.102           -1.327     0.756       0.236
+                                       sl4_tp2 6498         -12.207            -1.649 0.368     0.626   11.362   -51.663  0.820    -16.374                -10.393           -1.814     0.626       0.343
+                                       sl4_tp4 6498         -12.543            -0.827 0.519     0.465   29.089   -48.692  0.626    -16.307                -10.779           -1.763     0.438       0.454
+                                       sl4_tp8 6498         -13.891            -0.773 0.528     0.349   44.535   -45.239  0.504    -10.403                -13.430           -0.462     0.178       0.503
+                                    sl2_trail1 6498         -13.351             1.648 0.196     0.204   15.914   -20.854  0.567    -28.501                -12.090           -1.261     0.000       0.999
+                                    sl2_trail2 6498         -14.397             0.588 0.283     0.234   24.262   -26.222  0.519    -21.438                -12.522           -1.875     0.000       0.992
+                                    sl4_trail1 6498         -13.538             1.444 0.223     0.244   15.924   -23.042  0.591    -20.748                -12.168           -1.370     0.000       0.991
+                                    sl4_trail2 6498         -14.701             0.210 0.334     0.309   23.865   -31.961  0.573    -18.279                -12.676           -2.025     0.000       0.955
+
+=== 15. WALK-FORWARD RULE SELECTION — chosen on VALIDATION (max mean net S1, >=30 signals & >=20 bars), reported on OOS ===
+fold      cost_scenario             universe  horizon  min_move  top_conf  cooldown  val_exp  oos_n  oos_bars  oos_exp  oos_pf  oos_wr  oos_sum_bps  oos_dd_bps  oos_avg_win  oos_avg_loss  oos_t  oos_drift_part  oos_exp_ex_drift  oos_quarters_pos  oos_exp_at_S1
+  F1         S1_current    TRADED_order_flow       60        50     0.750         0   15.239     36        36    3.170   1.089   0.389      114.112     666.233       99.605       -58.198  0.234          -0.019             3.188                 1          3.170
+  F1 S6_plausible_maker    TRADED_order_flow       60        50     0.750         0   20.739     36        36    8.670   1.269   0.417      312.112     627.733       98.290       -55.345  0.640          -0.019             8.688                 1          3.170
+  F2         S1_current OF_bar_p5_t0.45_v1.4       60        50     0.250         0   14.426     23        23   -2.889   0.849   0.522      -66.457     291.974       31.045       -39.909 -0.172           0.240            -3.129                 1         -2.889
+  F2 S6_plausible_maker OF_bar_p5_t0.45_v1.4       60        50     0.250         0   19.926     23        23    2.611   1.159   0.522       60.043     231.474       36.545       -34.409  0.155           0.240             2.371                 2         -2.889
+  F3         S1_current          TRADED_vwap       60         0     0.500         0   15.939    152       150  -30.043   0.473   0.388    -4566.527    6175.612       69.377       -93.116 -1.685          -2.782           -27.261                 2        -30.043
+  F3 S6_plausible_maker          TRADED_vwap       60         0     0.500         0   21.439    152       150  -24.543   0.542   0.395    -3730.527    5878.903       73.646       -88.579 -1.376          -2.782           -21.761                 2        -30.043
+
+=== 7/14. MARGINAL EFFECTS on TRADED_ALL (and order_flow), pooled over the three OOS windows ===
+         universe                         dim  horizon  param  retained  pct_retained  win_rate     pf  exp_S1     sum_bps     dd_bps  frictionless
+       TRADED_ALL           min_expected_move       10  0.000      3105         1.000     0.253  0.252 -13.758  -42720.128  42724.963        -0.258
+       TRADED_ALL           min_expected_move       10  5.000      3105         1.000     0.253  0.252 -13.758  -42720.128  42724.963        -0.258
+       TRADED_ALL           min_expected_move       10 10.000      3105         1.000     0.253  0.252 -13.758  -42720.128  42724.963        -0.258
+       TRADED_ALL           min_expected_move       10 15.000      2993         0.964     0.257  0.258 -13.781  -41245.199  41250.033        -0.281
+       TRADED_ALL           min_expected_move       10 20.000      2411         0.776     0.264  0.277 -13.881  -33466.797  33471.632        -0.381
+       TRADED_ALL           min_expected_move       10 30.000       930         0.300     0.275  0.331 -14.468  -13455.011  13459.846        -0.968
+       TRADED_ALL           min_expected_move       10 50.000       218         0.070     0.298  0.442 -13.129   -2862.149   3073.171         0.371
+       TRADED_ALL top_confidence(descriptive)       10  1.000      3105         1.000     0.253  0.252 -13.758  -42720.128  42724.963        -0.258
+       TRADED_ALL top_confidence(descriptive)       10  0.750      2332         0.751     0.253  0.254 -13.811  -32207.477  32212.312        -0.311
+       TRADED_ALL top_confidence(descriptive)       10  0.500      1553         0.500     0.261  0.255 -13.962  -21683.434  21684.615        -0.462
+       TRADED_ALL top_confidence(descriptive)       10  0.250       861         0.277     0.259  0.258 -14.360  -12363.732  12364.295        -0.860
+       TRADED_ALL top_confidence(descriptive)       10  0.100       311         0.100     0.228  0.193 -17.278   -5373.588   5373.588        -3.778
+       TRADED_ALL                cooldown_min       10  0.000      3105         1.000     0.253  0.252 -13.758  -42720.128  42724.963        -0.258
+       TRADED_ALL                cooldown_min       10  5.000      1710         0.551     0.254  0.273 -13.521  -23120.499  23190.951        -0.021
+       TRADED_ALL                cooldown_min       10 15.000      1082         0.348     0.255  0.291 -12.991  -14056.515  14064.815         0.509
+       TRADED_ALL                cooldown_min       10 30.000       786         0.253     0.260  0.291 -12.963  -10188.555  10259.007         0.537
+       TRADED_ALL                cooldown_min       10 60.000       535         0.172     0.258  0.285 -12.955   -6931.167   6939.466         0.545
+       TRADED_ALL           min_expected_move       30  0.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL           min_expected_move       30  5.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL           min_expected_move       30 10.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL           min_expected_move       30 15.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL           min_expected_move       30 20.000      3104         1.000     0.349  0.485 -12.039  -37369.808  37369.808         1.461
+       TRADED_ALL           min_expected_move       30 30.000      2753         0.887     0.362  0.506 -11.900  -32761.134  32761.134         1.600
+       TRADED_ALL           min_expected_move       30 50.000      1075         0.346     0.386  0.519 -14.027  -15079.283  15095.166        -0.527
+       TRADED_ALL top_confidence(descriptive)       30  1.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL top_confidence(descriptive)       30  0.750      2332         0.751     0.346  0.494 -11.722  -27336.144  27336.144         1.778
+       TRADED_ALL top_confidence(descriptive)       30  0.500      1553         0.500     0.342  0.467 -12.689  -19705.317  19707.549         0.811
+       TRADED_ALL top_confidence(descriptive)       30  0.250       861         0.277     0.317  0.474 -12.396  -10673.154  10675.386         1.104
+       TRADED_ALL top_confidence(descriptive)       30  0.100       311         0.100     0.286  0.428 -13.462   -4186.624   4186.624         0.038
+       TRADED_ALL                cooldown_min       30  0.000      3105         1.000     0.349  0.485 -12.038  -37377.395  37377.395         1.462
+       TRADED_ALL                cooldown_min       30  5.000      1710         0.551     0.341  0.485 -12.407  -21216.217  21447.036         1.093
+       TRADED_ALL                cooldown_min       30 15.000      1082         0.348     0.331  0.501 -11.945  -12924.561  12955.057         1.555
+       TRADED_ALL                cooldown_min       30 30.000       786         0.253     0.337  0.514 -11.485   -9026.878   9102.860         2.015
+       TRADED_ALL                cooldown_min       30 60.000       535         0.172     0.333  0.504 -11.434   -6117.224   6147.719         2.066
+       TRADED_ALL           min_expected_move       60  0.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL           min_expected_move       60  5.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL           min_expected_move       60 10.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL           min_expected_move       60 15.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL           min_expected_move       60 20.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL           min_expected_move       60 30.000      3096         0.997     0.420  0.686  -9.054  -28012.821  28199.404         4.446
+       TRADED_ALL           min_expected_move       60 50.000      2365         0.762     0.430  0.721  -8.541  -20181.439  20462.463         4.959
+       TRADED_ALL top_confidence(descriptive)       60  1.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL top_confidence(descriptive)       60  0.750      2332         0.751     0.430  0.719  -8.041  -18744.352  20060.813         5.459
+       TRADED_ALL top_confidence(descriptive)       60  0.500      1553         0.500     0.423  0.699  -9.043  -14043.767  14683.923         4.457
+       TRADED_ALL top_confidence(descriptive)       60  0.250       861         0.277     0.420  0.776  -6.461   -5563.111   7697.995         7.039
+       TRADED_ALL top_confidence(descriptive)       60  0.100       311         0.100     0.418  0.826  -4.870   -1514.454   2521.393         8.630
+       TRADED_ALL                cooldown_min       60  0.000      3105         1.000     0.420  0.685  -9.071  -28148.680  28335.263         4.429
+       TRADED_ALL                cooldown_min       60  5.000      1710         0.551     0.407  0.658 -10.264  -17530.927  19533.561         3.236
+       TRADED_ALL                cooldown_min       60 15.000      1082         0.348     0.406  0.658 -10.477  -11315.398  12103.458         3.023
+       TRADED_ALL                cooldown_min       60 30.000       786         0.253     0.395  0.696  -9.088   -7124.880   7675.464         4.412
+       TRADED_ALL                cooldown_min       60 60.000       535         0.172     0.406  0.694  -9.093   -4855.659   5088.635         4.407
+TRADED_order_flow           min_expected_move       10  0.000       165         1.000     0.279  0.499 -10.112   -1668.520   1668.520         3.388
+TRADED_order_flow           min_expected_move       10  5.000       165         1.000     0.279  0.499 -10.112   -1668.520   1668.520         3.388
+TRADED_order_flow           min_expected_move       10 10.000       165         1.000     0.279  0.499 -10.112   -1668.520   1668.520         3.388
+TRADED_order_flow           min_expected_move       10 15.000       162         0.982     0.284  0.506 -10.024   -1623.861   1623.861         3.476
+TRADED_order_flow           min_expected_move       10 20.000       155         0.939     0.284  0.506 -10.127   -1569.686   1569.686         3.373
+TRADED_order_flow           min_expected_move       10 30.000       106         0.642     0.302  0.460 -11.594   -1229.014   1241.542         1.906
+TRADED_order_flow           min_expected_move       10 50.000        37         0.224     0.378  0.836  -2.991    -110.655    313.448        10.509
+TRADED_order_flow top_confidence(descriptive)       10  1.000       165         1.000     0.279  0.499 -10.112   -1668.520   1668.520         3.388
+TRADED_order_flow top_confidence(descriptive)       10  0.750       124         0.752     0.306  0.505 -10.211   -1266.118   1266.118         3.289
+TRADED_order_flow top_confidence(descriptive)       10  0.500        83         0.503     0.313  0.481 -11.243    -933.146    965.236         2.257
+TRADED_order_flow top_confidence(descriptive)       10  0.250        42         0.255     0.357  0.508 -11.418    -479.548    479.548         2.082
+TRADED_order_flow top_confidence(descriptive)       10  0.100        17         0.103     0.588  1.618   8.379     142.438    169.785        21.879
+TRADED_order_flow                cooldown_min       10  0.000       165         1.000     0.279  0.499 -10.112   -1668.520   1668.520         3.388
+TRADED_order_flow                cooldown_min       10  5.000       116         0.703     0.241  0.428 -11.630   -1349.037   1493.571         1.870
+TRADED_order_flow                cooldown_min       10 15.000        81         0.491     0.272  0.497  -9.249    -749.146    809.356         4.251
+TRADED_order_flow                cooldown_min       10 30.000        69         0.418     0.246  0.402 -11.954    -824.844    869.844         1.546
+TRADED_order_flow                cooldown_min       10 60.000        49         0.297     0.245  0.363 -10.993    -538.661    563.967         2.507
+TRADED_order_flow           min_expected_move       30  0.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow           min_expected_move       30  5.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow           min_expected_move       30 10.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow           min_expected_move       30 15.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow           min_expected_move       30 20.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow           min_expected_move       30 30.000       158         0.958     0.424  1.006   0.125      19.791    652.570        13.625
+TRADED_order_flow           min_expected_move       30 50.000       110         0.667     0.464  1.038   0.836      91.991    658.124        14.336
+TRADED_order_flow top_confidence(descriptive)       30  1.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow top_confidence(descriptive)       30  0.750       124         0.752     0.427  1.260   4.635     574.777    623.265        18.135
+TRADED_order_flow top_confidence(descriptive)       30  0.500        83         0.503     0.410  1.193   3.518     292.027    372.198        17.018
+TRADED_order_flow top_confidence(descriptive)       30  0.250        42         0.255     0.429  1.271   5.218     219.158    248.267        18.718
+TRADED_order_flow top_confidence(descriptive)       30  0.100        17         0.103     0.706  5.508  38.864     660.692     97.399        52.364
+TRADED_order_flow                cooldown_min       30  0.000       165         1.000     0.418  0.989  -0.235     -38.752    711.113        13.265
+TRADED_order_flow                cooldown_min       30  5.000       116         0.703     0.371  0.744  -6.135    -711.607   1235.896         7.365
+TRADED_order_flow                cooldown_min       30 15.000        81         0.491     0.358  0.793  -4.980    -403.345    734.678         8.520
+TRADED_order_flow                cooldown_min       30 30.000        69         0.418     0.319  0.650  -8.699    -600.217    750.435         4.801
+TRADED_order_flow                cooldown_min       30 60.000        49         0.297     0.367  0.721  -5.590    -273.906    614.542         7.910
+TRADED_order_flow           min_expected_move       60  0.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow           min_expected_move       60  5.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow           min_expected_move       60 10.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow           min_expected_move       60 15.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow           min_expected_move       60 20.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow           min_expected_move       60 30.000       164         0.994     0.442  1.053   1.582     257.879   1202.896        15.082
+TRADED_order_flow           min_expected_move       60 50.000       155         0.939     0.448  1.067   2.058     316.932   1163.153        15.558
+TRADED_order_flow top_confidence(descriptive)       60  1.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow top_confidence(descriptive)       60  0.750       124         0.752     0.492  1.324   8.950    1109.797    819.686        22.450
+TRADED_order_flow top_confidence(descriptive)       60  0.500        83         0.503     0.494  1.358  10.389     862.281    679.705        23.889
+TRADED_order_flow top_confidence(descriptive)       60  0.250        42         0.255     0.524  1.512  13.905     584.000    316.837        27.405
+TRADED_order_flow top_confidence(descriptive)       60  0.100        17         0.103     0.765 10.667  56.658     963.194     67.461        70.158
+TRADED_order_flow                cooldown_min       60  0.000       165         1.000     0.439  1.047   1.407     230.820   1202.896        14.907
+TRADED_order_flow                cooldown_min       60  5.000       116         0.703     0.391  0.827  -5.455    -627.377   1327.848         8.045
+TRADED_order_flow                cooldown_min       60 15.000        81         0.491     0.400  0.845  -5.159    -412.722   1008.842         8.341
+TRADED_order_flow                cooldown_min       60 30.000        69         0.418     0.397  0.918  -2.396    -162.915    644.869        11.104
+TRADED_order_flow                cooldown_min       60 60.000        49         0.297     0.396  0.912  -2.507    -120.356    404.644        10.993
+       ALLSIG_ALL           min_expected_move       10  0.000      8069         1.000     0.265  0.287 -12.775 -102901.967 102901.967         0.725
+       ALLSIG_ALL           min_expected_move       10  5.000      8069         1.000     0.265  0.287 -12.775 -102901.967 102901.967         0.725
+       ALLSIG_ALL           min_expected_move       10 10.000      8069         1.000     0.265  0.287 -12.775 -102901.967 102901.967         0.725
+       ALLSIG_ALL           min_expected_move       10 15.000      7919         0.981     0.266  0.290 -12.771 -100952.495 100952.495         0.729
+       ALLSIG_ALL           min_expected_move       10 20.000      6797         0.842     0.274  0.309 -12.658  -85857.150  85857.150         0.842
+       ALLSIG_ALL           min_expected_move       10 30.000      2973         0.368     0.319  0.402 -11.800  -34915.391  34915.391         1.700
+       ALLSIG_ALL           min_expected_move       10 50.000       902         0.112     0.369  0.584  -8.027   -7240.417   8424.816         5.473
+       ALLSIG_ALL top_confidence(descriptive)       10  1.000      8069         1.000     0.265  0.287 -12.775 -102901.967 102901.967         0.725
+       ALLSIG_ALL top_confidence(descriptive)       10  0.750      6052         0.750     0.257  0.276 -13.151  -79418.715  79418.715         0.349
+       ALLSIG_ALL top_confidence(descriptive)       10  0.500      4107         0.509     0.256  0.289 -12.895  -52854.914  52854.914         0.605
+       ALLSIG_ALL top_confidence(descriptive)       10  0.250      2022         0.251     0.249  0.273 -13.319  -26865.369  26865.369         0.181
+       ALLSIG_ALL top_confidence(descriptive)       10  0.100       864         0.107     0.236  0.256 -14.245  -12307.762  12307.762        -0.745
+       ALLSIG_ALL                cooldown_min       10  0.000      8069         1.000     0.265  0.287 -12.775 -102901.967 102901.967         0.725
+       ALLSIG_ALL                cooldown_min       10  5.000      2804         0.348     0.263  0.298 -12.667  -35456.265  35546.514         0.833
+       ALLSIG_ALL                cooldown_min       10 15.000      1487         0.184     0.274  0.334 -11.656  -17285.458  17362.687         1.844
+       ALLSIG_ALL                cooldown_min       10 30.000       985         0.122     0.268  0.303 -12.429  -12230.567  12320.816         1.071
+       ALLSIG_ALL                cooldown_min       10 60.000       644         0.080     0.281  0.350 -11.612   -7466.569   7494.665         1.888
+       ALLSIG_ALL           min_expected_move       30  0.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL           min_expected_move       30  5.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL           min_expected_move       30 10.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL           min_expected_move       30 15.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL           min_expected_move       30 20.000      8068         1.000     0.374  0.544 -10.599  -85108.908  85194.487         2.901
+       ALLSIG_ALL           min_expected_move       30 30.000      7552         0.936     0.380  0.558 -10.450  -78519.074  78604.653         3.050
+       ALLSIG_ALL           min_expected_move       30 50.000      3370         0.418     0.425  0.629  -9.856  -32840.475  32904.192         3.644
+       ALLSIG_ALL top_confidence(descriptive)       30  1.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL top_confidence(descriptive)       30  0.750      6052         0.750     0.362  0.536 -10.912  -65714.482  65778.200         2.588
+       ALLSIG_ALL top_confidence(descriptive)       30  0.500      4107         0.509     0.362  0.562  -9.945  -40646.438  41372.370         3.555
+       ALLSIG_ALL top_confidence(descriptive)       30  0.250      2022         0.251     0.344  0.536 -10.566  -21237.826  22583.201         2.934
+       ALLSIG_ALL top_confidence(descriptive)       30  0.100       864         0.107     0.314  0.506 -10.962   -9470.870  10357.586         2.538
+       ALLSIG_ALL                cooldown_min       30  0.000      8069         1.000     0.374  0.544 -10.598  -85116.495  85202.074         2.902
+       ALLSIG_ALL                cooldown_min       30  5.000      2804         0.348     0.364  0.519 -11.486  -32022.180  32453.976         2.014
+       ALLSIG_ALL                cooldown_min       30 15.000      1487         0.184     0.360  0.523 -11.335  -16708.092  16812.935         2.165
+       ALLSIG_ALL                cooldown_min       30 30.000       985         0.122     0.350  0.512 -11.790  -11530.598  11606.580         1.710
+       ALLSIG_ALL                cooldown_min       30 60.000       644         0.080     0.365  0.570  -9.835   -6274.988   6305.483         3.665
+       ALLSIG_ALL           min_expected_move       60  0.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL           min_expected_move       60  5.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL           min_expected_move       60 10.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL           min_expected_move       60 15.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL           min_expected_move       60 20.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL           min_expected_move       60 30.000      8058         0.999     0.421  0.679  -9.986  -79705.907  81781.908         3.514
+       ALLSIG_ALL           min_expected_move       60 50.000      6672         0.827     0.427  0.702  -9.793  -64593.756  66669.756         3.707
+       ALLSIG_ALL top_confidence(descriptive)       60  1.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL top_confidence(descriptive)       60  0.750      6052         0.750     0.420  0.692  -9.540  -57124.258  59970.922         3.960
+       ALLSIG_ALL top_confidence(descriptive)       60  0.500      4107         0.509     0.421  0.733  -8.279  -33606.360  38559.896         5.221
+       ALLSIG_ALL top_confidence(descriptive)       60  0.250      2022         0.251     0.422  0.778  -6.720  -13359.784  17700.313         6.780
+       ALLSIG_ALL top_confidence(descriptive)       60  0.100       864         0.107     0.384  0.764  -7.126   -6135.214   9042.526         6.374
+       ALLSIG_ALL                cooldown_min       60  0.000      8069         1.000     0.421  0.679  -9.985  -79813.042  81889.043         3.515
+       ALLSIG_ALL                cooldown_min       60  5.000      2804         0.348     0.408  0.654 -10.898  -30242.969  32262.732         2.602
+       ALLSIG_ALL                cooldown_min       60 15.000      1487         0.184     0.406  0.664 -10.648  -15621.086  16232.934         2.852
+       ALLSIG_ALL                cooldown_min       60 30.000       985         0.122     0.385  0.660 -10.843  -10561.365  10881.661         2.657
+       ALLSIG_ALL                cooldown_min       60 60.000       644         0.080     0.393  0.644 -11.550   -7346.034   7507.916         1.950
+
+=== 13b. EXIT CONFIG chosen on VALIDATION, OOS result (traded signals) ===
+fold      exit  val_exp  oos_n  oos_exp  oos_pf  oos_wr  existing_exit_oos
+  F1   sl4_tp1  -11.011   1056  -11.363   0.110   0.472            -14.277
+  F2 fixed_60m   -9.046   1056  -10.312   0.556   0.389            -13.766
+  F3   sl4_tp2   -9.689    991  -13.449   0.344   0.605            -11.777
+
+=== 17. SUCCESS CRITERIA on validation-selected rules (S1 realistic cost) ===
+{'R1_positive_net_all_folds': False, 'R1_folds_positive': 1, 'R2_pf_gt1_all_folds': False, 'R3_pooled_oos_exp': -21.416456288869785, 'R4_quarters_positive': [1, 1, 2], 'R5_min_oos_bars': 23, 'R7_same_rule_selected_each_fold': False}
+S6 (plausible maker) selected rules: folds positive 2  pooled -15.92  same rules evaluated at S1: [3.17, -2.89, -30.04]

@@ -172,6 +172,71 @@ async def _ensure_features_persisted(db: AsyncSession, context: MarketContext) -
         await db.flush()
 
 
+# --------------------------------------------------------------------------- #
+# PRETRADE_MODE=shadow hooks. app.pretrade is imported lazily, so with the default PRETRADE_MODE=off none of it is
+# even loaded. Every hook swallows its own failures: shadow instrumentation can never break or delay a cycle beyond
+# its hard timeout, and it never writes to the database (see app/pretrade/shadow.py).
+# --------------------------------------------------------------------------- #
+_pretrade_state: dict = {}
+
+
+def _pretrade() -> dict:
+    """Process-wide shadow state: council view, recorder, public order-book reader (created on first use)."""
+    if not _pretrade_state:
+        from app.market.hyperliquid_client import HyperliquidClient
+        from app.pretrade.council_view import CouncilView
+        from app.pretrade.shadow import ShadowRecorder
+
+        settings = get_settings()
+        _pretrade_state.update(view=CouncilView(), recorder=ShadowRecorder(settings.pretrade_shadow_dir),
+                               book=HyperliquidClient(timeout=settings.pretrade_shadow_book_timeout_seconds))
+    return _pretrade_state
+
+
+async def _pretrade_shadow_step(db, context, prev_context, candles, features_started_ms, features_completed_ms) -> None:
+    from app.pretrade.shadow import run_shadow_cycle
+
+    settings = get_settings()
+    try:
+        state = _pretrade()
+        await asyncio.wait_for(run_shadow_cycle(
+            bind=db.bind, context=context, prev_context=prev_context, candles=candles, generation=None,
+            settings=settings, council_view=state["view"], recorder=state["recorder"], book_provider=state["book"],
+            features_started_ms=features_started_ms, features_completed_ms=features_completed_ms,
+        ), timeout=settings.pretrade_shadow_timeout_seconds)
+    except Exception:  # noqa: BLE001 - shadow must never affect the existing path
+        metrics.inc("pretrade_shadow_failures")
+        logger.exception("pretrade_shadow.cycle_failed", candle_open_time=context.candle_open_time)
+
+
+def _pretrade_publish_council(consensus, open_time: int, interval_ms: int) -> None:
+    try:
+        from app.pretrade.council_view import CouncilSnapshot
+
+        settings = get_settings()
+        _pretrade()["view"].publish(CouncilSnapshot(
+            bias=consensus.final_bias.value, confidence=float(consensus.final_confidence or 0.0),
+            information_cutoff_ms=open_time + interval_ms - 1, completed_at_ms=time.time_ns() // 1_000_000,
+            model_version=settings.ollama_model or None, prompt_version=None, status=consensus.council_status,
+        ))
+    except Exception:  # noqa: BLE001
+        logger.exception("pretrade_shadow.council_publish_failed")
+
+
+async def _pretrade_old_path_point(open_time: int, processed: int) -> None:
+    from app.pretrade.shadow import record_old_path_point
+
+    settings = get_settings()
+    try:
+        state = _pretrade()
+        await asyncio.wait_for(record_old_path_point(
+            open_time_ms=open_time, recorder=state["recorder"], book_provider=state["book"], settings=settings,
+            old_path_completed_ms=time.time_ns() // 1_000_000, old_path_agents_processed=processed,
+        ), timeout=settings.pretrade_shadow_book_timeout_seconds + 1.0)
+    except Exception:  # noqa: BLE001
+        logger.exception("pretrade_shadow.old_path_point_failed", candle_open_time=open_time)
+
+
 async def process_candle(
     db: AsyncSession,
     market: MarketDataService,
@@ -215,6 +280,7 @@ async def process_candle(
         candles = await market.get_recent_candles(db, limit=FEATURE_WINDOW, confirmed_only=True, up_to_open_time=open_time)
         if candles.empty or int(candles["open_time"].iloc[-1]) != open_time:
             raise InsufficientDataError(f"confirmed candle {open_time} not present in the store")
+        features_started_ms = time.time_ns() // 1_000_000
         context = compute_features(candles, symbol=symbol, timeframe=timeframe)
         # First finality gate: the bar we are about to compute on must be a confirmed one in the store.
         await market.verify_candle_final(db, open_time, expected_close=context.close_price)
@@ -230,6 +296,11 @@ async def process_candle(
 
         await _ensure_features_persisted(db, context)
         await db.commit()
+        features_completed_ms = time.time_ns() // 1_000_000
+
+        if settings.pretrade_mode == "shadow" and is_latest:
+            # Runs BEFORE the council and never waits for it; own read-only transaction; records only.
+            await _pretrade_shadow_step(db, context, prev_context, candles, features_started_ms, features_completed_ms)
 
         council_decision_id = None
         council_trade_allowed = True
@@ -267,6 +338,8 @@ async def process_candle(
                     council_trade_allowed = consensus.trade_allowed
                     council_status = consensus.council_status
                     council_bias, council_confidence = consensus.final_bias, consensus.final_confidence
+                    if settings.pretrade_mode == "shadow":
+                        _pretrade_publish_council(consensus, open_time, market.interval_ms)
                     logger.info(
                         "cycle.council_decision", final_bias=consensus.final_bias.value,
                         confidence=consensus.final_confidence, council_status=consensus.council_status,
@@ -336,6 +409,8 @@ async def process_candle(
         cycle.trading_halt_reason = halt
         cycle.error = None
         await db.commit()
+        if settings.pretrade_mode == "shadow" and is_latest:
+            await _pretrade_old_path_point(open_time, processed)
         return CycleOutcome(
             cycle_id, open_time, COMPLETED, processed, council_status, halt, cycle.cycle_latency_seconds
         )

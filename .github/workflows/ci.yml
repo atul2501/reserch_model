@@ -29,6 +29,32 @@ jobs:
       - name: Secret scan
         working-directory: backend
         run: python -m scripts.secret_scan
-      - name: Tests (SQLite + real PostgreSQL)
+      - name: Tests (deterministic suite - SQLite + real PostgreSQL)
         working-directory: backend
         run: python -m pytest -q --cov=app --cov-report=term-missing:skip-covered
+      - name: Performance tests (informational; wall-clock, machine-dependent)
+        working-directory: backend
+        continue-on-error: true
+        run: python -m pytest -q -m performance
+
+  # Office PC (Windows), personal PC (macOS): the deterministic suite must pass without Postgres, Ollama, internet,
+  # Hyperliquid or credentials. Integration tests needing PostgreSQL/Node skip themselves when absent.
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      TRADING_MODE: paper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Tests (deterministic suite)
+        working-directory: backend
+        run: python -m pytest -q

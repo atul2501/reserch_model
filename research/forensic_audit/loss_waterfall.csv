@@ -1,0 +1,13 @@
+component,bps_per_trade,t_cluster
+Signal latency (signal close -> fill-bar open),-0.0013122018009735165,-0.030888136991083646
+"Raw directional move over the actual hold (fill-bar open -> exit-bar close, mid)",-0.5745471026949497,-0.7539597749116762
+Exit logic (actual exit reference vs exit-bar close),0.6580422691440893,2.909289364773832
+= Gross edge at reference prices,0.08349516644913962,
+Entry slippage,-2.0013023694163334,
+Entry fee,-4.5,
+Exit slippage,-2.789917567379801,
+Exit fee,-4.174989132829524,
+Funding,0.0006148868864783081,
+= Final expectancy (sum of components from fill-bar open),-13.382099016290043,
+Final expectancy (DB net_pnl / notional),-13.381817832536745,
+"Memo: fixed 10m hold, mid (exit-independent signal edge)",1.2518186481021696,1.2530067100339104

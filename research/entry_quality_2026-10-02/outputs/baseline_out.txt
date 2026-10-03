@@ -1,0 +1,50 @@
+ALL (raw)         trades=43878  wins=12793  losses=31085  win_rate=0.2916  gross_profit=591.04  gross_loss=1935.24  net=-1344.20  pf=0.3054  exp=-0.0306  avg_win=0.0462  avg_loss=-0.0623  med_win=0.0273  med_loss=-0.0487  payoff=0.7421  be_wr=0.5740  max_dd=1344.57  fees=854.64  funding=-0.0663  hold_avg_min=8.8552  hold_med_min=5.9833  exp_bps=-13.52  gross_exp_bps=-4.8386
+ALL (ex 202 stale-rollover) trades=43676  wins=12701  losses=30975  win_rate=0.2908  gross_profit=520.11  gross_loss=1830.27  net=-1310.17  pf=0.2842  exp=-0.0300  avg_win=0.0410  avg_loss=-0.0591  med_win=0.0270  med_loss=-0.0485  payoff=0.6930  be_wr=0.5907  max_dd=1310.54  fees=850.56  funding=-0.0663  hold_avg_min=8.8955  hold_med_min=5.9833  exp_bps=-13.34  gross_exp_bps=-4.6619
+ALL ex ALL rollover trades=43323  wins=12694  losses=30629  win_rate=0.2930  gross_profit=519.99  gross_loss=1823.34  net=-1303.35  pf=0.2852  exp=-0.0301  avg_win=0.0410  avg_loss=-0.0595  med_win=0.0270  med_loss=-0.0490  payoff=0.6881  be_wr=0.5924  max_dd=1303.72  fees=842.96  funding=-0.0663  hold_avg_min=8.9099  hold_med_min=5.9833  exp_bps=-13.38  gross_exp_bps=-4.7074
+LAST 72h (clean)    trades=23929  wins=7281  losses=16648  win_rate=0.3043  gross_profit=281.13  gross_loss=975.51  net=-694.38  pf=0.2882  exp=-0.0290  avg_win=0.0386  avg_loss=-0.0586  med_win=0.0262  med_loss=-0.0491  payoff=0.6589  be_wr=0.6028  max_dd=695.05  fees=468.14  funding=-0.0073  hold_avg_min=9.4269  hold_med_min=5.9833  exp_bps=-12.82  gross_exp_bps=-4.1468
+LAST 48h (clean)    trades=15432  wins=4725  losses=10707  win_rate=0.3062  gross_profit=194.05  gross_loss=618.71  net=-424.66  pf=0.3136  exp=-0.0275  avg_win=0.0411  avg_loss=-0.0578  med_win=0.0273  med_loss=-0.0482  payoff=0.7107  be_wr=0.5846  max_dd=425.04  fees=301.38  funding=-0.0513  hold_avg_min=9.8407  hold_med_min=5.9833  exp_bps=-12.00  gross_exp_bps=-3.4000
+LAST 24h (clean)    trades=7647  wins=2628  losses=5019  win_rate=0.3437  gross_profit=133.60  gross_loss=306.53  net=-172.93  pf=0.4359  exp=-0.0226  avg_win=0.0508  avg_loss=-0.0611  med_win=0.0346  med_loss=-0.0500  payoff=0.8324  be_wr=0.5457  max_dd=173.25  fees=143.35  funding=-0.0285  hold_avg_min=9.2001  hold_med_min=5.9833  exp_bps=-10.21  gross_exp_bps=-1.7042
+
+BY GENERATION (clean)
+ generation  trades  wins  losses  win_rate  gross_profit  gross_loss       net     pf     exp  avg_win  avg_loss  med_win  med_loss  payoff  be_wr   max_dd     fees  funding  hold_avg_min  hold_med_min  exp_bps  gross_exp_bps
+          1    3076   559    2517    0.1817       18.9533    136.6199 -117.6666 0.1387 -0.0383   0.0339   -0.0543   0.0188   -0.0419  0.6247 0.6155 118.2107  62.0241  -0.0208        9.6397        3.9833 -16.2615        -7.6173
+          2    9858  2443    7415    0.2478      107.7230    431.9401 -324.2171 0.2494 -0.0329   0.0441   -0.0583   0.0286   -0.0467  0.7570 0.5692 326.7657 188.9399  -0.0399        6.8835        3.9833 -14.8731        -6.2182
+          3    8390  3015    5375    0.3594      128.8088    335.3901 -206.5813 0.3841 -0.0246   0.0427   -0.0624   0.0279   -0.0515  0.6847 0.5936 206.5813 159.6471   0.0044        9.1156        6.9833 -11.4392        -2.6988
+          4    7979  2166    5813    0.2715       74.0577    340.7405 -266.6828 0.2173 -0.0334   0.0342   -0.0586   0.0239   -0.0497  0.5833 0.6316 266.6828 157.8857   0.0402        8.8805        6.9833 -14.9450        -6.1174
+          5    8380  2307    6073    0.2753       71.6359    336.3352 -264.6992 0.2130 -0.0316   0.0311   -0.0554   0.0217   -0.0464  0.5607 0.6407 264.6992 171.3426  -0.0173       10.2393        5.9833 -13.3449        -4.6752
+          6    5993  2211    3782    0.3689      118.9275    249.2479 -130.3204 0.4771 -0.0217   0.0538   -0.0659   0.0369   -0.0549  0.8162 0.5506 134.5621 110.7210  -0.0329        9.6561        5.9833  -9.8279        -1.3768
+
+BY DAY (UTC, clean)
+  day  trades  win_rate     pf     exp       net  payoff  be_wr  exp_bps  gross_exp_bps
+09-27    3010    0.1801 0.1391 -0.0377 -113.4622  0.6333 0.6122 -16.0410        -7.3998
+09-28    8624    0.2505 0.2593 -0.0337 -290.2851  0.7759 0.5631 -15.1377        -6.5018
+09-29    8537    0.3336 0.3556 -0.0259 -221.3279  0.7103 0.5847 -12.0391        -3.2837
+09-30    8457    0.2995 0.2442 -0.0317 -268.5084  0.5711 0.6365 -14.2818        -5.4834
+10-01    7873    0.2723 0.2084 -0.0321 -252.6030  0.5568 0.6424 -13.5899        -4.9186
+10-02    7175    0.3448 0.4322 -0.0229 -163.9809  0.8212 0.5491 -10.2030        -1.6918
+
+COSTS (clean, ex rollover)
+gross=-460.45  fees=842.96  funding(cost)=-0.07  net=-1303.35
+gross exp/trade=-0.01063  net exp/trade=-0.03008  gross bps=-4.71  fee bps=8.67  net bps=-13.38
+gross win rate=0.3592  net win rate=0.2930
+gross PF=0.6280
+entry slippage bps mean=2.00  exit slippage bps mean=-2.79  slippage_cost sum=466.71
+notional quantiles {0.05: 10.69, 0.5: 18.93, 0.95: 47.33}  risk_amount q {0.05: 0.012, 0.5: 0.034, 0.95: 0.108}
+planned stop bps q {0.1: 9.4, 0.5: 17.5, 0.9: 31.1}  planned tp bps q {0.1: 17.3, 0.5: 39.5, 0.9: 80.3}
+planned RR (tp/stop) median 2.3451000000000213
+
+EXIT REASONS (clean)
+        exit_reason  trades  win_rate     exp        net  avg_win  avg_loss  exp_bps
+         exit_rules   16386    0.4859 -0.0034   -55.5253   0.0307   -0.0356  -1.4204
+generation_rollover     353    0.0198 -0.0193    -6.8219   0.0166   -0.0201  -8.0715
+    signal_reversal     500    0.0680 -0.0377   -18.8496   0.0340   -0.0429 -19.7379
+          stop_loss   21712    0.0000 -0.0692 -1503.1193      NaN   -0.0692 -30.9770
+        take_profit    4690    0.9974  0.0584   274.0311   0.0586   -0.0016  26.8385
+      trailing_stop      35    0.5714  0.0034     0.1176   0.0253   -0.0260   2.9050
+
+Win-rate candidates for user's 37.2%:
+  all raw: 0.2916
+  clean: 0.2908
+  last24h: 0.3437
+  gen6: 0.3689
+  gen5: 0.2753

@@ -14,6 +14,16 @@ class _Echo(BaseModel):
     value: str
 
 
+def _configure_keys(monkeypatch, keys: str) -> None:
+    """Keys go in through Settings, exactly as OLLAMA_API_KEYS does in production. Assigning client._api_keys after
+    construction (as these tests used to) skips the per-key health state built in __init__, so every key looked
+    unavailable regardless of what the HTTP layer returned."""
+    from pydantic import SecretStr
+
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "ollama_api_keys", SecretStr(keys))
+
+
 def _mock_transport(handler):
     return httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://fake-ollama")
 
@@ -81,7 +91,7 @@ async def test_timeout_is_retried_then_raises():
 
 
 @pytest.mark.asyncio
-async def test_401_on_one_key_is_retried_and_recovers_on_the_next_key():
+async def test_401_on_one_key_is_retried_and_recovers_on_the_next_key(monkeypatch):
     """Root cause of the reported intermittent analyst 401s: with multiple
     OLLAMA_API_KEYS round-robining per attempt, a single bad/expired key
     must not permanently fail a call — the retry must rotate onto the next
@@ -96,9 +106,9 @@ async def test_401_on_one_key_is_retried_and_recovers_on_the_next_key():
             return httpx.Response(401)
         return httpx.Response(200, json={"message": {"content": json.dumps({"value": "ok"})}})
 
+    _configure_keys(monkeypatch, "bad-key,good-key")   # the public configuration path (OLLAMA_API_KEYS)
     client = OllamaClient()
     client._client = _mock_transport(handler)
-    client._api_keys = ["bad-key", "good-key"]
     client._max_retries = 3
 
     result, stats = await client.generate_structured(system_prompt="s", user_prompt="u", response_model=_Echo)
@@ -110,13 +120,13 @@ async def test_401_on_one_key_is_retried_and_recovers_on_the_next_key():
 
 
 @pytest.mark.asyncio
-async def test_401_on_every_key_exhausts_retries_and_raises_auth_error():
+async def test_401_on_every_key_exhausts_retries_and_raises_auth_error(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401)
 
+    _configure_keys(monkeypatch, "bad-key-1,bad-key-2")
     client = OllamaClient()
     client._client = _mock_transport(handler)
-    client._api_keys = ["bad-key-1", "bad-key-2"]
     client._max_retries = 2
 
     with pytest.raises(OllamaAuthError):

@@ -31,6 +31,9 @@ async def main(*, once: bool, force: bool) -> None:
     configure_logging()
     use_immediate_transactions()  # SQLite writer process: queue on the write lock instead of failing (database.py)
     settings = get_settings()
+    from app.research.registry import warm_provenance_cache
+
+    warm_provenance_cache()       # git/alembic provenance resolved before any heartbeat runs (see registry.py)
     lease = LeaseKeeper(
         AsyncSessionLocal, name=RESEARCH_LEASE, ttl_seconds=max(300, settings.worker_lease_ttl_seconds),
         heartbeat_seconds=settings.worker_lease_heartbeat_seconds,

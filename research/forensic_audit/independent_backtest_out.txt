@@ -1,0 +1,6 @@
+independent: 6510 unique traded signals, 12027 candles
+h= 1m n=6510 gross mean +0.000 bps  dir.acc 0.472 | realistic 13.5: -13.50 (PF 0.025) | taker fees only 9: -9.00 (PF 0.072) | maker both 3: -3.00 (PF 0.386) | frictionless 0: +0.00 (PF 1.000)
+h= 5m n=6510 gross mean -0.355 bps  dir.acc 0.472 | realistic 13.5: -13.86 (PF 0.160) | taker fees only 9: -9.36 (PF 0.286) | maker both 3: -3.36 (PF 0.636) | frictionless 0: -0.36 (PF 0.953)
+h=10m n=6507 gross mean -0.562 bps  dir.acc 0.475 | realistic 13.5: -14.06 (PF 0.256) | taker fees only 9: -9.56 (PF 0.392) | maker both 3: -3.56 (PF 0.704) | frictionless 0: -0.56 (PF 0.946)
+h=30m n=6503 gross mean -0.342 bps  dir.acc 0.474 | realistic 13.5: -13.84 (PF 0.432) | taker fees only 9: -9.34 (PF 0.565) | maker both 3: -3.34 (PF 0.814) | frictionless 0: -0.34 (PF 0.979)
+h=60m n=6501 gross mean +1.831 bps  dir.acc 0.504 | realistic 13.5: -11.67 (PF 0.614) | taker fees only 9: -7.17 (PF 0.741) | maker both 3: -1.17 (PF 0.952) | frictionless 0: +1.83 (PF 1.080)

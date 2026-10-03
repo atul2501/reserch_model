@@ -1,0 +1,9 @@
+check,n,value
+"TP exits filled at exact TP level, zero slippage, maker fee",4690,0.0015 exact
+TP exits where bar only TOUCHED the level (<1 bp through) - fill not guaranteed live,808,0.172 of TP exits
+stop exits filled at gapped OPEN (worse than level),527,0.0242 of stops
+stop exit slippage bps (model 4 + impact),21747,4.003
+signal exits referenced at OPEN of exit bar (decided prior close),16886,0.9999
+signal exits executed at bar OPEN but closed_at stamped at bar CLOSE (+59.999s) - timestamp label bug,16886,1.0000 of signal exits
+"decision written AFTER the price it is filled at (seconds, p50/p90/p99)",43878,3.12 / 11.21 / 17.14
+partial fills (entry filled_qty < qty),43878,

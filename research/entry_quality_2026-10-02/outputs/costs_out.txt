@@ -1,0 +1,21 @@
+per-trade means (bps): gross(after slip)=-4.72 slip=4.81 fees=8.67 net=-13.40  MID (no slip,no fee)=0.08
+cost share of |avg loss|: 0.508
+  actual                                     exp=-13.40 bps  win_rate=0.293  PF=0.286
+  maker both sides (3bps fee), same slip     exp= -7.72 bps  win_rate=0.341  PF=0.474
+  taker fees, zero slippage                  exp= -8.59 bps  win_rate=0.328  PF=0.427
+  maker both sides, zero slippage            exp= -2.92 bps  win_rate=0.364  PF=0.737
+  frictionless                               exp= +0.08 bps  win_rate=0.380  PF=1.009
+
+MID bps by family (frictionless edge) with hour-block t-stat:
+  breakout          n=  1721 mid= -4.05  t=-0.56  hours=80
+  hybrid            n=  2100 mid= -3.61  t=-0.78  hours=81
+  market_structure  n=  1901 mid= -1.62  t=+0.61  hours=86
+  mean_reversion    n= 11975 mid= +0.99  t=+1.63  hours=120
+  momentum          n=  5335 mid= -1.81  t=-0.82  hours=123
+  order_flow        n=  2105 mid= +3.78  t=+0.40  hours=89
+  scalping          n=  5747 mid= +0.12  t=+0.62  hours=114
+  trend_following   n=   427 mid= -4.30  t=-0.02  hours=16
+  volatility        n=     9 mid= +8.66  t=+1.19  hours=3
+  vwap              n= 11967 mid= +1.02  t=-0.46  hours=124
+
+Trades/day: 8167  median hold min: 5.983333333333333  stop bps median: 17.512723436233454  round-trip cost as % of stop: 0.76

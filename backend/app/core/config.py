@@ -32,8 +32,12 @@ def resolve_sqlite_url(url: str) -> str:
     if not db or db == ":memory:" or db.startswith("file:"):
         return url
     path = Path(db)
-    if not path.is_absolute():
-        path = (BACKEND_DIR / path).resolve()
+    if path.is_absolute():
+        # Contract: an absolute URL is returned UNCHANGED (only its folder is created). Re-rendering it through
+        # str(Path) rewrote "/" to "\" on Windows, silently changing the caller's URL.
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return url
+    path = (BACKEND_DIR / path).resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return parsed.set(database=str(path)).render_as_string(hide_password=False)
 
@@ -185,6 +189,30 @@ class Settings(BaseSettings):
     #   signal_close - fill at the signal bar's own close (kept for engines that model live submission, e.g. tests).
     # SHADOW always fills immediately against the live order book (that is what it exists to measure).
     paper_fill_timing: str = "next_open"
+    # Which PRICE a next_open paper ENTRY fills at:
+    #   next_open                      - the open of the bar after the signal (legacy default). That price is printed
+    #                                    BEFORE the decision is made (the cycle decides 3-47 s after the bar closes), so
+    #                                    it is slightly optimistic vs a live order (forensic audit: +0.045 bps/trade).
+    #   first_observed_after_decision  - the first ACTUALLY OBSERVED price whose timestamp is >= the decision's wall
+    #                                    clock. With 1m OHLCV only, that is the fill bar's CLOSE (high/low carry no
+    #                                    timestamp and are never used); the position opens at that close. No price is
+    #                                    modelled or interpolated. Off by default: switching it changes paper results
+    #                                    and must be done together with the backtester to keep paper/backtest parity.
+    paper_entry_price_source: str = "next_open"
+    # --- Pre-trade decision architecture (app.pretrade) ---------------------------------------------------------
+    #   off    - (default) production behaviour, nothing from app.pretrade runs.
+    #   shadow - the deterministic pre-trade path runs on every confirmed bar BEFORE (and never waiting for) the LLM
+    #            council, in its own READ-ONLY database transaction, and only appends JSON lines to
+    #            `pretrade_shadow_dir`. It can never create orders/positions or touch balances, risk or agent state.
+    #   on     - refused: production enablement requires a separate review (see research/pretrade_shadow/).
+    pretrade_mode: str = "off"
+    pretrade_max_decision_age_seconds: float = 5.0    # starting RESEARCH value (audit), not a tuned production value
+    pretrade_max_entry_drift_bps: float = 10.0        # starting RESEARCH value (audit), not a tuned production value
+    pretrade_shadow_dir: str = "data/shadow"          # relative paths resolve under backend/
+    pretrade_shadow_book_timeout_seconds: float = 1.5 # public l2Book read for bid/ask; on timeout spread is recorded as unknown
+    pretrade_shadow_timeout_seconds: float = 10.0     # hard cap on the whole shadow step (it is skipped, never retried)
+    microstructure_dir: str = "data/microstructure"   # output of scripts/collect_microstructure.py (research data only)
+    edge_registry_path: str = ""   # experiment registry JSONL; empty = <repo>/research/edge_registry/experiments.jsonl
     # Trailing stops count the CURRENT bar's own extreme (worst-case path: rally first, then fall). False = prior bars only
     # (optimistic). Shared by paper, shadow and the backtest so they can never disagree.
     trailing_stop_uses_same_bar_extreme: bool = True
@@ -440,6 +468,24 @@ class Settings(BaseSettings):
     def _known_fill_timing(cls, v: str) -> str:
         if v not in ("next_open", "signal_close"):
             raise ValueError("paper_fill_timing must be 'next_open' or 'signal_close'")
+        return v
+
+    @field_validator("paper_entry_price_source")
+    @classmethod
+    def _known_entry_price_source(cls, v: str) -> str:
+        if v not in ("next_open", "first_observed_after_decision"):
+            raise ValueError("paper_entry_price_source must be 'next_open' or 'first_observed_after_decision'")
+        return v
+
+    @field_validator("pretrade_mode")
+    @classmethod
+    def _known_pretrade_mode(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v == "on":
+            raise ValueError("PRETRADE_MODE=on is not enabled: moving the pre-trade path into the execution path "
+                             "requires a separate review after the shadow run (use 'off' or 'shadow')")
+        if v not in ("off", "shadow"):
+            raise ValueError("pretrade_mode must be 'off' or 'shadow'")
         return v
 
     @field_validator("agent_count")

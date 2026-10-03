@@ -57,6 +57,7 @@ from app.execution.base import ExecutionEngine, ExecutionRequest, ExecutionResul
 from app.execution.fillmodel import fee_rate_for, slipped_price, slippage_bps
 from app.execution.margin import margin_state
 from app.execution.paper_adapter import new_client_order_id
+from app.execution.price_observation import bar_observations, first_observed_at_or_after
 from app.execution.sizing import (
     approve_against_margin,
     below_min_order_notional,
@@ -703,8 +704,34 @@ async def _execute_pending_entry(
         # Kill switch / data gap / catch-up replay: a NEW entry is never opened, and a stale one is dropped.
         _cancel_order(order, f"entries_halted:{cc.halt_reason or agent.status.value}")
         return None
+    if get_settings().paper_entry_price_source == "first_observed_after_decision":
+        return await _fill_entry_after_decision(cc, agent, dna, order, decision)
     return await _fill_entry(cc, agent, dna, order, decision, reference_price=cc.bar.open,
                              fill_bar_open_ms=K, immediate=False)
+
+
+async def _fill_entry_after_decision(
+    cc: CycleContext, agent: Agent, dna: StrategyDNA, order: Order, decision: Decision
+) -> Position | None:
+    """paper_entry_price_source=first_observed_after_decision: never fill at a price printed BEFORE the decision.
+
+    The decision's wall clock is the order row's creation time (written when the signal bar's cycle decided). Of
+    this bar's timestamped prices (open, close) the first one at/after that instant is used; with 1m OHLCV that is
+    the bar CLOSE, so the position opens at the close and protective management starts on the next bar (exactly
+    the immediate-fill semantics). No sub-minute price is modelled. If no observed price follows the decision (a
+    late catch-up cycle), the order is cancelled with an explicit reason instead of being filled in the past."""
+    K = cc.context.candle_open_time
+    decided_ms = int(order.created_at.timestamp() * 1000) if order.created_at is not None else None
+    obs = None
+    if decided_ms is not None:
+        obs = first_observed_at_or_after(decided_ms, bar_observations(K, cc.interval_ms, cc.bar.open, cc.bar.close))
+    if obs is None:
+        _cancel_order(order, "no_observed_price_after_decision")
+        return None
+    order.intent = {**(order.intent or {}), "entry_price_source": obs.source, "entry_price_ts_ms": obs.ts_ms,
+                    "decided_at_ms": decided_ms}
+    return await _fill_entry(cc, agent, dna, order, decision, reference_price=obs.price, fill_bar_open_ms=K,
+                             immediate=obs.source == "bar_close")
 
 
 async def _fill_entry(
@@ -757,6 +784,7 @@ async def _fill_entry(
         leverage=order.leverage, initial_margin=fnotional / (order.leverage or 1.0),
         maintenance_margin=fnotional * settings.maintenance_margin_rate,
         peak_price=entry, trough_price=entry, last_funding_time=last_funding,
+        funding_accrued=0.0,   # explicit: see the flush below
         entry_order_id=order.id, entry_fee=fill.fee, entry_slippage_cost=fill.slippage_cost,
         liquidation_price=liq_price, entry_candle_open_time=fill_bar_open_ms,
         entry_regime=intent.get("entry_regime") or context.regime.regime.value,
@@ -767,6 +795,12 @@ async def _fill_entry(
         last_processed_open_time=context.candle_open_time if immediate else None,
     )
     db.add(position)
+    # Flush NOW: the position is managed in this same cycle (funding, stop/TP) before anything else flushes, and its
+    # `id` and column defaults only exist after INSERT. On a funding-settlement bar _accrue_funding used to hit
+    # `funding_accrued = None` (TypeError) and then `FundingPayment.position_id = None` (NOT NULL), the agent's
+    # savepoint rolled back, and every entry filling on an hour bar was silently lost: 0 of 43,881 production positions
+    # opened on an hour bar; all 397 :59 signals expired. Regression: tests/test_funding_hour_entry.py.
+    await db.flush()
     cc.positions[agent.id] = position
 
     agent.balance -= fill.fee
